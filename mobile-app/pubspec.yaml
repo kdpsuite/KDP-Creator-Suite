@@ -1,0 +1,72 @@
+name: kdp_creator_suite
+description: A new Flutter project.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.10.0-75.1.beta <4.0.0"
+
+dependencies:
+  flutter:       # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+    sdk: flutter # 🚨 CRITICAL: Required for every Flutter project - DO NOT REMOVE
+  
+  # 🚨 CRITICAL: Core UI and responsive design - DO NOT REMOVE OR MODIFY
+  sizer: ^2.0.15              # Required for responsive design system
+  flutter_svg: ^2.0.9        # Required for SVG icon support
+  google_fonts: ^6.1.0       # Required for typography (replaces local fonts)
+  shared_preferences: ^2.2.2 # Required for local data storage
+  web: ^1.1.1
+  
+  # Feature dependencies - safe to modify
+  cached_network_image: ^3.3.1
+  connectivity_plus: ^6.1.4
+  dio: ^5.4.0
+  fluttertoast: ^8.2.4
+  fl_chart: ^0.65.0
+  file_picker: ^6.1.1
+  camera: ^0.10.5+5
+  permission_handler: ^11.1.0
+  
+  # Supabase Integration
+  supabase_flutter: ^2.9.1
+  
+  # Enhanced PDF Processing Dependencies
+  pdf: ^3.11.3                      # PDF creation and manipulation
+  syncfusion_flutter_pdf: ^30.1.42  # Advanced PDF reading and editing
+  image: ^4.5.4                     # Image processing and optimization
+  flutter_tesseract_ocr: ^0.4.29    # OCR for scanned PDFs
+  printing: ^5.14.2                 # PDF printing and layout preservation
+  pdf_render: ^1.4.12               # PDF rendering APIs
+  flutter_pdfview: ^1.4.1+1         # PDF preview widgets
+  flutter_archive: ^6.0.3           # ZIP compression for batch processing
+  mime: ^2.0.0                      # MIME type handling
+  crypto: ^3.0.6                    # Cryptographic functions for security
+  uuid: ^4.5.1                      # UUID generation for file management
+  convert: ^3.1.2                   # Data conversion utilities
+  
+  # Cloud Storage Integration
+  googleapis: ^14.0.0               # Google APIs client library
+  googleapis_auth: ^2.0.0           # Google OAuth2 authentication
+  dropbox_client: ^1.2.0            # Dropbox client for file operations
+  oauth2: ^2.0.3                    # OAuth2 authentication library
+  url_launcher: ^6.3.2              # URL launching for OAuth flows
+  webview_flutter: ^4.13.0          # WebView for OAuth authentication
+  universal_html: ^2.2.4            # HTML support for web platform
+
+dev_dependencies:
+  flutter_test:    # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+    sdk: flutter   # 🚨 CRITICAL: Required for Flutter project testing - DO NOT REMOVE
+  flutter_lints: ^5.0.0 # 🚨 CRITICAL: Required for code quality - DO NOT REMOVE
+
+flutter:
+  uses-material-design: true # 🚨 CRITICAL: Required for Material icon font - DO NOT REMOVE
+  assets:
+    - assets/
+    - assets/images/
+  # 🚨 CRITICAL ASSET MANAGEMENT RULES:
+  # - DO NOT ADD NEW ASSET DIRECTORIES (assets/svg/, assets/icons/, etc.)
+  # - ONLY USE EXISTING AND ITEMS AVAILABLE IN THE DIRECTORIES LISTED ABOVE (assets/, assets/images/)
+  
+  # 🚨 CRITICAL FONTS RULE: 
+  # - THIS PROJECT USES GOOGLE FONTS INSTEAD OF LOCAL FONTS
+  # - DO NOT ADD ANY LOCAL FONTS SECTION OR FONT FILES
