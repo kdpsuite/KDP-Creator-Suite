@@ -4,14 +4,17 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # allows manual trigger from GitHub Actions tab
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # allows manual trigger from the Actions tab
 
 jobs:
-- name: Run tests
-  run: flutter test
-  build:
-    runs-on: ubuntu-latest
 
+  # 1️⃣ Run tests
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,17 +27,53 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build release APK
+      - name: Run tests
+        run: flutter test
+
+  # 2️⃣ Build APKs (Debug + Release)
+  build_apk:
+    name: Build Debug and Release APK
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Debug APK
         run: flutter build apk --debug
 
-      - name: Upload APK artifact
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload Release APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-on:
-  pull_request:
-    branches:
-      - main
+          path: build/app/outputs/flutter-apk/app-release.apk
 
----
+  # 3️⃣ Security scan (OSV scanner) using local copy
+  security_scan:
+    name: Run OSV Scanner
+    runs-on: ubuntu-latest
+    needs: build_apk
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # OSV Scanner job – local reusable workflow inside your repo
+      - name: Run OSV Scanner
+        uses: ./github/workflows/osv-scanner-reusable.yml
