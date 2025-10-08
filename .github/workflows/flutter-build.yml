@@ -7,6 +7,8 @@ on:
   workflow_dispatch:  # allows manual trigger from GitHub Actions tab
 
 jobs:
+- name: Run tests
+  run: flutter test
   build:
     runs-on: ubuntu-latest
 
@@ -23,13 +25,16 @@ jobs:
         run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --debug
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-
+          path: build/app/outputs/flutter-apk/app-debug.apk
+on:
+  pull_request:
+    branches:
+      - main
 
 ---
