@@ -17,10 +17,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
         with:
           flutter-version: 'stable'
 
@@ -37,10 +37,10 @@ jobs:
     needs: test
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
       - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
         with:
           flutter-version: 'stable'
 
@@ -51,7 +51,7 @@ jobs:
         run: flutter build apk --debug
 
       - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
@@ -60,7 +60,7 @@ jobs:
         run: flutter build apk --release
 
       - name: Upload Release APK
-        uses: actions/upload-artifact@v4
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -72,7 +72,7 @@ jobs:
     needs: build_apk
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
       # OSV Scanner job – local reusable workflow inside your repo
       - name: Run OSV Scanner
