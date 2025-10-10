@@ -26,24 +26,27 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+        working-directory: ./mobile-app
 
       - name: Build Debug APK
         run: flutter build apk --debug
+        working-directory: ./mobile-app
 
       - name: Upload Debug APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: ./mobile-app/build/app/outputs/flutter-apk/app-debug.apk
 
       - name: Build Release APK
         run: flutter build apk --release
+        working-directory: ./mobile-app
 
       - name: Upload Release APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: ./mobile-app/build/app/outputs/flutter-apk/app-release.apk
 
   # 🔒 OSV Security Scan
   security_scan:
