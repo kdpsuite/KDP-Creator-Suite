@@ -10,7 +10,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 🧱 Build both Debug + Release APKs (no cache)
+
+  # 🧱 Build Debug + Release APKs
   build:
     name: Build Debug and Release APK
     runs-on: ubuntu-latest
@@ -19,7 +20,7 @@ jobs:
         uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
       - name: Set up Flutter
-        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
+        uses: kdpsuite/flutter-action@087a20b9cc7f0c097761ee01628dc65272dc13a3
         with:
           flutter-version: 'stable'
 
@@ -44,8 +45,7 @@ jobs:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
-
-  # 🔒 OSV Vulnerability Scan
+  # 🔒 OSV Security Scan
   security_scan:
     name: Run OSV Security Scan
     runs-on: ubuntu-latest
