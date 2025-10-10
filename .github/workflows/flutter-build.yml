@@ -7,7 +7,7 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:  # allows manual trigger from the Actions tab
+  workflow_dispatch:
 
 jobs:
   # 1️⃣ Run tests
@@ -21,35 +21,7 @@ jobs:
       - name: Set up Flutter
         uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
         with:
-          flutter-version: 'stable'
-
-      - name: Install dependencies
-        run: flutter pub get
-
-name: Build Flutter APK
-
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch:  # allows manual trigger from the Actions tab
-
-jobs:
-  # 1️⃣ Run tests
-  test:
-    name: Run tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
-
-      - name: Set up Flutter
-        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
-        with:
-          flutter-version: 'stable'
+          flutter-version: stable
 
       - name: Install dependencies
         run: flutter pub get
@@ -69,7 +41,7 @@ jobs:
       - name: Set up Flutter
         uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
         with:
-          flutter-version: 'stable'
+          flutter-version: stable
 
       - name: Install dependencies
         run: flutter pub get
@@ -92,19 +64,23 @@ jobs:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
-  # 3️⃣ Security scan (OSV scanner) using pinned SHA
+  # 3️⃣ Security scan (OSV Scanner)
   security_scan:
     name: Run OSV Scanner
-    runs-on: ubuntu-latest
     needs: build_apk
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
       - name: Run OSV Scanner
-        uses: kdpsuite/KDP-Creator-Suite/.github/workflows/osv-scanner-reusable.yml@5fadc42a9d5a3ff382842b8b21e6a80ea9865179
+        run: |
+          curl -sSfL https://github.com/google/osv-scanner/releases/latest/download/osv-scanner-linux-amd64 -o osv-scanner
+          chmod +x osv-scanner
+          ./osv-scanner --recursive . > osv-scan-report.txt || true
 
-ses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
-
-      - name: Run OSV Scanner
-        uses: kdpsuite/KDP-Creator-Suite/.github/workflows/osv-scanner-reusable.yml@5fadc42a9d5a3ff382842b8b21e6a80ea9865179
+      - name: Upload OSV Scan Report
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+        with:
+          name: osv-scan-report
+          path: osv-scan-report.txt
