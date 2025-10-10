@@ -1,69 +1,58 @@
-name: Build Flutter APK
+name: Flutter Build
 
 on:
   push:
     branches:
       - main
+      - dev
+      - staging
   pull_request:
     branches:
       - main
-  workflow_dispatch:
 
 jobs:
-
-  update_text_widgets:
-    name: Update Text Widgets
+  build:
+    name: Build Flutter App
     runs-on: ubuntu-latest
+
     steps:
+      # ✅ Use your custom checkout action
       - name: Checkout repository
-        uses: kdpsuite/checkout@087a20b9cc7f0c097761ee01628dc65272dc13a3
+        uses: kdpsuite/checkout@5a1018aaa496a5efd2a6406a55b8a72a1433eba1
 
+      # ✅ Setup Flutter SDK
       - name: Set up Flutter
-        uses: kdpsuite/flutter-action@5d96fd628a5d96e6ea113407642eeb89d3218dab
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
+          flutter-version: "3.24.0"
+          channel: "stable"
+          cache: true
 
-      - name: Run Text replacement script
-        run: dart run tools/replace_text_widgets_with_color.dart
-
-      - name: Commit changes
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add .
-          git commit -m "Auto-update Text widgets to AppTextStyles" || echo "No changes to commit"
-          git push || echo "Push failed (maybe no changes)"
-
-  build_apk:
-    name: Build Debug and Release APK
-    runs-on: ubuntu-latest
-    needs: update_text_widgets
-    steps:
-      - name: Checkout repository
-        uses: kdpsuite/checkout@087a20b9cc7f0c097761ee01628dc65272dc13a3
-
-      - name: Set up Flutter
-        uses: kdpsuite/flutter-action@5d96fd628a5d96e6ea113407642eeb89d3218dab
-        with:
-          flutter-version: 'stable'
-
+      # ✅ Get dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Debug APK
+      # ✅ Ensure SDK and licenses are accepted
+      - name: Setup Android SDK
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 6
+          script: flutter doctor -v
+
+      # ✅ Build APK for Android
+      - name: Build Android Debug APK
         run: flutter build apk --debug
 
-      - name: Upload Debug APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+      # ✅ Build Release APK
+        # Uncomment this line if you also want to build release version
+        # run: flutter build apk --release
+
+      # ✅ Upload the build artifact
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
+          name: flutter-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
-
-      - name: Build Release APK
-        run: flutter build apk --release
-
-      - name: Upload Release APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
-        with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
