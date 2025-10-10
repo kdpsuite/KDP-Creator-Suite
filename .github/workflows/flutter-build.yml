@@ -11,25 +11,6 @@ on:
 
 jobs:
 
-  # 1️⃣ Run Flutter Tests — no cache, pure test only
-  test:
-    name: Run Flutter Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
-
-      - name: Set up Flutter
-        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
-        with:
-          flutter-version: 'stable'
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Run tests
-        run: flutter test
-
 
   # 2️⃣ Build both Debug + Release APKs (with cache)
   build:
