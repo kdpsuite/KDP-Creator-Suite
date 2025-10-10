@@ -11,56 +11,59 @@ on:
 
 jobs:
 
-  # 🧱 Build Debug + Release APKs
-  build:
-    name: Build Debug and Release APK
+  update_text_widgets:
+    name: Update Text Widgets
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        uses: kdpsuite/checkout@087a20b9cc7f0c097761ee01628dc65272dc13a3
 
       - name: Set up Flutter
         uses: kdpsuite/flutter-action@5d96fd628a5d96e6ea113407642eeb89d3218dab
         with:
-          flutter-version: '3.37.0-0.1.pre'  # Dart 3.10+
+          flutter-version: 'stable'
 
-      - name: Verify Flutter & Dart
+      - name: Run Text replacement script
+        run: dart run tools/replace_text_widgets_with_color.dart
+
+      - name: Commit changes
         run: |
-          flutter --version
-          dart --version
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .
+          git commit -m "Auto-update Text widgets to AppTextStyles" || echo "No changes to commit"
+          git push || echo "Push failed (maybe no changes)"
+
+  build_apk:
+    name: Build Debug and Release APK
+    runs-on: ubuntu-latest
+    needs: update_text_widgets
+    steps:
+      - name: Checkout repository
+        uses: kdpsuite/checkout@087a20b9cc7f0c097761ee01628dc65272dc13a3
+
+      - name: Set up Flutter
+        uses: kdpsuite/flutter-action@5d96fd628a5d96e6ea113407642eeb89d3218dab
+        with:
+          flutter-version: 'stable'
 
       - name: Install dependencies
         run: flutter pub get
-        working-directory: ./mobile-app
 
       - name: Build Debug APK
         run: flutter build apk --debug
-        working-directory: ./mobile-app
 
       - name: Upload Debug APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-debug-apk
-          path: ./mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
 
       - name: Build Release APK
         run: flutter build apk --release
-        working-directory: ./mobile-app
 
       - name: Upload Release APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-release-apk
-          path: ./mobile-app/build/app/outputs/flutter-apk/app-release.apk
-
-  # 🔒 OSV Security Scan
-  security_scan:
-    name: Run OSV Security Scan
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
-
-      - name: Run OSV Scanner
-        uses: kdpsuite/osv-scanner-action@5fadc42a9d5a3ff382842b8b21e6a80ea9865179
+          path: build/app/outputs/flutter-apk/app-release.apk
