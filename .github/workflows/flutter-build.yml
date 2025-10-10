@@ -22,7 +22,12 @@ jobs:
       - name: Set up Flutter
         uses: kdpsuite/flutter-action@5d96fd628a5d96e6ea113407642eeb89d3218dab
         with:
-          flutter-version: 'stable'
+          flutter-version: '3.37.0-0.1.pre'  # Dart 3.10+
+
+      - name: Verify Flutter & Dart
+        run: |
+          flutter --version
+          dart --version
 
       - name: Install dependencies
         run: flutter pub get
