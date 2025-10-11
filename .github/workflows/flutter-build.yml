@@ -9,43 +9,36 @@ on:
       - main
   workflow_dispatch:
 
+defaults:
+  run:
+    working-directory: ./mobile-app
+
 jobs:
   build_apk:
     name: Build Debug and Release APK
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: ./mobile-app  # Flutter project root
-
     steps:
-      # 1️⃣ Checkout repository (standard action)
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-      # 2️⃣ Install Flutter manually
-      - name: Install Flutter
-        run: |
-          git clone https://github.com/flutter/flutter.git -b stable --depth 1
-          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+      # 2️⃣ Set up Flutter (beta channel)
+      - name: Set up Flutter (3.37.0-0.1.pre)
+        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
+        with:
+          flutter-version: '3.37.0-0.1.pre'
+          channel: 'beta'
 
       # 3️⃣ Accept Android licenses
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses
 
-      # 4️⃣ Debug Flutter environment
-      - name: Debug Flutter environment
-        run: |
-          flutter --version
-          flutter doctor -v
-          pwd
-          ls -la
-
-      # 5️⃣ Install dependencies
+      # 4️⃣ Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 6️⃣ Determine version numbers
+      # 5️⃣ Determine versions dynamically
       - name: Set version numbers
         run: |
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
@@ -54,40 +47,30 @@ jobs:
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
           echo "Version set to $TAG+$BUILD_NUMBER"
 
-      # 7️⃣ Build Debug APK (verbose)
-      - name: Build Debug APK (verbose)
+      # 6️⃣ Build Debug APK
+      - name: Build Debug APK
         run: |
-          flutter clean
-          sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml || echo "No version line found"
+          sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml
           flutter pub get
-          flutter build apk --debug -v
+          flutter build apk --debug
 
-      # 8️⃣ Build Release APK (verbose)
-      - name: Build Release APK (verbose)
-        run: |
-          flutter clean
-          sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml || echo "No version line found"
-          flutter pub get
-          flutter build apk --release -v
-
-      # 9️⃣ Prepare artifacts
-      - name: Prepare artifacts
-        run: |
-          mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/app-debug.apk artifacts/
-          cp build/app/outputs/flutter-apk/app-release.apk artifacts/
-          ls -lh artifacts
-
-      # 🔟 Upload Debug APK
+      # 7️⃣ Upload Debug APK
       - name: Upload Debug APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
-          name: app-debug-${{ env.VERSION_NAME }}-${{ github.run_number }}
-          path: artifacts/app-debug.apk
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
 
-      # 1️⃣1️⃣ Upload Release APK
+      # 8️⃣ Build Release APK
+      - name: Build Release APK
+        run: |
+          sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
+          flutter build apk --release
+
+      # 9️⃣ Upload Release APK
       - name: Upload Release APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
-          name: app-release-${{ env.VERSION_NAME }}-${{ github.run_number }}
-          path: artifacts/app-release.apk
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
