@@ -16,16 +16,12 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./mobile-app  # <-- Flutter project root
+        working-directory: ./mobile-app  # Flutter project root
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout repository (standard action)
       - name: Checkout repository
-        run: |
-          git init
-          git remote add origin https://github.com/${{ github.repository }}.git
-          git fetch origin ${{ github.ref }}
-          git checkout FETCH_HEAD
+        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
       # 2️⃣ Install Flutter manually
       - name: Install Flutter
@@ -37,7 +33,7 @@ jobs:
       - name: Accept Android licenses
         run: yes | flutter doctor --android-licenses
 
-      # 4️⃣ Debug environment
+      # 4️⃣ Debug Flutter environment
       - name: Debug Flutter environment
         run: |
           flutter --version
