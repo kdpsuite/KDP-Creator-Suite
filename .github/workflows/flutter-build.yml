@@ -13,16 +13,22 @@ jobs:
   build_apk:
     name: Build Debug and Release APK
     runs-on: ubuntu-latest
-    steps:
-      # 1️⃣ Checkout repository
-      - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-      # 2️⃣ Set up Flutter
-      - name: Set up Flutter
-        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
-        with:
-          flutter-version: 'stable'
+    steps:
+      # 1️⃣ Checkout repository manually (no external actions)
+      - name: Checkout repository
+        run: |
+          git init
+          git remote add origin https://github.com/${{ github.repository }}.git
+          git fetch origin ${{ github.ref }}
+          git checkout FETCH_HEAD
+
+      # 2️⃣ Install Flutter manually (no cache)
+      - name: Install Flutter
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          flutter doctor
 
       # 3️⃣ Install dependencies
       - name: Install dependencies
@@ -35,63 +41,44 @@ jobs:
           BUILD_NUMBER=${GITHUB_RUN_NUMBER}
           echo "VERSION_NAME=$TAG" >> $GITHUB_ENV
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
-          echo "VERSION_TAGGED_NAME=${TAG}+${BUILD_NUMBER}" >> $GITHUB_ENV
           echo "Version set to $TAG+$BUILD_NUMBER"
 
       # 5️⃣ Build Debug APK
       - name: Build Debug APK
         run: |
           sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
           flutter build apk --debug
 
-      # 6️⃣ Upload Debug APK as artifact
-      - name: Upload Debug APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
-        with:
-          name: app-debug-${{ env.VERSION_TAGGED_NAME }}-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-
-      # 7️⃣ Build Release APK
+      # 6️⃣ Build Release APK
       - name: Build Release APK
         run: |
           sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
           flutter build apk --release
 
-      # 8️⃣ Upload Release APK as artifact
-      - name: Upload Release APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
-        with:
-          name: app-release-${{ env.VERSION_TAGGED_NAME }}-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+      # 7️⃣ Prepare artifacts directory
+      - name: Prepare artifacts
+        run: |
+          mkdir -p artifacts
+          cp build/app/outputs/flutter-apk/app-debug.apk artifacts/
+          cp build/app/outputs/flutter-apk/app-release.apk artifacts/
+          echo "Artifacts prepared."
 
-      # 9️⃣ GitHub Release steps commented out until internal fork & SHA are ready
-      # - name: Create GitHub Release
-      #   uses: kdpsuite/create-release@<full_commit_sha>
-      #   with:
-      #     tag_name: ${{ env.VERSION_TAGGED_NAME }}
-      #     release_name: Release ${{ env.VERSION_TAGGED_NAME }}
-      #     body: "Automated release from workflow run #${{ github.run_number }}"
-      #     draft: false
-      #     prerelease: false
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 8️⃣ Upload artifacts to workflow (no external action)
+      - name: Upload artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Uploading APKs as artifacts..."
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            -F name="app-debug-apk" \
+            -F path="artifacts/app-debug.apk" || true
 
-      # - name: Upload Debug APK to Release
-      #   uses: kdpsuite/upload-release-asset@<full_commit_sha>
-      #   with:
-      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #     asset_path: build/app/outputs/flutter-apk/app-debug.apk
-      #     asset_name: app-debug-${{ env.VERSION_TAGGED_NAME }}.apk
-      #     asset_content_type: application/vnd.android.package-archive
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # - name: Upload Release APK to Release
-      #   uses: kdpsuite/upload-release-asset@<full_commit_sha>
-      #   with:
-      #     upload_url: ${{ steps.create_release.outputs.upload_url }}
-      #     asset_path: build/app/outputs/flutter-apk/app-release.apk
-      #     asset_name: app-release-${{ env.VERSION_TAGGED_NAME }}.apk
-      #     asset_content_type: application/vnd.android.package-archive
-      #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            -F name="app-release-apk" \
+            -F path="artifacts/app-release.apk" || true
