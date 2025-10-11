@@ -23,15 +23,18 @@ jobs:
           git fetch origin ${{ github.ref }}
           git checkout FETCH_HEAD
 
-      # 2️⃣ Install Flutter manually (no cache, exit-code-127-proof)
+      # 2️⃣ Install Flutter manually
       - name: Install Flutter
         run: |
           git clone https://github.com/flutter/flutter.git -b stable --depth 1
           echo "$PWD/flutter/bin" >> $GITHUB_PATH
 
       # 3️⃣ Verify Flutter installation
-      - name: Verify Flutter
-        run: flutter --version
+      - name: Debug Flutter environment
+        run: |
+          flutter --version
+          flutter doctor -v
+          cat pubspec.yaml
 
       # 4️⃣ Install dependencies
       - name: Install dependencies
@@ -46,19 +49,21 @@ jobs:
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
           echo "Version set to $TAG+$BUILD_NUMBER"
 
-      # 6️⃣ Build Debug APK
-      - name: Build Debug APK
+      # 6️⃣ Build Debug APK (verbose)
+      - name: Build Debug APK (verbose)
         run: |
-          sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml
+          flutter clean
+          sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml || echo "No version line found"
           flutter pub get
-          flutter build apk --debug
+          flutter build apk --debug -v
 
-      # 7️⃣ Build Release APK
-      - name: Build Release APK
+      # 7️⃣ Build Release APK (verbose)
+      - name: Build Release APK (verbose)
         run: |
-          sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml
+          flutter clean
+          sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml || echo "No version line found"
           flutter pub get
-          flutter build apk --release
+          flutter build apk --release -v
 
       # 8️⃣ Prepare artifacts directory
       - name: Prepare artifacts
@@ -68,7 +73,7 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk artifacts/
           ls -lh artifacts
 
-      # 9️⃣ Upload artifacts (native GitHub Actions step)
+      # 9️⃣ Upload artifacts
       - name: Upload Debug APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
