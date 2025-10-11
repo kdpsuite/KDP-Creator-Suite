@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository manually (no external actions)
+      # 1️⃣ Checkout repository manually
       - name: Checkout repository
         run: |
           git init
@@ -65,20 +65,24 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk artifacts/
           echo "Artifacts prepared."
 
-      # 8️⃣ Upload artifacts to workflow (no external action)
+      # 🆕 8️⃣ Install GitHub CLI (so gh command works)
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y git curl unzip
+          type -p curl >/dev/null || sudo apt install curl -y
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt update -y
+          sudo apt install gh -y
+          gh --version
+
+      # 9️⃣ Upload artifacts using gh CLI (no external actions)
       - name: Upload artifacts
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "Uploading APKs as artifacts..."
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
-            -F name="app-debug-apk" \
-            -F path="artifacts/app-debug.apk" || true
-
-          gh api \
-            -H "Accept: application/vnd.github+json" \
-            /repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
-            -F name="app-release-apk" \
-            -F path="artifacts/app-release.apk" || true
+          gh run upload-artifact "app-debug-apk" artifacts/app-debug.apk
+          gh run upload-artifact "app-release-apk" artifacts/app-release.apk
