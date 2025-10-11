@@ -14,36 +14,54 @@ jobs:
     name: Build Debug and Release APK
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
+      # 2️⃣ Set up Flutter
       - name: Set up Flutter
         uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
         with:
           flutter-version: 'stable'
 
+      # 3️⃣ Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Set version info
+      # 4️⃣ Determine versions
+      - name: Set version numbers
         run: |
-          VERSION_NAME=$(grep 'version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
-          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_ENV
+          # Get latest Git tag
+          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
+          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
+          echo "VERSION_NAME=$TAG" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "Version set to $TAG+$BUILD_NUMBER"
 
+      # 5️⃣ Build Debug APK
       - name: Build Debug APK
-        run: flutter build apk --debug --build-name=$VERSION_NAME --build-number=$GITHUB_RUN_NUMBER
+        run: |
+          sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
+          flutter build apk --debug
 
+      # 6️⃣ Upload Debug APK
       - name: Upload Debug APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
-          name: app-debug-apk-${{ env.VERSION_NAME }}
+          name: app-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
 
+      # 7️⃣ Build Release APK
       - name: Build Release APK
-        run: flutter build apk --release --build-name=$VERSION_NAME --build-number=$GITHUB_RUN_NUMBER
+        run: |
+          sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
+          flutter build apk --release
 
+      # 8️⃣ Upload Release APK
       - name: Upload Release APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
-          name: app-release-apk-${{ env.VERSION_NAME }}
+          name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
