@@ -23,18 +23,21 @@ jobs:
           git fetch origin ${{ github.ref }}
           git checkout FETCH_HEAD
 
-      # 2️⃣ Install Flutter manually (no cache)
+      # 2️⃣ Install Flutter manually (no cache, exit-code-127-proof)
       - name: Install Flutter
         run: |
           git clone https://github.com/flutter/flutter.git -b stable --depth 1
           echo "$PWD/flutter/bin" >> $GITHUB_PATH
-          flutter doctor
 
-      # 3️⃣ Install dependencies
+      # 3️⃣ Verify Flutter installation
+      - name: Verify Flutter
+        run: flutter --version
+
+      # 4️⃣ Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 4️⃣ Determine version numbers
+      # 5️⃣ Determine version numbers
       - name: Set version numbers
         run: |
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
@@ -43,46 +46,37 @@ jobs:
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
           echo "Version set to $TAG+$BUILD_NUMBER"
 
-      # 5️⃣ Build Debug APK
+      # 6️⃣ Build Debug APK
       - name: Build Debug APK
         run: |
           sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml
           flutter pub get
           flutter build apk --debug
 
-      # 6️⃣ Build Release APK
+      # 7️⃣ Build Release APK
       - name: Build Release APK
         run: |
           sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml
           flutter pub get
           flutter build apk --release
 
-      # 7️⃣ Prepare artifacts directory
+      # 8️⃣ Prepare artifacts directory
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
           cp build/app/outputs/flutter-apk/app-debug.apk artifacts/
           cp build/app/outputs/flutter-apk/app-release.apk artifacts/
-          echo "Artifacts prepared."
+          ls -lh artifacts
 
-      # 🆕 8️⃣ Install GitHub CLI (so gh command works)
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y git curl unzip
-          type -p curl >/dev/null || sudo apt install curl -y
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt update -y
-          sudo apt install gh -y
-          gh --version
+      # 9️⃣ Upload artifacts (native GitHub Actions step)
+      - name: Upload Debug APK
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+        with:
+          name: app-debug-${{ env.VERSION_NAME }}-${{ github.run_number }}
+          path: artifacts/app-debug.apk
 
-      # 9️⃣ Upload artifacts using gh CLI (no external actions)
-      - name: Upload artifacts
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "Uploading APKs as artifacts..."
-          gh run upload-artifact "app-debug-apk" artifacts/app-debug.apk
-          gh run upload-artifact "app-release-apk" artifacts/app-release.apk
+      - name: Upload Release APK
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+        with:
+          name: app-release-${{ env.VERSION_NAME }}-${{ github.run_number }}
+          path: artifacts/app-release.apk
