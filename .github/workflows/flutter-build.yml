@@ -28,40 +28,58 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # 4️⃣ Determine versions
+      # 4️⃣ Determine version numbers
       - name: Set version numbers
         run: |
-          # Get latest Git tag
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
           BUILD_NUMBER=${GITHUB_RUN_NUMBER}
           echo "VERSION_NAME=$TAG" >> $GITHUB_ENV
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
+          echo "VERSION_TAGGED_NAME=${TAG}+${BUILD_NUMBER}" >> $GITHUB_ENV
           echo "Version set to $TAG+$BUILD_NUMBER"
 
       # 5️⃣ Build Debug APK
       - name: Build Debug APK
         run: |
           sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
           flutter build apk --debug
 
-      # 6️⃣ Upload Debug APK
-      - name: Upload Debug APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
-        with:
-          name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-
-      # 7️⃣ Build Release APK
+      # 6️⃣ Build Release APK
       - name: Build Release APK
         run: |
           sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
           flutter build apk --release
 
-      # 8️⃣ Upload Release APK
-      - name: Upload Release APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+      # 7️⃣ Create or update GitHub Release
+      - name: Create GitHub Release
+        uses: kdpsuite/create-release@<full_commit_sha>
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          tag_name: ${{ env.VERSION_TAGGED_NAME }}
+          release_name: Release ${{ env.VERSION_TAGGED_NAME }}
+          body: "Automated release from workflow run #${{ github.run_number }}"
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 8️⃣ Upload Debug APK to Release
+      - name: Upload Debug APK to Release
+        uses: kdpsuite/upload-release-asset@<full_commit_sha>
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: build/app/outputs/flutter-apk/app-debug.apk
+          asset_name: app-debug-${{ env.VERSION_TAGGED_NAME }}.apk
+          asset_content_type: application/vnd.android.package-archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 9️⃣ Upload Release APK to Release
+      - name: Upload Release APK to Release
+        uses: kdpsuite/upload-release-asset@<full_commit_sha>
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: build/app/outputs/flutter-apk/app-release.apk
+          asset_name: app-release-${{ env.VERSION_TAGGED_NAME }}.apk
+          asset_content_type: application/vnd.android.package-archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
