@@ -2,11 +2,9 @@ name: Build Flutter APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 defaults:
@@ -19,16 +17,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout repository
+      # 1️⃣ Checkout repository (your own forked version)
       - name: Checkout repository
         uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-      # 2️⃣ Set up Flutter (beta channel)
-      - name: Set up Flutter (3.37.0-0.1.pre)
-        uses: kdpsuite/flutter-action@fd55f4c5af5b953cc57a2be44cb082c8f6635e8e
-        with:
-          flutter-version: '3.37.0-0.1.pre'
-          channel: 'beta'
+      # 2️⃣ Manually install Flutter (no cache)
+      - name: Install Flutter (3.37.0-0.1.pre)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa
+          git clone https://github.com/flutter/flutter.git -b beta
+          cd flutter
+          git checkout 3.37.0-0.1.pre
+          echo "$PWD/bin" >> $GITHUB_PATH
+          flutter --version
 
       # 3️⃣ Accept Android licenses
       - name: Accept Android licenses
@@ -38,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      # 5️⃣ Determine versions dynamically
+      # 5️⃣ Set version dynamically
       - name: Set version numbers
         run: |
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
