@@ -16,7 +16,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: ./KDP-Creator-Suite  # <-- your Flutter project root
+        working-directory: ./mobile-app  # <-- Flutter project root
 
     steps:
       # 1️⃣ Checkout repository
