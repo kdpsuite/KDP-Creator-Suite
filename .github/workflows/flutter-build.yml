@@ -14,8 +14,12 @@ jobs:
     name: Build Debug and Release APK
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ./KDP-Creator-Suite  # <-- your Flutter project root
+
     steps:
-      # 1️⃣ Checkout repository manually
+      # 1️⃣ Checkout repository
       - name: Checkout repository
         run: |
           git init
@@ -29,18 +33,23 @@ jobs:
           git clone https://github.com/flutter/flutter.git -b stable --depth 1
           echo "$PWD/flutter/bin" >> $GITHUB_PATH
 
-      # 3️⃣ Verify Flutter installation
+      # 3️⃣ Accept Android licenses
+      - name: Accept Android licenses
+        run: yes | flutter doctor --android-licenses
+
+      # 4️⃣ Debug environment
       - name: Debug Flutter environment
         run: |
           flutter --version
           flutter doctor -v
-          cat pubspec.yaml
+          pwd
+          ls -la
 
-      # 4️⃣ Install dependencies
+      # 5️⃣ Install dependencies
       - name: Install dependencies
         run: flutter pub get
 
-      # 5️⃣ Determine version numbers
+      # 6️⃣ Determine version numbers
       - name: Set version numbers
         run: |
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
@@ -49,7 +58,7 @@ jobs:
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
           echo "Version set to $TAG+$BUILD_NUMBER"
 
-      # 6️⃣ Build Debug APK (verbose)
+      # 7️⃣ Build Debug APK (verbose)
       - name: Build Debug APK (verbose)
         run: |
           flutter clean
@@ -57,7 +66,7 @@ jobs:
           flutter pub get
           flutter build apk --debug -v
 
-      # 7️⃣ Build Release APK (verbose)
+      # 8️⃣ Build Release APK (verbose)
       - name: Build Release APK (verbose)
         run: |
           flutter clean
@@ -65,7 +74,7 @@ jobs:
           flutter pub get
           flutter build apk --release -v
 
-      # 8️⃣ Prepare artifacts directory
+      # 9️⃣ Prepare artifacts
       - name: Prepare artifacts
         run: |
           mkdir -p artifacts
@@ -73,13 +82,14 @@ jobs:
           cp build/app/outputs/flutter-apk/app-release.apk artifacts/
           ls -lh artifacts
 
-      # 9️⃣ Upload artifacts
+      # 🔟 Upload Debug APK
       - name: Upload Debug APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-debug-${{ env.VERSION_NAME }}-${{ github.run_number }}
           path: artifacts/app-debug.apk
 
+      # 1️⃣1️⃣ Upload Release APK
       - name: Upload Release APK
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
