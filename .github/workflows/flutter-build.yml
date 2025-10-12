@@ -27,34 +27,7 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa
           git clone https://github.com/flutter/flutter.git -b beta
-          cd flutter
-          git checkout 3.37.0-0.1.pre
-          echo "$PWD/bin" >> $GITHUB_PATH
-          flutter --version
-
-      # 3️⃣ Accept Android licenses
-      - name: Accept Android licenses
-        run: yes | flutter doctor --android-licenses
-
-      # 4️⃣ Install dependencies
-      - name: Install dependencies
-        run: flutter pub get
-
-      # 5️⃣ Set version dynamically
-      - name: Set version numbers
-        run: |
-          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
-          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
-          echo "VERSION_NAME=$TAG" >> $GITHUB_ENV
-          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_ENV
-          echo "Version set to $TAG+$BUILD_NUMBER"
-
-      # 6️⃣ Build Debug APK
-      - name: Build Debug APK
-        run: |
-          sed -i "s/^version: .*/version: $VERSION_NAME-debug+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-          flutter build apk --debug
+apk --debug
 
       # 7️⃣ Upload Debug APK
       - name: Upload Debug APK
