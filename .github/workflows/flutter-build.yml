@@ -14,6 +14,10 @@ jobs:
     name: Build Debug and Release APK
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: mobile-app
+
     steps:
       # 1️⃣ Checkout repository
       - name: Checkout repository
@@ -22,6 +26,8 @@ jobs:
       # 2️⃣ Setup Flutter & build APKs (single step)
       - name: Setup Flutter 3.37.0-0.1.pre & Build APKs
         run: |
+          set -e  # ❌ Fail immediately on any error
+
           # Install dependencies
           sudo apt-get update -y
           sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa libgtk-3-dev clang cmake ninja-build pkg-config
@@ -32,10 +38,10 @@ jobs:
           git checkout 3.37.0-0.1.pre
           cd ..
 
-          # Add Flutter to PATH for this step
+          # Add Flutter to PATH
           export PATH="$PWD/flutter/bin:$PATH"
 
-          # Verify Flutter
+          # Verify Flutter setup
           flutter --version
           flutter doctor -v
 
@@ -56,11 +62,15 @@ jobs:
           # Update pubspec.yaml for Debug APK
           sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
           flutter pub get
+
+          # Build Debug APK (fail immediately on error)
           flutter build apk --debug
 
           # Update pubspec.yaml for Release APK
           sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
           flutter pub get
+
+          # Build Release APK (fail immediately on error)
           flutter build apk --release
 
       # 3️⃣ Upload Debug APK
@@ -75,4 +85,4 @@ jobs:
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
           name: app-release-apk
-          path: mobile-app/build/app/outputs/flutter-apk
+          path: mobile-app/build/app/outputs/flutter-apk/app-release.apk
