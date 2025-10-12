@@ -1,38 +1,37 @@
+ }
+}
 import 'package:flutter/material.dart';
-import 'package:sizer/sizer.dart';
-
-import '../../../core/app_export.dart';
-import '../../../theme/app_theme.dart';
+import 'package:kdp_creator_suite/core/themes/app_theme.dart';
 
 class PageIndicatorWidget extends StatelessWidget {
-  final int currentPage;
+  final int currentIndex;
   final int totalPages;
 
   const PageIndicatorWidget({
-    super.key,
-    required this.currentPage,
+    Key? key,
+    required this.currentIndex,
     required this.totalPages,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(
-        totalPages,
-        (index) => Container(
-          margin: EdgeInsets.symmetric(horizontal: 1.w),
-          width: currentPage == index ? 8.w : 2.w,
-          height: 1.h,
+      children: List.generate(totalPages, (index) {
+        final isActive = index == currentIndex;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          margin: const EdgeInsets.symmetric(horizontal: 4.0),
+          height: 10.0,
+          width: isActive ? 12.0 : 8.0,
           decoration: BoxDecoration(
-            color: currentPage == index
+            color: isActive
                 ? AppTheme.lightTheme.colorScheme.primary
-                : AppTheme.lightTheme.colorScheme.outline
-                    .withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(4.0),
+                : AppTheme.lightTheme.colorScheme.outline,
+            borderRadius: BorderRadius.circular(8.0),
           ),
-        ),
-      ),
+        );
+      }),
     );
   }
 }
