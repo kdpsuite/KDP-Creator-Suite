@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        uses: actions/checkout@v4
 
       # 🧩 Verify and fix missing files before build
       - name: Verify and fix Flutter project structure
@@ -128,14 +128,51 @@ EOF
 
           echo "✅ File structure verified successfully."
 
-      # 🧠 Optional future step: auto-fix missing imports in other files
-      # (placeholder for future integration)
+      # 🧠 Auto-fix missing Dart imports
+      - name: Auto-fix missing Dart imports
+        shell: bash
+        run: |
+          echo "🚀 Running Dart analysis to detect issues..."
+          flutter pub get
 
-      - name: Setup Flutter 3.37.0-0.1.pre & Build APKs
+          # Run dart analyzer and save output
+          flutter analyze > analysis.txt || true
+
+          if grep -q "Some errors can be fixed automatically" analysis.txt; then
+            echo "🛠 Applying automatic fixes..."
+            dart fix --apply
+            echo "✅ Automatic fixes applied."
+          else
+            echo "✅ No auto-fixable issues found."
+          fi
+
+          flutter format .
+          echo "🎨 Dart files formatted."
+
+      # 🔢 Auto-increment version & build number
+      - name: Set version and build number
+        shell: bash
+        run: |
+          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
+          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
+
+          echo "🔖 Using version $TAG and build number $BUILD_NUMBER"
+
+          # Set debug version
+          sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
+          flutter build apk --debug
+
+          # Set release version
+          sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
+          flutter build apk --release
+
+      # 🏗 Setup Flutter environment
+      - name: Setup Flutter 3.37.0-0.1.pre
         shell: bash
         run: |
           set -e
-
           sudo apt-get update -y
           sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa libgtk-3-dev clang cmake ninja-build pkg-config
 
@@ -143,27 +180,13 @@ EOF
           cd flutter
           git checkout 3.37.0-0.1.pre
           cd ..
-
           export PATH="$PWD/flutter/bin:$PATH"
 
           flutter --version
           flutter doctor -v
           yes | flutter doctor --android-licenses
 
-          flutter pub get
-
-          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
-          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
-          echo "Version set to $TAG+$BUILD_NUMBER"
-
-          sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-          flutter build apk --debug
-
-          sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-          flutter build apk --release
-
+      # 📦 Zip APKs
       - name: Zip APKs
         run: |
           mkdir -p build/apk_zip
@@ -171,8 +194,9 @@ EOF
             build/app/outputs/flutter-apk/app-debug.apk \
             build/app/outputs/flutter-apk/app-release.apk
 
+      # 📤 Upload APK ZIP
       - name: Upload APK ZIP
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+        uses: actions/upload-artifact@v3
         with:
           name: kdp_creator_suite_apks
           path: build/apk_zip/kdp_creator_suite_apks.zip
