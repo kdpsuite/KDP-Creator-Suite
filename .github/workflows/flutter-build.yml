@@ -23,10 +23,10 @@ jobs:
       - name: Checkout repository
         uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-      # 2️⃣ Setup Flutter & build APKs (single step)
+      # 2️⃣ Setup Flutter & Build APKs
       - name: Setup Flutter 3.37.0-0.1.pre & Build APKs
         run: |
-          set -e  # ❌ Fail immediately on any error
+          set -e
 
           # Install dependencies
           sudo apt-get update -y
@@ -38,51 +38,37 @@ jobs:
           git checkout 3.37.0-0.1.pre
           cd ..
 
-          # Add Flutter to PATH
           export PATH="$PWD/flutter/bin:$PATH"
 
-          # Verify Flutter setup
           flutter --version
           flutter doctor -v
-
-          # Accept Android licenses
           yes | flutter doctor --android-licenses
 
-          # Navigate to project
-          cd mobile-app
-
-          # Install Flutter dependencies
           flutter pub get
 
-          # Set version numbers
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
           BUILD_NUMBER=${GITHUB_RUN_NUMBER}
           echo "Version set to $TAG+$BUILD_NUMBER"
 
-          # Update pubspec.yaml for Debug APK
           sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
           flutter pub get
-
-          # Build Debug APK (fail immediately on error)
           flutter build apk --debug
 
-          # Update pubspec.yaml for Release APK
           sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
           flutter pub get
-
-          # Build Release APK (fail immediately on error)
           flutter build apk --release
 
-      # 3️⃣ Upload Debug APK
-      - name: Upload Debug APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
-        with:
-          name: app-debug-apk
-          path: mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+      # 3️⃣ Zip both APKs
+      - name: Zip APKs
+        run: |
+          mkdir -p build/apk_zip
+          zip -j build/apk_zip/kdp_creator_suite_apks.zip \
+            build/app/outputs/flutter-apk/app-debug.apk \
+            build/app/outputs/flutter-apk/app-release.apk
 
-      # 4️⃣ Upload Release APK
-      - name: Upload Release APK
+      # 4️⃣ Upload zipped APK
+      - name: Upload APK ZIP
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
-          name: app-release-apk
-          path: mobile-app/build/app/outputs/flutter-apk/app-release.apk
+          name: kdp_creator_suite_apks
+          path: build/apk_zip/kdp_creator_suite_apks.zip
