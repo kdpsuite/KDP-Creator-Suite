@@ -1,29 +1,78 @@
-- name: Setup Flutter & Build APKs
-  run: |
-    # Install dependencies
-    sudo apt-get update -y
-    sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa libgtk-3-dev clang cmake ninja-build pkg-config
+name: Build Flutter APK
 
-    # Clone Flutter pre-release
-    git clone https://github.com/flutter/flutter.git -b beta
-    cd flutter
-    git checkout 3.37.0-0.1.pre
-    cd ..
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
 
-    # Add Flutter to PATH for this step
-    export PATH="$PWD/flutter/bin:$PATH"
+jobs:
+  build_apk:
+    name: Build Debug and Release APK
+    runs-on: ubuntu-latest
 
-    # Verify Flutter
-    flutter --version
-    flutter doctor -v
+    steps:
+      # 1️⃣ Checkout repository
+      - name: Checkout repository
+        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-    # Accept Android licenses
-    yes | flutter doctor --android-licenses
+      # 2️⃣ Setup Flutter & build APKs (single step)
+      - name: Setup Flutter 3.37.0-0.1.pre & Build APKs
+        run: |
+          # Install dependencies
+          sudo apt-get update -y
+          sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa libgtk-3-dev clang cmake ninja-build pkg-config
 
-    # Navigate to project and install dependencies
-    cd mobile-app
-    flutter pub get
+          # Clone Flutter pre-release
+          git clone https://github.com/flutter/flutter.git -b beta
+          cd flutter
+          git checkout 3.37.0-0.1.pre
+          cd ..
 
-    # Build APKs
-    flutter build apk --debug
-    flutter build apk --release
+          # Add Flutter to PATH for this step
+          export PATH="$PWD/flutter/bin:$PATH"
+
+          # Verify Flutter
+          flutter --version
+          flutter doctor -v
+
+          # Accept Android licenses
+          yes | flutter doctor --android-licenses
+
+          # Navigate to project
+          cd mobile-app
+
+          # Install Flutter dependencies
+          flutter pub get
+
+          # Set version numbers
+          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
+          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
+          echo "Version set to $TAG+$BUILD_NUMBER"
+
+          # Update pubspec.yaml for Debug APK
+          sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
+          flutter build apk --debug
+
+          # Update pubspec.yaml for Release APK
+          sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
+          flutter build apk --release
+
+      # 3️⃣ Upload Debug APK
+      - name: Upload Debug APK
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+        with:
+          name: app-debug-apk
+          path: mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+
+      # 4️⃣ Upload Release APK
+      - name: Upload Release APK
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+        with:
+          name: app-release-apk
+          path: mobile-app/build/app/outputs/flutter-apk
