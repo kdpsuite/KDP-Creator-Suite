@@ -1,51 +1,50 @@
-name: Build Flutter APK
+name: Build Debug and Release APK
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - dev
   pull_request:
-    branches: [main]
-  workflow_dispatch:
-
-defaults:
-  run:
-    working-directory: ./mobile-app
 
 jobs:
-  build_apk:
-    name: Build Debug and Release APK
+  build:
     runs-on: ubuntu-latest
 
-    steps:
-      # 1️⃣ Checkout repository (your own forked version)
-      - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+    defaults:
+      run:
+        working-directory: mobile-app
 
-      # 2️⃣ Manually install Flutter (no cache)
-      - name: Install Flutter (3.37.0-0.1.pre)
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
         run: |
           sudo apt-get update -y
           sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa
-          git clone https://github.com/flutter/flutter.git -b beta
-apk --debug
 
-      # 7️⃣ Upload Debug APK
-      - name: Upload Debug APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
-        with:
-          name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-
-      # 8️⃣ Build Release APK
-      - name: Build Release APK
+      - name: Setup Flutter
         run: |
-          sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-          flutter build apk --release
+          git clone https://github.com/flutter/flutter.git -b 3.37.0-0.1.pre
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          export PATH="$PATH:$PWD/flutter/bin"
+          flutter --version
+          flutter doctor
 
-      # 9️⃣ Upload Release APK
-      - name: Upload Release APK
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+      - name: Get Flutter packages
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: Flutter-APKs
+          path: |
+            build/app/outputs/flutter-apk/app-debug.apk
+            build/app/outputs/flutter-apk/app-release.apk
