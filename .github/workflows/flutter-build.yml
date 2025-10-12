@@ -17,23 +17,22 @@ jobs:
         working-directory: mobile-app
 
     steps:
-      # 1️⃣ Checkout repository
       - name: Checkout repository
         uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-      # 2️⃣ Auto-verify & restore critical Flutter files
+      # 🧩 Verify and fix missing files before build
       - name: Verify and fix Flutter project structure
+        shell: bash
         run: |
           set -e
           mkdir -p lib/core/themes
-
           THEME_FILE="lib/core/themes/app_theme.dart"
           WIDGET_FILE="lib/presentation/onboarding_flow/widgets/page_indicator_widget.dart"
 
           # 🧱 Restore app_theme.dart if missing
           if [ ! -f "$THEME_FILE" ]; then
-            echo "🔧 app_theme.dart missing — restoring default version..."
-            cat <<'EOF' > "$THEME_FILE"
+            echo "🔧 Restoring missing app_theme.dart..."
+            cat > "$THEME_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -85,10 +84,10 @@ class AppTheme {
 EOF
           fi
 
-          # 🧹 Fix PageIndicatorWidget formatting if invalid
+          # 🧹 Repair PageIndicatorWidget.dart if it begins with stray braces
           if grep -q '^}' "$WIDGET_FILE" 2>/dev/null; then
-            echo "⚙️ Cleaning invalid PageIndicatorWidget.dart structure..."
-            cat <<'EOF' > "$WIDGET_FILE"
+            echo "⚙️ Cleaning malformed PageIndicatorWidget.dart..."
+            cat > "$WIDGET_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 import 'package:kdp_creator_suite/core/themes/app_theme.dart';
 
@@ -127,10 +126,13 @@ class PageIndicatorWidget extends StatelessWidget {
 EOF
           fi
 
-          echo "✅ File structure verified."
+          echo "✅ File structure verified successfully."
 
-      # 3️⃣ Setup Flutter & Build APKs
+      # 🧠 Optional future step: auto-fix missing imports in other files
+      # (placeholder for future integration)
+
       - name: Setup Flutter 3.37.0-0.1.pre & Build APKs
+        shell: bash
         run: |
           set -e
 
@@ -162,7 +164,6 @@ EOF
           flutter pub get
           flutter build apk --release
 
-      # 4️⃣ Zip both APKs
       - name: Zip APKs
         run: |
           mkdir -p build/apk_zip
@@ -170,7 +171,6 @@ EOF
             build/app/outputs/flutter-apk/app-debug.apk \
             build/app/outputs/flutter-apk/app-release.apk
 
-      # 5️⃣ Upload single ZIP artifact
       - name: Upload APK ZIP
         uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
