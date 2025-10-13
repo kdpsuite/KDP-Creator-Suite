@@ -28,9 +28,8 @@ jobs:
           THEME_FILE="lib/core/themes/app_theme.dart"
           WIDGET_FILE="lib/presentation/onboarding_flow/widgets/page_indicator_widget.dart"
 
-          # Restore app_theme.dart if missing
-          if [ ! -f "$THEME_FILE" ]; then
-            cat > "$THEME_FILE" <<'EOF'
+          # Restore app_theme.dart if missing (safe heredoc)
+          [ -f "$THEME_FILE" ] || cat > "$THEME_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 
 class AppTheme {
@@ -80,11 +79,9 @@ class AppTheme {
   );
 }
 EOF
-          fi
 
-          # Repair PageIndicatorWidget if malformed
-          if grep -q '^}' "$WIDGET_FILE" 2>/dev/null; then
-            cat > "$WIDGET_FILE" <<'EOF'
+          # Repair PageIndicatorWidget if malformed (safe heredoc)
+          grep -q '^}' "$WIDGET_FILE" 2>/dev/null && cat > "$WIDGET_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 import 'package:kdp_creator_suite/core/themes/app_theme.dart';
 
@@ -121,7 +118,6 @@ class PageIndicatorWidget extends StatelessWidget {
   }
 }
 EOF
-          fi
 
           echo "✅ File structure verified successfully."
 
