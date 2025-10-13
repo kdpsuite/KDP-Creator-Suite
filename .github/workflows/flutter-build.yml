@@ -1,224 +1,69 @@
-name: Build Flutter APK
+name: Build Flutter APKs
 
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch:
 
 jobs:
-  build_apk:
-    name: Build Debug and Release APK
+  build:
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: mobile-app
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      # 🧱 Ensure fix script exists
-      - name: Ensure fix_files.sh script
-        shell: bash
+      - name: Verify and restore Dart files
         run: |
-          mkdir -p scripts
-          FIX_SCRIPT="scripts/fix_files.sh"
-
-          if [ ! -f "$FIX_SCRIPT" ]; then
-            echo "🧩 Creating missing scripts/fix_files.sh..."
-            cat > "$FIX_SCRIPT" <<'EOF'
-#!/usr/bin/env bash
-set -e
-
-echo "🔧 Running Flutter project structure fixer..."
-
-mkdir -p lib/core/themes
-THEME_FILE="lib/core/themes/app_theme.dart"
-WIDGET_FILE="lib/presentation/onboarding_flow/widgets/page_indicator_widget.dart"
-
-# Restore missing app_theme.dart
-if [ ! -f "$THEME_FILE" ]; then
-  echo "🧱 Restoring app_theme.dart..."
-  cat > "$THEME_FILE" <<'DART'
-import 'package:flutter/material.dart';
-
-class AppTheme {
-  AppTheme._();
-
-  static final lightTheme = ThemeData(
-    brightness: Brightness.light,
-    primaryColor: const Color(0xFF1E88E5),
-    scaffoldBackgroundColor: Colors.white,
-    colorScheme: const ColorScheme.light(
-      primary: Color(0xFF1E88E5),
-      secondary: Color(0xFF43A047),
-      background: Colors.white,
-      surface: Colors.white,
-      outline: Color(0xFFBDBDBD),
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onBackground: Colors.black,
-      onSurface: Colors.black,
-      onError: Colors.white,
-      error: Colors.redAccent,
-    ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1E88E5),
-      foregroundColor: Colors.white,
-      elevation: 2,
-    ),
-  );
-
-  static final darkTheme = ThemeData(
-    brightness: Brightness.dark,
-    primaryColor: const Color(0xFF1E88E5),
-    scaffoldBackgroundColor: const Color(0xFF121212),
-    colorScheme: const ColorScheme.dark(
-      primary: Color(0xFF1E88E5),
-      secondary: Color(0xFF43A047),
-      background: Color(0xFF121212),
-      surface: Color(0xFF1E1E1E),
-      outline: Color(0xFF616161),
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onBackground: Colors.white,
-      onSurface: Colors.white,
-      onError: Colors.white,
-      error: Colors.redAccent,
-    ),
-  );
-}
-DART
-fi
-
-# Repair PageIndicatorWidget if malformed
-if grep -q '^}' "$WIDGET_FILE" 2>/dev/null; then
-  echo "⚙️ Cleaning malformed PageIndicatorWidget.dart..."
-  cat > "$WIDGET_FILE" <<'DART'
-import 'package:flutter/material.dart';
-import 'package:kdp_creator_suite/core/themes/app_theme.dart';
-
-class PageIndicatorWidget extends StatelessWidget {
-  final int currentIndex;
-  final int totalPages;
-
-  const PageIndicatorWidget({
-    Key? key,
-    required this.currentIndex,
-    required this.totalPages,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(totalPages, (index) {
-        final isActive = index == currentIndex;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4.0),
-          height: 10.0,
-          width: isActive ? 12.0 : 8.0,
-          decoration: BoxDecoration(
-            color: isActive
-                ? AppTheme.lightTheme.colorScheme.primary
-                : AppTheme.lightTheme.colorScheme.outline,
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-        );
-      }),
-    );
-  }
-}
-DART
-fi
-
-echo "✅ Flutter files verified and fixed successfully."
+          # Ensure lib/file1.dart exists and has content
+          if [[ ! -s lib/file1.dart ]]; then
+            echo "Restoring lib/file1.dart"
+            cat <<EOF > lib/file1.dart
+// Default content for file1.dart
+EOF
+          fi
+          # Ensure lib/file2.dart exists and has content
+          if [[ ! -s lib/file2.dart ]]; then
+            echo "Restoring lib/file2.dart"
+            cat <<EOF > lib/file2.dart
+// Default content for file2.dart
 EOF
           fi
 
-          chmod +x "$FIX_SCRIPT"
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: beta
+          flutter-version: "3.37.0-0.1.pre"
 
-      - name: Run fix_files.sh
-        shell: bash
-        run: |
-          ./scripts/fix_files.sh
-
-      - name: Setup Flutter 3.37.0-0.1.pre
-        shell: bash
-        run: |
-          set -e
-          sudo apt-get update -y
-          sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa libgtk-3-dev clang cmake ninja-build pkg-config
-
-          git clone https://github.com/flutter/flutter.git -b beta
-          cd flutter
-          git checkout 3.37.0-0.1.pre
-          cd ..
-
-          export PATH="$PWD/flutter/bin:$PATH"
-          flutter --version
-          flutter doctor -v
-          yes | flutter doctor --android-licenses
-
-      - name: Get Flutter dependencies
+      - name: Install dependencies
         run: flutter pub get
 
-      # 🧠 Auto-fix lint issues and missing imports using dart fix
-      - name: Auto-fix Dart issues
-        shell: bash
-        run: |
-          echo "🧠 Running dart fix --apply..."
-          dart fix --apply || echo "⚠️ dart fix found no issues or failed gracefully."
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Build Debug and Release APKs
-        shell: bash
-        run: |
-          set -e
-          export PATH="$PWD/flutter/bin:$PATH"
+      - name: Apply Dart fixes
+        run: dart fix --apply
 
-          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
-          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
-          echo "Version set to $TAG+$BUILD_NUMBER"
+      - name: Build debug APK
+        run: flutter build apk --debug
 
-          sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-          flutter build apk --debug
-
-          sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-          flutter build apk --release
-
-      # 🪄 Auto-commit and push any fixed files
-      - name: Commit and push fixes
-        shell: bash
-        run: |
-          echo "🪄 Checking for modified files..."
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "📦 Committing changes..."
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add .
-            git commit -m "chore: auto-fix Dart issues and project structure [skip ci]"
-            git push origin main
-          else
-            echo "✅ No changes to commit."
-          fi
+      - name: Build release APK
+        run: flutter build apk --release
 
       - name: Zip APKs
         run: |
-          mkdir -p build/apk_zip
-          zip -j build/apk_zip/kdp_creator_suite_apks.zip \
-            build/app/outputs/flutter-apk/app-debug.apk \
-            build/app/outputs/flutter-apk/app-release.apk
+          zip -j build-debug-release.zip build/app/outputs/flutter-apk/app-*.apk
 
-      - name: Upload APK ZIP
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: kdp_creator_suite_apks
-          path: build/apk_zip/kdp_creator_suite_apks.zip
+          name: android-apks
+          path: build-debug-release.zip
