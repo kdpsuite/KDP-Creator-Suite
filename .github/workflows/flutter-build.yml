@@ -21,7 +21,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2️⃣ Setup Flutter environment (runs once)
+      # 2️⃣ Setup Flutter environment
       - name: Setup Flutter 3.37.0-0.1.pre
         shell: bash
         run: |
@@ -203,7 +203,6 @@ EOF
           BUILD_NUMBER=${GITHUB_RUN_NUMBER}
           RELEASE_TAG="$TAG.$BUILD_NUMBER"
 
-          # Skip if tag already exists
           if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "⚠️ Tag $RELEASE_TAG already exists, skipping."
           else
