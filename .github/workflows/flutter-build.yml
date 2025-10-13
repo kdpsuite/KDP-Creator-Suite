@@ -193,7 +193,7 @@ EOF
           name: kdp_creator_suite_apks
           path: build/apk_zip/kdp_creator_suite_apks.zip
 
-      # 9️⃣ Create Git tag for release
+      # 9️⃣ Create Git tag for release (skip if exists)
       - name: Create Git tag for release
         shell: bash
         run: |
@@ -202,5 +202,12 @@ EOF
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
           BUILD_NUMBER=${GITHUB_RUN_NUMBER}
           RELEASE_TAG="$TAG.$BUILD_NUMBER"
-          git tag $RELEASE_TAG
-          git push origin $RELEASE_TAG
+
+          # Skip if tag already exists
+          if git rev-parse "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "⚠️ Tag $RELEASE_TAG already exists, skipping."
+          else
+            git tag $RELEASE_TAG
+            git push origin $RELEASE_TAG
+            echo "✅ Tag $RELEASE_TAG created."
+          fi
