@@ -140,7 +140,6 @@ class PageIndicatorWidget extends StatelessWidget {
   }
 }
 EOF
-          fi
 
       # 4️⃣ Install Flutter dependencies
       - name: Install Flutter dependencies
