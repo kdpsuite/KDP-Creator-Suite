@@ -30,7 +30,6 @@ jobs:
 
           # Restore app_theme.dart if missing
           if [ ! -f "$THEME_FILE" ]; then
-            echo "🔧 Restoring missing app_theme.dart..."
             cat > "$THEME_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 
@@ -85,7 +84,6 @@ EOF
 
           # Repair PageIndicatorWidget if malformed
           if grep -q '^}' "$WIDGET_FILE" 2>/dev/null; then
-            echo "⚙️ Cleaning malformed PageIndicatorWidget.dart..."
             cat > "$WIDGET_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 import 'package:kdp_creator_suite/core/themes/app_theme.dart';
