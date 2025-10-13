@@ -28,7 +28,7 @@ jobs:
           THEME_FILE="lib/core/themes/app_theme.dart"
           WIDGET_FILE="lib/presentation/onboarding_flow/widgets/page_indicator_widget.dart"
 
-          # Restore app_theme.dart if missing (safe heredoc)
+          # Restore app_theme.dart if missing (safe pattern)
           [ -f "$THEME_FILE" ] || cat > "$THEME_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 
@@ -80,7 +80,7 @@ class AppTheme {
 }
 EOF
 
-          # Repair PageIndicatorWidget if malformed (safe heredoc)
+          # Repair PageIndicatorWidget if malformed (safe pattern)
           grep -q '^}' "$WIDGET_FILE" 2>/dev/null && cat > "$WIDGET_FILE" <<'EOF'
 import 'package:flutter/material.dart';
 import 'package:kdp_creator_suite/core/themes/app_theme.dart';
