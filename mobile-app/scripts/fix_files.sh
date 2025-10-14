@@ -1,73 +1,39 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -e
 
-echo "🧰 Running full Flutter project repair (imports, permissions, structure)..."
+# Base directories
+REPO_ROOT="$(pwd)"
+MOBILE_APP="$REPO_ROOT/mobile-app"
 
-# Go to project root
-cd "$(dirname "$0")/../mobile-app"
+echo "🧰 Running Flutter project repair..."
 
-# Make sure scripts are executable
-chmod +x ../scripts/*.sh || true
-
-# Ensure directory structure exists
-echo "📁 Ensuring key directories exist..."
-mkdir -p lib/theme lib/widgets lib/presentation
-mkdir -p android ios web assets
-
-# Ensure correct permissions
-echo "🔑 Setting correct file permissions..."
-find . -type d -exec chmod 755 {} \;
-find . -type f -name "*.dart" -exec chmod 644 {} \;
-
-# Call the AppTheme import fixer
-echo "🎨 Running AppTheme import repair..."
-../scripts/fix_app_theme_imports.sh
-
-# Validate app_theme.dart exists and has definitions
-APP_THEME_FILE="lib/theme/app_theme.dart"
-if ! grep -q "class AppTheme" "$APP_THEME_FILE"; then
-  echo "⚠️ app_theme.dart seems incomplete — regenerating minimal fallback..."
-  cat <<'EOF' > "$APP_THEME_FILE"
-import 'package:flutter/material.dart';
-
-class AppTheme {
-  static final ThemeData lightTheme = ThemeData.light().copyWith(
-    colorScheme: const ColorScheme.light(),
-  );
-
-  static final ThemeData darkTheme = ThemeData.dark().copyWith(
-    colorScheme: const ColorScheme.dark(),
-  );
-}
-EOF
+# Ensure Flutter project exists
+if [ ! -d "$MOBILE_APP" ]; then
+  echo "Error: mobile-app folder not found at $MOBILE_APP"
+  exit 1
 fi
 
-# Auto-fix any Flutter import paths that got renamed (optional but safe)
-echo "🔍 Scanning for old import paths to correct..."
-find lib -type f -name "*.dart" -exec sed -i \
-  "s#import 'package:kdp_creator_suite/app_theme.dart';#import 'package:kdp_creator_suite/theme/app_theme.dart';#g" {} +
+# List of files to fix AppTheme references
+FILES_TO_FIX=(
+  "$MOBILE_APP/lib/main.dart"
+  "$MOBILE_APP/lib/presentation/settings/widgets/theme_selector_widget.dart"
+  "$MOBILE_APP/lib/widgets/custom_error_widget.dart"
+  "$MOBILE_APP/lib/presentation/onboarding_flow/onboarding_flow.dart"
+  "$MOBILE_APP/lib/presentation/pdf_import/pdf_import.dart"
+  "$MOBILE_APP/lib/presentation/amazon_kdp_integration/widgets/authentication_section_widget.dart"
+)
 
-# Ensure pubspec.yaml exists
-if [ ! -f "pubspec.yaml" ]; then
-  echo "⚠️ pubspec.yaml missing — creating a minimal version..."
-  cat <<'EOF' > pubspec.yaml
-name: kdp_creator_suite
-description: Flutter app for KDP Creator Suite
-publish_to: "none"
-environment:
-  sdk: ">=3.0.0 <4.0.0"
+# Add missing import for AppTheme if not present
+for file in "${FILES_TO_FIX[@]}"; do
+  if grep -q "AppTheme" "$file"; then
+    echo "AppTheme references found in $file"
+  else
+    echo "Adding import for AppTheme in $file"
+    sed -i "1i import 'package:kdp_creator_suite/theme/app_theme.dart';" "$file"
+  fi
+done
 
-dependencies:
-  flutter:
-    sdk: flutter
+# Fix basic file permissions
+find "$MOBILE_APP" -type f -name "*.dart" -exec chmod 644 {} \;
 
-flutter:
-  uses-material-design: true
-EOF
-fi
-
-# Run flutter pub get to re-sync dependencies
-echo "📦 Running flutter pub get..."
-flutter pub get
-
-echo "✅ Flutter project structure and imports successfully repaired."
+echo "✅ Flutter project repair completed."
