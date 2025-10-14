@@ -1,78 +1,59 @@
-name: Build Debug and Release APK
+name: Flutter Build APKs
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  build_apk:
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Required so the workflow can push fixes
-
     defaults:
       run:
         working-directory: mobile-app
 
     steps:
+      # 1️⃣ Checkout repo (pinned SHA for allowed actions)
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
+        uses: kdpsuite/checkout@<full-commit-sha>
+      
+      # 2️⃣ Setup Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.3'  # Replace with your Flutter version
-          channel: 'stable'
-          cache: true
+          flutter-version: '3.13.0'  # match your project
+          channel: stable
 
-      - name: Verify Flutter installation
-        run: flutter --version
+      # 3️⃣ Accept Android licenses
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
 
-      - name: Run permission fix script
-        run: chmod +x scripts/fix_files.sh
+      # 4️⃣ Repair project files (AppTheme, permissions, imports)
+      - name: Repair Project Files
+        run: bash ../scripts/fix_files.sh
 
-      - name: Execute fix_files.sh
-        run: ./scripts/fix_files.sh
-
-      - name: Fix AppTheme imports
-        run: |
-          chmod +x scripts/fix_app_theme_imports.sh
-          ./scripts/fix_app_theme_imports.sh
-
-      - name: Commit and push theme fixes if any
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git add .
-            git commit -m "Automated: Fix missing AppTheme imports and restore app_theme.dart"
-            git push origin HEAD:main
-            echo "✅ Fixes committed and pushed."
-          else
-            echo "No changes to commit."
-          fi
-
-      - name: Get Flutter dependencies
+      # 5️⃣ Get Flutter dependencies
+      - name: Get dependencies
         run: flutter pub get
 
-      - name: Accept Android SDK Licenses
-        run: yes | flutter doctor --android-licenses
-
+      # 6️⃣ Build Debug APK
       - name: Build Debug APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug --no-shrink
 
+      # 7️⃣ Build Release APK
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-shrink
 
+      # 8️⃣ Upload artifacts
       - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
+        uses: kdpsuite/upload-artifact@<full-commit-sha>
         with:
           name: debug-apk
-          path: mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
 
       - name: Upload Release APK
-        uses: actions/upload-artifact@v4
+        uses: kdpsuite/upload-artifact@<full-commit-sha>
         with:
           name: release-apk
-          path: mobile-app/build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
