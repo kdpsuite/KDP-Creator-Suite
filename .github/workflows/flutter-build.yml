@@ -20,55 +20,86 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Flutter
-        id: setup-flutter
+      # ---------- SETUP FLUTTER (runs from repo root, writes to GITHUB_PATH) ----------
+      - name: Setup Flutter SDK (clone & add to PATH)
+        shell: bash
         run: |
           set -e
+          # Ensure prerequisites
           sudo apt-get update -y
           sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa libgtk-3-dev clang cmake ninja-build pkg-config
-          
-          # Download Flutter SDK (beta channel)
-          git clone https://github.com/flutter/flutter.git -b beta
-          echo "$PWD/flutter/bin" >> $GITHUB_PATH
-          export PATH="$PWD/flutter/bin:$PATH"
 
+          # Work from the repo root so we know exactly where flutter will be
+          cd "$GITHUB_WORKSPACE"
+
+          # Clone the Flutter SDK (beta) into repo root/flutter
+          if [ ! -d "$GITHUB_WORKSPACE/flutter" ]; then
+            git clone https://github.com/flutter/flutter.git -b beta "$GITHUB_WORKSPACE/flutter"
+            cd "$GITHUB_WORKSPACE/flutter"
+            git checkout 3.37.0-0.1.pre || true
+          else
+            cd "$GITHUB_WORKSPACE/flutter"
+            git fetch --all --tags || true
+          fi
+
+          # Persist flutter on PATH for ALL subsequent steps
+          echo "$GITHUB_WORKSPACE/flutter/bin" >> "$GITHUB_PATH"
+
+          # Quick verification (safe)
+          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
           flutter --version
           flutter doctor -v
+          # Accept android licenses but don't fail on broken pipe
           yes | flutter doctor --android-licenses || true
 
+      # Make script executable and run it (runs in mobile-app per defaults)
       - name: Make fix_files.sh executable
+        shell: bash
         run: chmod +x ./scripts/fix_files.sh
 
-      - name: Run fix_files.sh
+      - name: Verify and fix Flutter project structure
+        shell: bash
         run: ./scripts/fix_files.sh
 
+      # ---------- DEPENDENCIES & DART FIX ----------
       - name: Get Flutter dependencies
+        shell: bash
         run: |
-          export PATH="$PWD/flutter/bin:$PATH"
+          # be defensive: ensure PATH contains the cloned flutter
+          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
           flutter pub get
 
-      - name: Apply Dart fixes
+      - name: Apply dart fix
+        shell: bash
         run: |
-          export PATH="$PWD/flutter/bin:$PATH"
-          dart fix --apply || echo "No fixes needed."
+          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
+          dart fix --apply || echo "No fixes or dart fix failed gracefully."
 
+      # ---------- BUILD APKs ----------
       - name: Build Debug APK
+        shell: bash
         run: |
-          export PATH="$PWD/flutter/bin:$PATH"
+          set -e
+          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
           BUILD_NUMBER=${GITHUB_RUN_NUMBER}
           sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
           flutter build apk --debug
 
       - name: Build Release APK
+        shell: bash
         run: |
-          export PATH="$PWD/flutter/bin:$PATH"
+          set -e
+          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
           TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
           BUILD_NUMBER=${GITHUB_RUN_NUMBER}
           sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
           flutter build apk --release
 
       - name: Zip APKs
+        shell: bash
         run: |
           mkdir -p build/apk_zip
           zip -j build/apk_zip/kdp_creator_suite_apks.zip \
