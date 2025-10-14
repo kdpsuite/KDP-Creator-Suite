@@ -1,105 +1,73 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
-# Create themes folder if it doesn't exist
-mkdir -p lib/core/themes
+echo "🧰 Running full Flutter project repair (imports, permissions, structure)..."
 
-THEME_FILE="lib/core/themes/app_theme.dart"
-WIDGET_FILE="lib/presentation/onboarding_flow/widgets/page_indicator_widget.dart"
+# Go to project root
+cd "$(dirname "$0")/../mobile-app"
 
-# Restore app_theme.dart if missing
-if [ ! -f "$THEME_FILE" ]; then
-  cat > "$THEME_FILE" <<'EOF'
+# Make sure scripts are executable
+chmod +x ../scripts/*.sh || true
+
+# Ensure directory structure exists
+echo "📁 Ensuring key directories exist..."
+mkdir -p lib/theme lib/widgets lib/presentation
+mkdir -p android ios web assets
+
+# Ensure correct permissions
+echo "🔑 Setting correct file permissions..."
+find . -type d -exec chmod 755 {} \;
+find . -type f -name "*.dart" -exec chmod 644 {} \;
+
+# Call the AppTheme import fixer
+echo "🎨 Running AppTheme import repair..."
+../scripts/fix_app_theme_imports.sh
+
+# Validate app_theme.dart exists and has definitions
+APP_THEME_FILE="lib/theme/app_theme.dart"
+if ! grep -q "class AppTheme" "$APP_THEME_FILE"; then
+  echo "⚠️ app_theme.dart seems incomplete — regenerating minimal fallback..."
+  cat <<'EOF' > "$APP_THEME_FILE"
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  AppTheme._();
-
-  static final lightTheme = ThemeData(
-    brightness: Brightness.light,
-    primaryColor: const Color(0xFF1E88E5),
-    scaffoldBackgroundColor: Colors.white,
-    colorScheme: const ColorScheme.light(
-      primary: Color(0xFF1E88E5),
-      secondary: Color(0xFF43A047),
-      background: Colors.white,
-      surface: Colors.white,
-      outline: Color(0xFFBDBDBD),
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onBackground: Colors.black,
-      onSurface: Colors.black,
-      onError: Colors.white,
-      error: Colors.redAccent,
-    ),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1E88E5),
-      foregroundColor: Colors.white,
-      elevation: 2,
-    ),
+  static final ThemeData lightTheme = ThemeData.light().copyWith(
+    colorScheme: const ColorScheme.light(),
   );
 
-  static final darkTheme = ThemeData(
-    brightness: Brightness.dark,
-    primaryColor: const Color(0xFF1E88E5),
-    scaffoldBackgroundColor: const Color(0xFF121212),
-    colorScheme: const ColorScheme.dark(
-      primary: Color(0xFF1E88E5),
-      secondary: Color(0xFF43A047),
-      background: Color(0xFF121212),
-      surface: Color(0xFF1E1E1E),
-      outline: Color(0xFF616161),
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onBackground: Colors.white,
-      onSurface: Colors.white,
-      onError: Colors.white,
-      error: Colors.redAccent,
-    ),
+  static final ThemeData darkTheme = ThemeData.dark().copyWith(
+    colorScheme: const ColorScheme.dark(),
   );
 }
 EOF
 fi
 
-# Repair PageIndicatorWidget if malformed
-if grep -q '^}' "$WIDGET_FILE" 2>/dev/null; then
-  cat > "$WIDGET_FILE" <<'EOF'
-import 'package:flutter/material.dart';
-import 'package:kdp_creator_suite/core/themes/app_theme.dart';
+# Auto-fix any Flutter import paths that got renamed (optional but safe)
+echo "🔍 Scanning for old import paths to correct..."
+find lib -type f -name "*.dart" -exec sed -i \
+  "s#import 'package:kdp_creator_suite/app_theme.dart';#import 'package:kdp_creator_suite/theme/app_theme.dart';#g" {} +
 
-class PageIndicatorWidget extends StatelessWidget {
-  final int currentIndex;
-  final int totalPages;
+# Ensure pubspec.yaml exists
+if [ ! -f "pubspec.yaml" ]; then
+  echo "⚠️ pubspec.yaml missing — creating a minimal version..."
+  cat <<'EOF' > pubspec.yaml
+name: kdp_creator_suite
+description: Flutter app for KDP Creator Suite
+publish_to: "none"
+environment:
+  sdk: ">=3.0.0 <4.0.0"
 
-  const PageIndicatorWidget({
-    Key? key,
-    required this.currentIndex,
-    required this.totalPages,
-  }) : super(key: key);
+dependencies:
+  flutter:
+    sdk: flutter
 
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(totalPages, (index) {
-        final isActive = index == currentIndex;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4.0),
-          height: 10.0,
-          width: isActive ? 12.0 : 8.0,
-          decoration: BoxDecoration(
-            color: isActive
-                ? AppTheme.lightTheme.colorScheme.primary
-                : AppTheme.lightTheme.colorScheme.outline,
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-        );
-      }),
-    );
-  }
-}
+flutter:
+  uses-material-design: true
 EOF
 fi
 
-echo "✅ Flutter project structure verified and fixed if needed."
+# Run flutter pub get to re-sync dependencies
+echo "📦 Running flutter pub get..."
+flutter pub get
+
+echo "✅ Flutter project structure and imports successfully repaired."
