@@ -17,42 +17,70 @@ jobs:
         working-directory: mobile-app
 
     steps:
+      # 1️⃣ Checkout repo
       - name: Checkout repository
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        uses: actions/checkout@v4
 
-      # 🧩 Verify and fix missing files before build
+      # 2️⃣ Repair Flutter project files
       - name: Run fix_files.sh
         run: |
-          chmod +x scripts/fix_files.sh
-          ./scripts/fix_files.sh
+          chmod +x ../scripts/fix_files.sh
+          ../scripts/fix_files.sh
 
-      # 🐦 Install Flutter manually
-      - name: Install Flutter
+      # 3️⃣ Commit any fixes back to repo
+      - name: Commit fixed files
         run: |
-          set -e
-          FLUTTER_VERSION=3.37.0-0.1.pre
-          wget https://storage.googleapis.com/flutter_infra_release/releases/beta/linux/flutter_linux_${FLUTTER_VERSION}.tar.xz
-          tar xf flutter_linux_${FLUTTER_VERSION}.tar.xz
-          echo "$PWD/flutter/bin" >> $GITHUB_PATH
-          flutter --version
-          flutter doctor -v
-          yes | flutter doctor --android-licenses
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add mobile-app/lib/theme/app_theme.dart
+          git add mobile-app/lib/main.dart
+          git add mobile-app/lib/presentation/settings/widgets/theme_selector_widget.dart
+          git add mobile-app/lib/widgets/custom_error_widget.dart
+          git add mobile-app/lib/presentation/onboarding_flow/onboarding_flow.dart
+          git add mobile-app/lib/presentation/pdf_import/pdf_import.dart
+          git add mobile-app/lib/presentation/amazon_kdp_integration/widgets/authentication_section_widget.dart
+          if ! git diff --cached --quiet; then
+            git commit -m "Automated fixes: add AppTheme imports and file repairs"
+            git push origin HEAD:${{ github.ref }}
+          else
+            echo "No fixes to commit"
+          fi
 
-      # 📦 Get dependencies
+      # 4️⃣ Setup Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.37.0-0.1.pre'
+
+      # 5️⃣ Accept Android licenses
+      - name: Accept Android SDK licenses
+        run: yes | flutter doctor --android-licenses
+
+      # 6️⃣ Get Flutter dependencies
       - name: Get Flutter dependencies
         run: flutter pub get
 
-      # 🔨 Build Debug APK
-      - name: Build Debug APK
+      # 7️⃣ Set build version
+      - name: Set build version
         run: |
-          flutter build apk --debug
+          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
+          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
+          echo "Version set to $TAG+$BUILD_NUMBER"
+          sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
 
-      # 🔨 Build Release APK
+      # 8️⃣ Build Debug APK
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      # 9️⃣ Build Release APK
       - name: Build Release APK
         run: |
+          sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
+          flutter pub get
           flutter build apk --release
 
-      # 🗜️ Zip APKs
+      # 🔟 Zip APKs
       - name: Zip APKs
         run: |
           mkdir -p build/apk_zip
@@ -60,9 +88,9 @@ jobs:
             build/app/outputs/flutter-apk/app-debug.apk \
             build/app/outputs/flutter-apk/app-release.apk
 
-      # 📤 Upload APK ZIP
+      # 1️⃣1️⃣ Upload APKs
       - name: Upload APK ZIP
-        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
+        uses: actions/upload-artifact@v3
         with:
           name: kdp_creator_suite_apks
           path: build/apk_zip/kdp_creator_suite_apks.zip
