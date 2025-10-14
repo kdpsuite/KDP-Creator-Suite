@@ -1,59 +1,68 @@
-name: Flutter Build APKs
+name: Build Flutter APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  build_apk:
+    name: Build Debug and Release APK
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: mobile-app
 
     steps:
-      # 1️⃣ Checkout repo (pinned SHA for allowed actions)
       - name: Checkout repository
-        uses: kdpsuite/checkout@<full-commit-sha>
-      
-      # 2️⃣ Setup Flutter
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.13.0'  # match your project
-          channel: stable
+        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
 
-      # 3️⃣ Accept Android licenses
-      - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses
+      # 🧩 Verify and fix missing files before build
+      - name: Run fix_files.sh
+        run: |
+          chmod +x scripts/fix_files.sh
+          ./scripts/fix_files.sh
 
-      # 4️⃣ Repair project files (AppTheme, permissions, imports)
-      - name: Repair Project Files
-        run: bash ../scripts/fix_files.sh
+      # 🐦 Install Flutter manually
+      - name: Install Flutter
+        run: |
+          set -e
+          FLUTTER_VERSION=3.37.0-0.1.pre
+          wget https://storage.googleapis.com/flutter_infra_release/releases/beta/linux/flutter_linux_${FLUTTER_VERSION}.tar.xz
+          tar xf flutter_linux_${FLUTTER_VERSION}.tar.xz
+          echo "$PWD/flutter/bin" >> $GITHUB_PATH
+          flutter --version
+          flutter doctor -v
+          yes | flutter doctor --android-licenses
 
-      # 5️⃣ Get Flutter dependencies
-      - name: Get dependencies
+      # 📦 Get dependencies
+      - name: Get Flutter dependencies
         run: flutter pub get
 
-      # 6️⃣ Build Debug APK
+      # 🔨 Build Debug APK
       - name: Build Debug APK
-        run: flutter build apk --debug --no-shrink
+        run: |
+          flutter build apk --debug
 
-      # 7️⃣ Build Release APK
+      # 🔨 Build Release APK
       - name: Build Release APK
-        run: flutter build apk --release --no-shrink
+        run: |
+          flutter build apk --release
 
-      # 8️⃣ Upload artifacts
-      - name: Upload Debug APK
-        uses: kdpsuite/upload-artifact@<full-commit-sha>
-        with:
-          name: debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+      # 🗜️ Zip APKs
+      - name: Zip APKs
+        run: |
+          mkdir -p build/apk_zip
+          zip -j build/apk_zip/kdp_creator_suite_apks.zip \
+            build/app/outputs/flutter-apk/app-debug.apk \
+            build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Upload Release APK
-        uses: kdpsuite/upload-artifact@<full-commit-sha>
+      # 📤 Upload APK ZIP
+      - name: Upload APK ZIP
+        uses: kdpsuite/upload-artifact@2848b2cda0e5190984587ec6bb1f36730ca78d50
         with:
-          name: release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: kdp_creator_suite_apks
+          path: build/apk_zip/kdp_creator_suite_apks.zip
