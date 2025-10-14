@@ -1,5 +1,6 @@
 import 'dart:io' if (dart.library.io) 'dart:io';
 
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
