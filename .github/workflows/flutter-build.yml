@@ -1,16 +1,13 @@
-name: Build Flutter APK
+name: Build Debug and Release APK
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
   build_apk:
-    name: Build Debug and Release APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required so the workflow can push fixes
 
     defaults:
       run:
@@ -18,74 +15,64 @@ jobs:
 
     steps:
       - name: Checkout repository
-        # using pinned kdpsuite checkout from your environment (change if you pin differently)
-        uses: kdpsuite/checkout@ff7abcd0c3c05ccf6adc123a8cd1fd4fb30fb493
+        uses: actions/checkout@v4
 
-      - name: Ensure fix_files.sh is executable and run it
-        shell: bash
-        run: |
-          chmod +x ./scripts/fix_files.sh || true
-          ./scripts/fix_files.sh
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.3'  # Replace with your Flutter version
+          channel: 'stable'
+          cache: true
 
-      - name: Ensure fix_app_theme_imports.sh is executable and run it
-        shell: bash
+      - name: Verify Flutter installation
+        run: flutter --version
+
+      - name: Run permission fix script
+        run: chmod +x scripts/fix_files.sh
+
+      - name: Execute fix_files.sh
+        run: ./scripts/fix_files.sh
+
+      - name: Fix AppTheme imports
         run: |
-          chmod +x ./scripts/fix_app_theme_imports.sh || true
+          chmod +x scripts/fix_app_theme_imports.sh
           ./scripts/fix_app_theme_imports.sh
 
-      - name: Setup Flutter SDK (clone & add to PATH)
+      - name: Commit and push theme fixes if any
         shell: bash
         run: |
-          set -e
-          sudo apt-get update -y
-          sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa libgtk-3-dev clang cmake ninja-build pkg-config
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Clone Flutter SDK into repo root/flutter if not present
-          if [ ! -d "$GITHUB_WORKSPACE/flutter" ]; then
-            git clone https://github.com/flutter/flutter.git -b beta "$GITHUB_WORKSPACE/flutter"
-            cd "$GITHUB_WORKSPACE/flutter"
-            git checkout 3.37.0-0.1.pre || true
+          if [[ -n "$(git status --porcelain)" ]]; then
+            git add .
+            git commit -m "Automated: Fix missing AppTheme imports and restore app_theme.dart"
+            git push origin HEAD:main
+            echo "✅ Fixes committed and pushed."
           else
-            cd "$GITHUB_WORKSPACE/flutter"
-            git fetch --all --tags || true
+            echo "No changes to commit."
           fi
 
-          # Persist flutter to PATH for subsequent steps
-          echo "$GITHUB_WORKSPACE/flutter/bin" >> "$GITHUB_PATH"
-
-          # verify and accept licenses (accept ignoring broken-pipe)
-          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
-          flutter --version
-          flutter doctor -v
-          yes | flutter doctor --android-licenses || true
-
       - name: Get Flutter dependencies
-        shell: bash
-        run: |
-          # ensure flutter is on PATH for this step
-          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
-          flutter pub get
+        run: flutter pub get
 
-      - name: Apply dart fixes (safe)
-        shell: bash
-        run: |
-          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
-          dart fix --apply || echo "dart fix returned non-zero or no fixes needed"
+      - name: Accept Android SDK Licenses
+        run: yes | flutter doctor --android-licenses
 
       - name: Build Debug APK
-        shell: bash
-        run: |
-          set -e
-          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "0.0.1")
-          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
-          sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml || true
-          flutter pub get
-          flutter build apk --debug
+        run: flutter build apk --debug
 
       - name: Build Release APK
-        shell: bash
-        run: |
-          set -e
-          export PATH="$GITHUB_WORKSPACE/flutter/bin:$PATH"
-          TAG=$(git describe --tags --ab
+        run: flutter build apk --release
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-apk
+          path: mobile-app/build/app/outputs/flutter-apk/app-debug.apk
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-apk
+          path: mobile-app/build/app/outputs/flutter-apk/app-release.apk
