@@ -1,27 +1,53 @@
 #!/usr/bin/env bash
 set -e
 
-# The import line to ensure exists
-IMPORT_LINE="import 'package:kdp_creator_suite/theme/app_theme.dart';"
+echo "🔍 Starting AppTheme import fix process..."
 
-# Find all Dart files that reference AppTheme
-FILES=$(grep -rl "AppTheme" lib/)
+# Ensure we're running from the correct project directory
+cd "$(dirname "$0")/../mobile-app"
 
-echo "Checking ${#FILES[@]} files for missing imports..."
+# Path to the AppTheme file
+APP_THEME_PATH="lib/theme/app_theme.dart"
 
-for FILE in $FILES; do
-    if ! grep -q "$IMPORT_LINE" "$FILE"; then
-        echo "Adding AppTheme import to $FILE"
-        # Insert after the first import or at the top if none
-        if grep -q "^import" "$FILE"; then
-            FIRST_IMPORT_LINE=$(grep -n "^import" "$FILE" | head -n1 | cut -d: -f1)
-            # Insert import after first import
-            sed -i "${FIRST_IMPORT_LINE}a $IMPORT_LINE" "$FILE"
-        else
-            # No imports found, add at the very top
-            sed -i "1i $IMPORT_LINE" "$FILE"
-        fi
-    fi
+# Check if app_theme.dart exists
+if [ ! -f "$APP_THEME_PATH" ]; then
+  echo "⚠️ app_theme.dart not found, recreating a minimal version..."
+  mkdir -p lib/theme
+  cat <<'EOF' > "$APP_THEME_PATH"
+import 'package:flutter/material.dart';
+
+class AppTheme {
+  static final ThemeData lightTheme = ThemeData.light().copyWith(
+    colorScheme: const ColorScheme.light(),
+  );
+
+  static final ThemeData darkTheme = ThemeData.dark().copyWith(
+    colorScheme: const ColorScheme.dark(),
+  );
+}
+EOF
+  echo "✅ Recreated lib/theme/app_theme.dart"
+fi
+
+# Find Dart files that use AppTheme but lack the import
+echo "🔧 Scanning for missing AppTheme imports..."
+grep -rl "AppTheme" lib/ | while read -r file; do
+  if ! grep -q "import 'package:kdp_creator_suite/theme/app_theme.dart';" "$file"; then
+    echo "🩹 Fixing import in: $file"
+    # Insert import after other import statements
+    awk '
+      BEGIN {inserted=0}
+      /^import / {
+        print $0
+        if (!inserted) {
+          print "import '\''package:kdp_creator_suite/theme/app_theme.dart'\'';"
+          inserted=1
+        }
+        next
+      }
+      { print $0 }
+    ' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+  fi
 done
 
-echo "✅ AppTheme imports fixed."
+echo "✅ All missing AppTheme imports fixed."
