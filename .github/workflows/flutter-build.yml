@@ -1,96 +1,48 @@
-name: Build Flutter APK
+name: Flutter Build APK
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
-  build_apk:
-    name: Build Debug and Release APK
+  build:
     runs-on: ubuntu-latest
-
     defaults:
       run:
-        working-directory: mobile-app
+        working-directory: ./mobile-app
 
     steps:
-      # 1️⃣ Checkout repo
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      # 2️⃣ Repair Flutter project files
-      - name: Run fix_files.sh
-        run: |
-          chmod +x ../scripts/fix_files.sh
-          ../scripts/fix_files.sh
-
-      # 3️⃣ Commit any fixes back to repo
-      - name: Commit fixed files
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add mobile-app/lib/theme/app_theme.dart
-          git add mobile-app/lib/main.dart
-          git add mobile-app/lib/presentation/settings/widgets/theme_selector_widget.dart
-          git add mobile-app/lib/widgets/custom_error_widget.dart
-          git add mobile-app/lib/presentation/onboarding_flow/onboarding_flow.dart
-          git add mobile-app/lib/presentation/pdf_import/pdf_import.dart
-          git add mobile-app/lib/presentation/amazon_kdp_integration/widgets/authentication_section_widget.dart
-          if ! git diff --cached --quiet; then
-            git commit -m "Automated fixes: add AppTheme imports and file repairs"
-            git push origin HEAD:${{ github.ref }}
-          else
-            echo "No fixes to commit"
-          fi
-
-      # 4️⃣ Setup Flutter
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.37.0-0.1.pre'
+          flutter-version: "3.13.7"
 
-      # 5️⃣ Accept Android licenses
+      - name: Install dependencies
+        run: flutter pub get
+
       - name: Accept Android SDK licenses
         run: yes | flutter doctor --android-licenses
 
-      # 6️⃣ Get Flutter dependencies
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      # 7️⃣ Set build version
-      - name: Set build version
-        run: |
-          TAG=$(git describe --tags --abbrev=0 || echo "0.0.1")
-          BUILD_NUMBER=${GITHUB_RUN_NUMBER}
-          echo "Version set to $TAG+$BUILD_NUMBER"
-          sed -i "s/^version: .*/version: $TAG-debug+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-
-      # 8️⃣ Build Debug APK
       - name: Build Debug APK
         run: flutter build apk --debug
 
-      # 9️⃣ Build Release APK
       - name: Build Release APK
-        run: |
-          sed -i "s/^version: .*/version: $TAG+$BUILD_NUMBER/" pubspec.yaml
-          flutter pub get
-          flutter build apk --release
+        run: flutter build apk --release
 
-      # 🔟 Zip APKs
-      - name: Zip APKs
+      - name: Create APK ZIP
         run: |
           mkdir -p build/apk_zip
-          zip -j build/apk_zip/kdp_creator_suite_apks.zip \
-            build/app/outputs/flutter-apk/app-debug.apk \
-            build/app/outputs/flutter-apk/app-release.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk build/apk_zip/
+          cp build/app/outputs/flutter-apk/app-release.apk build/apk_zip/
+          cd build/apk_zip && zip kdp_creator_suite_apks.zip *.apk
 
-      # 1️⃣1️⃣ Upload APKs
       - name: Upload APK ZIP
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: kdp_creator_suite_apks
           path: build/apk_zip/kdp_creator_suite_apks.zip
