@@ -44,7 +44,8 @@ jobs:
 
           flutter --version
           flutter doctor -v
-          yes | flutter doctor --android-licenses
+          # Accept Android SDK licenses safely, ignoring broken pipe errors
+          yes | flutter doctor --android-licenses || true
 
       - name: Get Flutter dependencies
         run: flutter pub get
