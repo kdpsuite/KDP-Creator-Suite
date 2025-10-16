@@ -1,91 +1,114 @@
-name: Flutter CI/CD
+name: 🏗️ Build Flutter APKs
 
 on:
-  workflow_dispatch: # manual trigger
+  workflow_dispatch:
   push:
     branches:
       - main
-      - 'feature/**'
-  pull_request:
+      - beta
+      - dev
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      FLUTTER_VERSION: "3.37.0-0.1.pre" # matches your SDK requirement
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
+      - name: 🧩 Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Setup Git for workflow
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+      - name: 🔧 Set up Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y unzip xz-utils zip git curl
+      - name: 🧱 Ensure scripts folder exists
+        run: |
+          mkdir -p mobile-app/scripts
+          echo "✅ Verified mobile-app/scripts folder exists."
 
-    - name: Clone Flutter manually
-      run: |
-        git clone -b beta https://github.com/flutter/flutter.git /home/runner/flutter
-        export PATH="$PATH:/home/runner/flutter/bin"
-        flutter doctor
+      - name: 🔒 Make scripts executable
+        run: chmod +x mobile-app/scripts/*.sh || true
 
-    - name: Flutter upgrade
-      run: |
-        export PATH="$PATH:/home/runner/flutter/bin"
-        flutter channel beta
-        flutter upgrade
+      - name: 🛠️ Manually install Flutter
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y git curl unzip xz-utils zip libglu1-mesa
+          git clone https://github.com/flutter/flutter.git -b beta
+          export PATH="$PATH:$PWD/flutter/bin"
+          flutter doctor -v
 
-    - name: Check outdated Dart/Flutter packages
-      run: |
-        export PATH="$PATH:/home/runner/flutter/bin"
-        flutter pub outdated
-        flutter pub upgrade --major-versions
+      - name: 🔄 Full Flutter upgrade (before pub get)
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          flutter upgrade || true
 
-    - name: Run project fix scripts
-      run: |
-        chmod +x mobile-app/scripts/fix_files.sh
-        chmod +x mobile-app/scripts/fix_app_theme_imports.sh
-        ./mobile-app/scripts/fix_files.sh
-        ./mobile-app/scripts/fix_app_theme_imports.sh
+      - name: 🔁 Switch to Flutter beta channel for stability
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          flutter channel beta
+          flutter upgrade || true
+          flutter doctor -v
 
-    - name: Push fixed files back to repo
-      run: |
-        git add .
-        git diff-index --quiet HEAD || git commit -m "💄 Auto-fix AppTheme imports and permissions"
-        git push origin HEAD
+      - name: 📦 Check for outdated packages (Dart + Flutter)
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          cd mobile-app
+          dart pub outdated || true
+          flutter pub outdated || true
+          flutter pub upgrade --major-versions || true
 
-    - name: Get Flutter dependencies
-      run: |
-        export PATH="$PATH:/home/runner/flutter/bin"
-        flutter pub get
+      - name: 🧹 Run AppTheme import fix
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          ./mobile-app/scripts/fix_app_theme_imports.sh
 
-    - name: Set build number and version automatically
-      run: |
-        BUILD_NUMBER=$(date +%s)
-        flutter pub run version:main --build-number=$BUILD_NUMBER
+      - name: 🧩 Run Flutter file repair
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          ./mobile-app/scripts/fix_files.sh
 
-    - name: Build Debug APK
-      run: |
-        export PATH="$PATH:/home/runner/flutter/bin"
-        flutter build apk --debug --build-number=$BUILD_NUMBER
+      - name: 💾 Commit and push any fixed files
+        run: |
+          git add .
+          git commit -m "🩹 Auto-fixed AppTheme imports and repaired files" || echo "No changes to commit"
+          git push || echo "No changes to push"
 
-    - name: Build Release APK
-      run: |
-        export PATH="$PATH:/home/runner/flutter/bin"
-        flutter build apk --release --build-number=$BUILD_NUMBER
+      - name: 📲 Get Flutter dependencies
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          cd mobile-app
+          flutter pub get
 
-    - name: Zip APKs
-      run: |
-        mkdir -p artifacts
-        zip -r artifacts/kdp_apks.zip build/app/outputs/flutter-apk/
+      - name: 🧮 Auto-increment version/build numbers
+        run: |
+          cd mobile-app
+          if [ -f pubspec.yaml ]; then
+            VERSION_LINE=$(grep '^version: ' pubspec.yaml)
+            VERSION_NUMBER=$(echo "$VERSION_LINE" | cut -d+ -f1 | cut -d' ' -f2)
+            BUILD_NUMBER=$(echo "$VERSION_LINE" | cut -d+ -f2)
+            NEW_BUILD_NUMBER=$((BUILD_NUMBER + 1))
+            NEW_VERSION="${VERSION_NUMBER}+${NEW_BUILD_NUMBER}"
+            sed -i "s/^version: .*/version: ${NEW_VERSION}/" pubspec.yaml
+            echo "📈 Version bumped to $NEW_VERSION"
+          fi
 
-    - name: Upload APKs artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: kdp_apks
-        path: artifacts/kdp_apks.zip
+      - name: ⚙️ Build Flutter APKs (Debug + Release)
+        run: |
+          export PATH="$PATH:$PWD/flutter/bin"
+          cd mobile-app
+          flutter build apk --debug
+          flutter build apk --release
+
+      - name: 📦 Zip APKs
+        run: |
+          cd mobile-app/build/app/outputs/flutter-apk
+          zip -r ../../../../KDP_Creator_Suite_APKs.zip ./*.apk
+
+      - name: 🚀 Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KDP_Creator_Suite_APKs
+          path: mobile-app/build/app/outputs/KDP_Creator_Suite_APKs.zip
