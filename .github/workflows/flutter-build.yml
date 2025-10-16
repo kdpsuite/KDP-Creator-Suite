@@ -1,85 +1,100 @@
-name: Flutter Build APKs
+name: 🧱 Build & Package Flutter APKs
 
 on:
-  workflow_dispatch:    # 👈 Manual trigger (Run workflow button)
+  workflow_dispatch:
   push:
     branches:
-      - main            # 👈 Auto run on pushes to main
+      - main
 
 permissions:
   contents: write
   actions: write
 
+env:
+  PROJECT_PATH: mobile-app
+  FLUTTER_VERSION: stable
+  BUILD_OUTPUT_DIR: build/app/outputs/flutter-apk
+  ARTIFACT_NAME: KDP_Creator_APKs.zip
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      FLUTTER_VERSION: "3.13.0" # Match your project Dart SDK requirement
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v3
-        with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Install Flutter manually
+      - name: 🛠️ Manually install Flutter
         run: |
+          echo "🔧 Cloning Flutter SDK..."
           git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git /home/runner/flutter
-          echo "/home/runner/flutter/bin" >> $GITHUB_PATH
+          echo "🔧 Adding Flutter to PATH..."
+          export PATH="$PATH:/home/runner/flutter/bin"
           flutter --version
+        env:
+          FLUTTER_VERSION: ${{ env.FLUTTER_VERSION }}
 
-      - name: Run project fix scripts
+      - name: ⚙️ Prepare project and install dependencies
         run: |
-          chmod +x mobile-app/scripts/fix_files.sh
-          ./mobile-app/scripts/fix_files.sh
-
-      - name: Get Flutter dependencies
-        run: |
+          export PATH="$PATH:/home/runner/flutter/bin"
+          cd $PROJECT_PATH
+          echo "📦 Getting Flutter dependencies..."
           flutter pub get
-        working-directory: mobile-app
 
-      - name: Auto version/build bump
+      - name: 🧰 Run project fix scripts
         run: |
-          cd mobile-app
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          echo "🧰 Running fix_files.sh..."
+          chmod +x $PROJECT_PATH/scripts/fix_files.sh
+          $PROJECT_PATH/scripts/fix_files.sh
 
-          VERSION_NAME=$(grep version: pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
-          BUILD_NUMBER=$(grep version: pubspec.yaml | awk '{print $2}' | cut -d'+' -f2)
-          NEW_BUILD_NUMBER=$((BUILD_NUMBER + 1))
-          sed -i "s/version: .*/version: ${VERSION_NAME}+${NEW_BUILD_NUMBER}/" pubspec.yaml
-          echo "Updated build number to ${NEW_BUILD_NUMBER}"
-
-          git add pubspec.yaml
-          git commit -m "CI: Bump build number to ${NEW_BUILD_NUMBER} [skip ci]"
-          git push origin HEAD:${{ github.ref }}
-
-      - name: Build Debug APK
+      - name: 🔢 Auto-increment build number & version
         run: |
-          flutter build apk --debug --build-name=$VERSION_NAME --build-number=$NEW_BUILD_NUMBER
-        working-directory: mobile-app
+          cd $PROJECT_PATH
+          export PATH="$PATH:/home/runner/flutter/bin"
+          echo "🔢 Incrementing version..."
+          VERSION_FILE="pubspec.yaml"
+          CURRENT_VERSION=$(grep 'version:' $VERSION_FILE | awk '{print $2}')
+          BASE_VERSION=$(echo $CURRENT_VERSION | cut -d'+' -f1)
+          BUILD_NUMBER=$(echo $CURRENT_VERSION | cut -d'+' -f2)
+          if [ -z "$BUILD_NUMBER" ]; then BUILD_NUMBER=0; fi
+          NEW_BUILD_NUMBER=$((BUILD_NUMBER+1))
+          NEW_VERSION="$BASE_VERSION+$NEW_BUILD_NUMBER"
+          sed -i "s/version: .*/version: $NEW_VERSION/" $VERSION_FILE
+          echo "✅ Updated version to $NEW_VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add $VERSION_FILE
+          git commit -m "🔢 Auto-bump build number to $NEW_BUILD_NUMBER"
+          git push
 
-      - name: Build Release APK
+      - name: 🏗️ Build Debug and Release APKs
         run: |
-          flutter build apk --release --build-name=$VERSION_NAME --build-number=$NEW_BUILD_NUMBER
-        working-directory: mobile-app
+          export PATH="$PATH:/home/runner/flutter/bin"
+          cd $PROJECT_PATH
+          echo "🏗️ Building debug APK..."
+          flutter build apk --debug
+          echo "🏗️ Building release APK..."
+          flutter build apk --release
 
-      - name: Zip APKs
+      - name: 📦 Zip APKs
         run: |
-          mkdir -p artifacts
-          cp mobile-app/build/app/outputs/flutter-apk/app-debug.apk artifacts/
-          cp mobile-app/build/app/outputs/flutter-apk/app-release.apk artifacts/
-          cd artifacts
-          zip -r kdp_apks.zip *
-        working-directory: ${{ github.workspace }}
+          cd $PROJECT_PATH/$BUILD_OUTPUT_DIR
+          echo "📦 Zipping APKs..."
+          zip -r ${{ github.workspace }}/${{ env.ARTIFACT_NAME }} *.apk
+          echo "✅ Created ${{ env.ARTIFACT_NAME }}"
 
-      - name: Upload APKs
+      - name: 🚀 Upload artifact (zipped APKs)
         uses: actions/upload-artifact@v4
         with:
-          name: kdp_apks
-          path: artifacts/kdp_apks.zip
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ github.workspace }}/${{ env.ARTIFACT_NAME }}
+
+      - name: 💾 Commit artifacts & changelog back to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          cp ${{ github.workspace }}/${{ env.ARTIFACT_NAME }} .
+          echo "🕓 Build completed on $(date)" > build_log.txt
+          git add ${{ env.ARTIFACT_NAME }} build_log.txt
+          git commit -m "📦 Automated build: $(date)"
+          git push
