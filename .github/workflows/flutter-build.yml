@@ -1,83 +1,91 @@
-name: Flutter Build & Repair
+name: Flutter CI/CD
 
 on:
+  workflow_dispatch: # manual trigger
   push:
     branches:
       - main
-  workflow_dispatch:
+      - 'feature/**'
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      FLUTTER_VERSION: "3.37.0-0.1.pre"
+      FLUTTER_VERSION: "3.37.0-0.1.pre" # matches your SDK requirement
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: true
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Give write permissions to scripts
-        run: chmod +x ./mobile-app/scripts/*.sh
+    - name: Setup Git for workflow
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Run project fix scripts
-        run: |
-          echo "Running fix_files.sh (will NOT change working directory inside the script)..."
-          ./mobile-app/scripts/fix_files.sh
-          echo "Running fix_app_theme_imports.sh (will NOT change working directory inside the script)..."
-          ./mobile-app/scripts/fix_app_theme_imports.sh
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y unzip xz-utils zip git curl
 
-      - name: Push fixed files back to repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add .
-          git commit -m "💾 Apply automated AppTheme and Flutter fixes" || echo "No changes to commit"
-          git push origin HEAD:${{ github.ref }} || echo "Push failed (likely no changes)"
+    - name: Clone Flutter manually
+      run: |
+        git clone -b beta https://github.com/flutter/flutter.git /home/runner/flutter
+        export PATH="$PATH:/home/runner/flutter/bin"
+        flutter doctor
 
-      - name: Install Git
-        run: sudo apt-get update && sudo apt-get install -y git curl unzip xz-utils zip
+    - name: Flutter upgrade
+      run: |
+        export PATH="$PATH:/home/runner/flutter/bin"
+        flutter channel beta
+        flutter upgrade
 
-      - name: Install Flutter manually
-        run: |
-          git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git /home/runner/flutter
-          export PATH="$PATH:/home/runner/flutter/bin"
-          flutter --version
-          flutter channel beta
-          flutter upgrade
+    - name: Check outdated Dart/Flutter packages
+      run: |
+        export PATH="$PATH:/home/runner/flutter/bin"
+        flutter pub outdated
+        flutter pub upgrade --major-versions
 
-      - name: Check for outdated Dart/Flutter packages
-        run: |
-          export PATH="$PATH:/home/runner/flutter/bin"
-          dart pub outdated
-          flutter pub outdated
-          flutter pub upgrade --major-versions
+    - name: Run project fix scripts
+      run: |
+        chmod +x mobile-app/scripts/fix_files.sh
+        chmod +x mobile-app/scripts/fix_app_theme_imports.sh
+        ./mobile-app/scripts/fix_files.sh
+        ./mobile-app/scripts/fix_app_theme_imports.sh
 
-      - name: Get Flutter dependencies
-        run: |
-          export PATH="$PATH:/home/runner/flutter/bin"
-          flutter pub get
+    - name: Push fixed files back to repo
+      run: |
+        git add .
+        git diff-index --quiet HEAD || git commit -m "💄 Auto-fix AppTheme imports and permissions"
+        git push origin HEAD
 
-      - name: Build Debug APK
-        run: |
-          export PATH="$PATH:/home/runner/flutter/bin"
-          flutter build apk --debug
+    - name: Get Flutter dependencies
+      run: |
+        export PATH="$PATH:/home/runner/flutter/bin"
+        flutter pub get
 
-      - name: Build Release APK
-        run: |
-          export PATH="$PATH:/home/runner/flutter/bin"
-          flutter build apk --release
+    - name: Set build number and version automatically
+      run: |
+        BUILD_NUMBER=$(date +%s)
+        flutter pub run version:main --build-number=$BUILD_NUMBER
 
-      - name: Zip Debug and Release APKs
-        run: |
-          mkdir -p build_artifacts
-          cp build/app/outputs/flutter-apk/app-debug.apk build_artifacts/
-          cp build/app/outputs/flutter-apk/app-release.apk build_artifacts/
-          zip -r build_artifacts.zip build_artifacts/
+    - name: Build Debug APK
+      run: |
+        export PATH="$PATH:/home/runner/flutter/bin"
+        flutter build apk --debug --build-number=$BUILD_NUMBER
 
-      - name: Upload APK Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: flutter_apks
-          path: build_artifacts.zip
+    - name: Build Release APK
+      run: |
+        export PATH="$PATH:/home/runner/flutter/bin"
+        flutter build apk --release --build-number=$BUILD_NUMBER
+
+    - name: Zip APKs
+      run: |
+        mkdir -p artifacts
+        zip -r artifacts/kdp_apks.zip build/app/outputs/flutter-apk/
+
+    - name: Upload APKs artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: kdp_apks
+        path: artifacts/kdp_apks.zip
