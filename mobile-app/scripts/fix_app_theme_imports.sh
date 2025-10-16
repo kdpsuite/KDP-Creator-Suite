@@ -3,15 +3,19 @@ set -e
 
 echo "🔍 Starting AppTheme import fix process..."
 
-# Ensure we're running from the correct project directory
-# cd "$(dirname "$0")/../mobile-app"
+# Navigate safely to project
+if [ ! -d "$(dirname "$0")/../mobile-app" ]; then
+  echo "⚠️ Skipping: mobile-app directory not found."
+  exit 0
+fi
 
-# Path to the AppTheme file
+cd "$(dirname "$0")/../mobile-app"
+
 APP_THEME_PATH="lib/theme/app_theme.dart"
 
-# Check if app_theme.dart exists
+# Recreate missing AppTheme file if needed
 if [ ! -f "$APP_THEME_PATH" ]; then
-  echo "⚠️ app_theme.dart not found, recreating a minimal version..."
+  echo "⚠️ app_theme.dart not found, recreating..."
   mkdir -p lib/theme
   cat <<'EOF' > "$APP_THEME_PATH"
 import 'package:flutter/material.dart';
@@ -29,12 +33,11 @@ EOF
   echo "✅ Recreated lib/theme/app_theme.dart"
 fi
 
-# Find Dart files that use AppTheme but lack the import
+# Scan for missing imports and patch them
 echo "🔧 Scanning for missing AppTheme imports..."
 grep -rl "AppTheme" lib/ | while read -r file; do
   if ! grep -q "import 'package:kdp_creator_suite/theme/app_theme.dart';" "$file"; then
     echo "🩹 Fixing import in: $file"
-    # Insert import after other import statements
     awk '
       BEGIN {inserted=0}
       /^import / {
