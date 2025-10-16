@@ -1,90 +1,93 @@
-name: Flutter Build Workflow
+name: Flutter Build & Publish
 
+# 1. Workflow triggers
 on:
-  workflow_dispatch:
+  workflow_dispatch:      # manual runs
   push:
     branches:
-      - main
+      - main             # automatic runs on main
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # for committing fixed files
-
-    env:
-      FLUTTER_VERSION: "3.37.0-0.1.pre"
-      APK_OUTPUT_DIR: "build/apks"
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      # 1. Checkout the repo
-      - name: Checkout repository
+      # 2. Repository checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0   # full history for commits
 
-      # 2. Set up git for committing fixes
-      - name: Git config
+      # 3. Git setup for committing fixed files
+      - name: Configure Git
         run: |
-          git config --global user.name "github-actions"
-          git config --global user.email "github-actions@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
 
-      # 3. Install Flutter manually
+      # 13. File permissions for scripts
+      - name: Ensure scripts are executable
+        run: chmod +x mobile-app/scripts/*.sh
+
+      # 4. Manual Flutter installation
       - name: Install Flutter
+        env:
+          FLUTTER_VERSION: "3.37.0-0.1.pre"
+          FLUTTER_GIT_URL: "https://github.com/flutter/flutter.git"
         run: |
-          git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git $HOME/flutter
+          git clone -b $FLUTTER_VERSION $FLUTTER_GIT_URL $HOME/flutter
           export PATH="$HOME/flutter/bin:$PATH"
-          flutter channel beta
-          flutter upgrade || echo "⚠️ Flutter upgrade failed, continuing..."
+          flutter doctor -v
 
-      # 4. Run project fix scripts (AppTheme & permissions)
-      - name: Run fix_files.sh
+      # 6. Run project repair scripts
+      - name: Run project fix scripts
         run: |
-          chmod +x mobile-app/scripts/fix_files.sh
-          ./mobile-app/scripts/fix_files.sh
-      - name: Run fix_app_theme_imports.sh
-        run: |
-          chmod +x mobile-app/scripts/fix_app_theme_imports.sh
-          ./mobile-app/scripts/fix_app_theme_imports.sh
+          echo "🧰 Running fix_files.sh..."
+          mobile-app/scripts/fix_files.sh
+          echo "🔍 Running fix_app_theme_imports.sh..."
+          mobile-app/scripts/fix_app_theme_imports.sh
 
-      # 5. Commit any fixed files back to repo
+      # 7. Committing fixed files
       - name: Commit fixed files
         run: |
           git add .
-          git diff --cached --quiet || git commit -m "Auto: Apply AppTheme & project fixes" || echo "No changes to commit"
-          git push || echo "Push failed or no write permissions"
+          git diff-index --quiet HEAD || git commit -m "Apply automated fixes from workflow"
 
-      # 6. Check & upgrade Dart dependencies
-      - name: Flutter pub outdated & upgrade
+      # 8. Dart & Flutter dependency management
+      - name: Upgrade Dart & Flutter dependencies
         run: |
           flutter pub outdated
           flutter pub upgrade --major-versions
           flutter pub get
 
-      # 7. Automatic versioning & build numbering
+      # 12. Automatic versioning & build numbering
       - name: Set version & build number
         run: |
-          VERSION=$(date +%Y.%m.%d.%H%M)
-          sed -i "s/^version:.*/version: $VERSION+1/" mobile-app/pubspec.yaml
+          # Example: auto-increment build number from timestamp
+          BUILD_NUMBER=$(date +%s)
+          VERSION_NAME="1.0.${BUILD_NUMBER}"
+          echo "version=$VERSION_NAME+$BUILD_NUMBER" > version.properties
 
-      # 8. Build APKs
-      - name: Build Debug APK
-        run: flutter build apk --debug
-      - name: Build Release APK
-        run: flutter build apk --release
-
-      # 9. Zip both APKs
-      - name: Prepare APKs
+      # 9. Flutter build
+      - name: Build Flutter APKs
         run: |
-          mkdir -p $APK_OUTPUT_DIR
-          cp build/app/outputs/flutter-apk/app-debug.apk $APK_OUTPUT_DIR/debug.apk
-          cp build/app/outputs/flutter-apk/app-release.apk $APK_OUTPUT_DIR/release.apk
-          cd $APK_OUTPUT_DIR
-          zip -r apks.zip debug.apk release.apk
+          flutter build apk --debug
+          flutter build apk --release
 
-      # 10. Upload APKs as artifacts
+      # 10. APK zipping
+      - name: Zip APKs
+        run: |
+          mkdir -p build/apks
+          cp build/app/outputs/flutter-apk/app-debug.apk build/apks/
+          cp build/app/outputs/flutter-apk/app-release.apk build/apks/
+          zip -r build/apks.zip build/apks
+
+      # 11. Artifact upload
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: apks
-          path: $APK_OUTPUT_DIR/apks.zip
+          name: apk-artifacts
+          path: build/apks.zip
