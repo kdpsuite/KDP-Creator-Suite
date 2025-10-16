@@ -4,7 +4,7 @@ set -e
 echo "🔍 Starting AppTheme import fix process..."
 
 # Ensure we're running from the correct project directory
-cd "$(dirname "$0")/../mobile-app"
+# cd "$(dirname "$0")/../mobile-app"
 
 # Path to the AppTheme file
 APP_THEME_PATH="lib/theme/app_theme.dart"
