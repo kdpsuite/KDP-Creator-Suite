@@ -1,13 +1,15 @@
 name: Flutter Build APKs
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:    # 👈 Manual trigger (Run workflow button)
   push:
     branches:
-      - main
+      - main            # 👈 Auto run on pushes to main
 
 permissions:
   contents: write
+  actions: write
+
 
 jobs:
   build:
