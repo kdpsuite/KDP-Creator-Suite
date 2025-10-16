@@ -1,82 +1,83 @@
-name: Flutter Build
+name: Flutter Build & Repair
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Give bot write access for pushing fixes/scripts
-
     env:
-      FLUTTER_VERSION: "3.37.0-0.1.pre" # Flutter version matching Dart SDK requirement
+      FLUTTER_VERSION: "3.37.0-0.1.pre"
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
 
-      - name: Setup required tools
+      - name: Give write permissions to scripts
+        run: chmod +x ./mobile-app/scripts/*.sh
+
+      - name: Run project fix scripts
         run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip xz-utils git curl
+          echo "Running fix_files.sh (will NOT change working directory inside the script)..."
+          ./mobile-app/scripts/fix_files.sh
+          echo "Running fix_app_theme_imports.sh (will NOT change working directory inside the script)..."
+          ./mobile-app/scripts/fix_app_theme_imports.sh
+
+      - name: Push fixed files back to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "💾 Apply automated AppTheme and Flutter fixes" || echo "No changes to commit"
+          git push origin HEAD:${{ github.ref }} || echo "Push failed (likely no changes)"
+
+      - name: Install Git
+        run: sudo apt-get update && sudo apt-get install -y git curl unzip xz-utils zip
 
       - name: Install Flutter manually
         run: |
           git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git /home/runner/flutter
           export PATH="$PATH:/home/runner/flutter/bin"
           flutter --version
+          flutter channel beta
+          flutter upgrade
 
-      - name: Run project fix scripts
-        run: |
-          echo "Running fix_files.sh (will NOT change working directory inside the script)..."
-          chmod +x mobile-app/scripts/fix_files.sh
-          ./mobile-app/scripts/fix_files.sh
-        continue-on-error: true
-
-      - name: 🔍 Check outdated Dart & Flutter packages
+      - name: Check for outdated Dart/Flutter packages
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
-          echo "Switching to beta channel for stability..."
-          flutter channel beta
-          flutter doctor
-
-          echo "Checking Dart packages..."
-          dart pub outdated || true
-
-          echo "Checking Flutter packages..."
-          flutter pub outdated || true
-
-          echo "Upgrading Flutter packages to latest major versions..."
+          dart pub outdated
+          flutter pub outdated
           flutter pub upgrade --major-versions
-        working-directory: mobile-app
 
       - name: Get Flutter dependencies
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
           flutter pub get
-        working-directory: mobile-app
 
       - name: Build Debug APK
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
-          flutter build apk --debug --build-number=$GITHUB_RUN_NUMBER
-        working-directory: mobile-app
+          flutter build apk --debug
 
       - name: Build Release APK
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
-          flutter build apk --release --build-number=$GITHUB_RUN_NUMBER
-        working-directory: mobile-app
+          flutter build apk --release
 
-      - name: Zip APKs
+      - name: Zip Debug and Release APKs
         run: |
           mkdir -p build_artifacts
-          zip -r build_artifacts/kdp_creator_suite_debug.apk.zip build/app/outputs/flutter-apk/app-debug.apk
-          zip -r build_artifacts/kdp_creator_suite_release.apk.zip build/app/outputs/flutter-apk/app-release.apk
+          cp build/app/outputs/flutter-apk/app-debug.apk build_artifacts/
+          cp build/app/outputs/flutter-apk/app-release.apk build_artifacts/
+          zip -r build_artifacts.zip build_artifacts/
 
-      - name: Upload APKs
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: kdp_creator_suite_apks
-          path: build_artifacts
+          name: flutter_apks
+          path: build_artifacts.zip
