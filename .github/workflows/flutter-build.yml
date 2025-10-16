@@ -1,111 +1,82 @@
-name: Flutter Build and Release
+name: Flutter Build
 
 on:
-  workflow_dispatch:   # allows manual triggers
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write    # gives bot write permission for push/changes
+      contents: write  # Give bot write access for pushing fixes/scripts
 
     env:
-      FLUTTER_VERSION: "3.37.0-0.1.pre"
+      FLUTTER_VERSION: "3.37.0-0.1.pre" # Flutter version matching Dart SDK requirement
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      # ------------------------------
-      # Install Flutter manually
-      # ------------------------------
-      - name: Install Flutter
+      - name: Setup required tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip xz-utils git curl
+
+      - name: Install Flutter manually
         run: |
           git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git /home/runner/flutter
           export PATH="$PATH:/home/runner/flutter/bin"
           flutter --version
 
-      # ------------------------------
-      # Run project fix scripts
-      # ------------------------------
       - name: Run project fix scripts
         run: |
+          echo "Running fix_files.sh (will NOT change working directory inside the script)..."
           chmod +x mobile-app/scripts/fix_files.sh
           ./mobile-app/scripts/fix_files.sh
-        working-directory: .
+        continue-on-error: true
 
-      # ------------------------------
-      # Check outdated Dart & Flutter packages
-      # ------------------------------
       - name: 🔍 Check outdated Dart & Flutter packages
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
           echo "Switching to beta channel for stability..."
           flutter channel beta
-          flutter upgrade
-          
+          flutter doctor
+
           echo "Checking Dart packages..."
           dart pub outdated || true
-          
+
           echo "Checking Flutter packages..."
           flutter pub outdated || true
-          
+
           echo "Upgrading Flutter packages to latest major versions..."
           flutter pub upgrade --major-versions
         working-directory: mobile-app
 
-      # ------------------------------
-      # Get Flutter dependencies
-      # ------------------------------
       - name: Get Flutter dependencies
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
           flutter pub get
         working-directory: mobile-app
 
-      # ------------------------------
-      # Auto versioning & build numbering
-      # ------------------------------
-      - name: Auto Versioning
-        run: |
-          ./mobile-app/scripts/auto_version.sh
-        working-directory: .
-
-      # ------------------------------
-      # Build Debug APK
-      # ------------------------------
       - name: Build Debug APK
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
           flutter build apk --debug --build-number=$GITHUB_RUN_NUMBER
         working-directory: mobile-app
 
-      # ------------------------------
-      # Build Release APK
-      # ------------------------------
       - name: Build Release APK
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
           flutter build apk --release --build-number=$GITHUB_RUN_NUMBER
         working-directory: mobile-app
 
-      # ------------------------------
-      # Zip APKs
-      # ------------------------------
       - name: Zip APKs
         run: |
-          mkdir -p artifacts
-          zip -r artifacts/kdp_apks.zip build/app/outputs/flutter-apk/*.apk
-        working-directory: mobile-app
+          mkdir -p build_artifacts
+          zip -r build_artifacts/kdp_creator_suite_debug.apk.zip build/app/outputs/flutter-apk/app-debug.apk
+          zip -r build_artifacts/kdp_creator_suite_release.apk.zip build/app/outputs/flutter-apk/app-release.apk
 
-      # ------------------------------
-      # Upload artifact
-      # ------------------------------
-      - name: Upload APK artifact
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: kdp_apks
-          path: mobile-app/artifacts/kdp_apks.zip
+          name: kdp_creator_suite_apks
+          path: build_artifacts
