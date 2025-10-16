@@ -1,38 +1,53 @@
-name: Build APKs
+name: Flutter Build & Release
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch:
+  workflow_dispatch: # Allows manual triggering
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
 
-      # ------------------------------
-      # Install the correct Flutter version
-      # ------------------------------
-      - name: 🛠️ Install Flutter 3.13.x (Dart >= 3.10)
-        run: |
-          git clone https://github.com/flutter/flutter.git /home/runner/flutter
-          cd /home/runner/flutter
-          git fetch --all --tags
-          git checkout 3.13.0
-          export PATH="$PATH:/home/runner/flutter/bin"
-          flutter --version
+    env:
+      FLUTTER_VERSION: "3.37.0-0.1.pre"
+
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       # ------------------------------
       # Run project fix scripts
       # ------------------------------
-      - name: Run project fix scripts
+      - name: 🛠️ Run project fix scripts
         run: |
           echo "Running fix_files.sh (will NOT change working directory inside the script)..."
-          chmod +x mobile-app/scripts/fix_files.sh
+          chmod +x ./mobile-app/scripts/fix_files.sh
           ./mobile-app/scripts/fix_files.sh
+        shell: bash
+
+      # ------------------------------
+      # Manually install Flutter
+      # ------------------------------
+      - name: 🚀 Install Flutter
+        run: |
+          git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git /home/runner/flutter
+          export PATH="$PATH:/home/runner/flutter/bin"
+          flutter --version
+
+      # ------------------------------
+      # Check for outdated Dart & Flutter packages
+      # ------------------------------
+      - name: 🔍 Check outdated Dart & Flutter packages
+        run: |
+          export PATH="$PATH:/home/runner/flutter/bin"
+          echo "Checking Dart packages..."
+          dart pub outdated || true
+          echo "Checking Flutter packages..."
+          flutter pub outdated || true
+        working-directory: mobile-app
 
       # ------------------------------
       # Get Flutter dependencies
@@ -44,51 +59,44 @@ jobs:
         working-directory: mobile-app
 
       # ------------------------------
-      # Automatic versioning & build number
+      # Increment version & build number
       # ------------------------------
-      - name: 🔢 Set version and build number
-        id: versioning
+      - name: ⚙️ Auto-increment version
         run: |
-          # Example: using Git commits count as build number
-          BUILD_NUMBER=$(git rev-list --count HEAD)
-          VERSION_NAME="1.0.$BUILD_NUMBER"
-          echo "Version: $VERSION_NAME, Build: $BUILD_NUMBER"
-          
-          # Update pubspec.yaml
-          sed -i "s/^version: .*/version: $VERSION_NAME+$BUILD_NUMBER/" mobile-app/pubspec.yaml
-          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          export PATH="$PATH:/home/runner/flutter/bin"
+          flutter pub run build_runner build --delete-conflicting-outputs
+          # Example: you can replace the line below with your actual version increment logic
+          echo "VERSION_CODE=$(date +%s)" >> $GITHUB_ENV
+          echo "VERSION_NAME=1.0.$(date +%s)" >> $GITHUB_ENV
 
       # ------------------------------
       # Build APKs
       # ------------------------------
-      - name: Build Debug APK
+      - name: 🏗️ Build Debug APK
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
-          flutter build apk --debug
+          flutter build apk --debug --build-name=$VERSION_NAME --build-number=$VERSION_CODE
         working-directory: mobile-app
 
-      - name: Build Release APK
+      - name: 🏗️ Build Release APK
         run: |
           export PATH="$PATH:/home/runner/flutter/bin"
-          flutter build apk --release
+          flutter build apk --release --build-name=$VERSION_NAME --build-number=$VERSION_CODE
         working-directory: mobile-app
 
       # ------------------------------
-      # Zip both APKs
+      # Zip APKs
       # ------------------------------
       - name: 📦 Zip APKs
         run: |
-          mkdir -p release_apks
-          cp mobile-app/build/app/outputs/flutter-apk/app-debug.apk release_apks/
-          cp mobile-app/build/app/outputs/flutter-apk/app-release.apk release_apks/
-          zip -r release_apks.zip release_apks
+          zip -r build_apks.zip ./mobile-app/build/app/outputs/apk/
+        shell: bash
 
       # ------------------------------
-      # Upload zipped APKs
+      # Upload zipped APKs as artifact
       # ------------------------------
-      - name: Upload APKs
+      - name: 📤 Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: APKs
-          path: release_apks.zip
+          name: build_apks
+          path: build_apks.zip
