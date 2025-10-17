@@ -1,7 +1,7 @@
 name: Build Flutter APKs
 
 on:
-  workflow_dispatch:       # manual trigger
+  workflow_dispatch:
   push:
     branches:
       - main
@@ -14,40 +14,39 @@ jobs:
       FLUTTER_VERSION: "3.37.0-0.1.pre"
 
     steps:
-
     # 1. Checkout repo with full history
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    # 2. Git setup for committing fixes
+    # 2. Setup Git for commits
     - name: Setup Git for commits
       run: |
         git config --global user.name "GitHub Actions Bot"
         git config --global user.email "actions@github.com"
         git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
 
-    # 3. Make scripts executable & fix Dart file permissions
+    # 3. Fix file and Dart permissions
     - name: Set file permissions
       run: |
-        chmod +x mobile-app/scripts/*.sh
+        chmod +x mobile-app/scripts/*.sh || true
         find mobile-app -type f -name "*.dart" -exec chmod 644 {} \;
 
-    # 4. Manual Flutter installation
+    # 4. Install Flutter manually
     - name: Install Flutter
       run: |
         git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git $HOME/flutter
         export PATH="$HOME/flutter/bin:$PATH"
         export FLUTTER_GIT_URL="https://github.com/flutter/flutter.git"
 
-    # 5. Flutter preflight check
+    # 5. Flutter Doctor (check installation)
     - name: Flutter Doctor
       run: |
         cd mobile-app
         flutter doctor -v
 
-    # 6. Run project repair scripts
+    # 6. Run fix scripts
     - name: Run fix_files.sh
       run: |
         cd mobile-app
@@ -65,15 +64,15 @@ jobs:
         git add .
         git diff --quiet || git commit -m "Apply automated Flutter project fixes"
 
-    # 8. Dart & Flutter dependency management
-    - name: Check outdated dependencies
+    # 8. Update and get dependencies
+    - name: Update dependencies
       run: |
         cd mobile-app
         flutter pub outdated
         flutter pub upgrade --major-versions
         flutter pub get
 
-    # 9. Flutter build APKs
+    # 9. Build APKs (Debug + Release)
     - name: Build Debug APK
       run: |
         cd mobile-app
@@ -84,7 +83,7 @@ jobs:
         cd mobile-app
         flutter build apk --release
 
-    # 10. APK zipping
+    # 10. Zip APKs for download
     - name: Zip APKs
       run: |
         cd mobile-app
@@ -94,15 +93,16 @@ jobs:
         cd build
         zip -r apks.zip apks
 
-    # 11. Upload APKs artifact
+    # 11. Upload the APKs artifact
     - name: Upload APKs
       uses: actions/upload-artifact@v4
       with:
         name: build-apks
         path: mobile-app/build/apks.zip
 
-    # 12. Automatic versioning & build numbering
-    - name: Set build number (example)
-      run: |
-        cd mobile-app
-        flutter pub run build_number:main
+    # 12. Optional: Automated version bump (disabled by default)
+    # Uncomment if you want to auto-increment version
+    # - name: Auto version bump
+    #   run: |
+    #     cd mobile-app
+    #     flutter pub run build_number:main
