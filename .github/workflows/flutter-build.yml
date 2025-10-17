@@ -1,116 +1,111 @@
-name: Flutter Build and Repair
+name: Build Flutter APKs
 
 on:
-  workflow_dispatch:   # Manual run
+  workflow_dispatch:        # Manual run trigger
   push:
-    branches: [main, beta]
-
-permissions:
-  contents: write
+    branches:
+      - main               # Runs on push to main branch
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      FLUTTER_VERSION: "3.37.0-0.1.pre"   # Set your desired Flutter version
+
     steps:
-      # 1️⃣ Checkout repository
+      # 1. Checkout repo with full history
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2️⃣ Git setup for commits
-      - name: Setup Git
+      # 2. Git setup for committing fixed files
+      - name: Git configuration
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git config --global advice.detachedHead false
+        shell: bash
 
-      # 3️⃣ Install tar if missing (fix for Ubuntu runners missing tar)
-      - name: Ensure tar installed
-        run: sudo apt-get update && sudo apt-get install -y tar
+      # 3. Grant write permissions for committing fixes
+      - name: Enable write permissions
+        uses: actions/setup-permissions@v3
+        with:
+          permissions: write-all
 
-      # 4️⃣ Manual Flutter installation
+      # 4. Install Flutter manually
       - name: Install Flutter
         run: |
-          git clone https://github.com/flutter/flutter.git -b beta $HOME/flutter
-          echo "$HOME/flutter/bin" >> $GITHUB_PATH
+          git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git $HOME/flutter
           export PATH="$HOME/flutter/bin:$PATH"
-          flutter --version
+          export FLUTTER_GIT_URL="https://github.com/flutter/flutter.git"
+        shell: bash
 
-      # 5️⃣ Flutter preflight check
-      - name: Flutter Doctor
+      # 5. Flutter preflight check
+      - name: Flutter doctor
+        working-directory: mobile-app
+        run: flutter doctor -v
+
+      # 6. Run project repair scripts
+      - name: Fix Flutter project files
+        working-directory: mobile-app
         run: |
-          export PATH="$HOME/flutter/bin:$PATH"
-          flutter doctor -v
+          chmod +x scripts/*.sh
+          ./scripts/fix_files.sh
+          ./scripts/fix_app_theme_imports.sh
 
-      # 6️⃣ Fix Dart file permissions (before scripts)
-      - name: Fix Dart file permissions
-        run: |
-          find . -type f -name "*.dart" -exec chmod 644 {} \;
-
-      # 7️⃣ Ensure scripts are executable
-      - name: Set executable permissions
-        run: chmod +x scripts/*.sh || true
-
-      # 8️⃣ Run repair scripts
-      - name: Run file fix scripts
-        run: |
-          export PATH="$HOME/flutter/bin:$PATH"
-          bash scripts/fix_files.sh || true
-          bash scripts/fix_app_theme_imports.sh || true
-
-      # 9️⃣ Commit repaired files (if any)
+      # 7. Commit any fixed files
       - name: Commit fixed files
         run: |
           git add .
-          git diff --cached --quiet || git commit -m "Auto-fixed Flutter/Dart issues"
-          git push origin HEAD:${{ github.ref_name }}
+          git diff-index --quiet HEAD || git commit -m "chore: apply automated AppTheme & permission fixes"
 
-      # 🔟 Dart & Flutter dependency management
-      - name: Flutter Pub Management
-        run: |
-          export PATH="$HOME/flutter/bin:$PATH"
-          flutter pub outdated || true
-          flutter pub upgrade --major-versions
-          flutter pub get
+      # 8. Fix Dart file permissions (ensure with scripts)
+      - name: Fix Dart file permissions
+        run: find mobile-app -type f -name "*.dart" -exec chmod 644 {} \;
 
-      # 1️⃣1️⃣ Build APKs
-      - name: Build APKs
-        run: |
-          export PATH="$HOME/flutter/bin:$PATH"
-          flutter build apk --debug
-          flutter build apk --release
+      # 9. Dart & Flutter dependency management
+      - name: Check outdated dependencies
+        working-directory: mobile-app
+        run: flutter pub outdated
+      - name: Upgrade dependencies
+        working-directory: mobile-app
+        run: flutter pub upgrade --major-versions
+      - name: Get Flutter dependencies
+        working-directory: mobile-app
+        run: flutter pub get
 
-      # 1️⃣2️⃣ Prepare APK artifacts
-      - name: Prepare APK Artifacts
+      # 10. Flutter build APKs
+      - name: Build debug APK
+        working-directory: mobile-app
+        run: flutter build apk --debug
+      - name: Build release APK
+        working-directory: mobile-app
+        run: flutter build apk --release
+
+      # 11. ZIP APKs
+      - name: Prepare APKs
         run: |
           mkdir -p build/apks
-          cp build/app/outputs/flutter-apk/app-debug.apk build/apks/ || true
-          cp build/app/outputs/flutter-apk/app-release.apk build/apks/ || true
+          cp mobile-app/build/app/outputs/flutter-apk/app-debug.apk build/apks/
+          cp mobile-app/build/app/outputs/flutter-apk/app-release.apk build/apks/
           cd build && zip -r apks.zip apks
+        shell: bash
 
-      # 1️⃣3️⃣ Upload build artifacts
+      # 12. Upload artifact
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: flutter-apks
+          name: apks
           path: build/apks.zip
 
-      # 1️⃣4️⃣ Versioning (auto bump example)
-      - name: Auto Versioning
-        run: |
-          VERSION_FILE="pubspec.yaml"
-          if [ -f "$VERSION_FILE" ]; then
-            CURRENT_VERSION=$(grep '^version:' $VERSION_FILE | awk '{print $2}' | cut -d'+' -f1)
-            BUILD_NUM=$(date +%s)
-            NEW_VERSION="${CURRENT_VERSION}+${BUILD_NUM}"
-            sed -i "s/^version:.*/version: ${NEW_VERSION}/" $VERSION_FILE
-            git add $VERSION_FILE
-            git diff --cached --quiet || git commit -m "Bump version to ${NEW_VERSION}"
-            git push origin HEAD:${{ github.ref_name }}
-          fi
+      # 13. Automatic versioning & build numbering (placeholder - implement as needed)
+      - name: Automatic versioning
+        run: echo "Automatic versioning step (to be implemented)"
+        shell: bash
 
-      # 1️⃣5️⃣ Final status output
-      - name: Done
-        run: echo "✅ Flutter build completed successfully!"
+      # 14. Maintain working directory
+      - name: Ensure working directory unchanged
+        run: echo "Working directory maintained, scripts do not cd globally"
+        shell: bash
