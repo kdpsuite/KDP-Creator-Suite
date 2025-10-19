@@ -4,12 +4,12 @@ set -e
 echo "🔍 Starting AppTheme import fix process..."
 
 # Navigate safely to project
-if [ ! -d "$(dirname "$0")/../mobile-app" ]; then
+if [ ! -d "$(dirname "$0")/.." ]; then
   echo "⚠️ Skipping: mobile-app directory not found."
   exit 0
 fi
 
-cd "$(dirname "$0")/../mobile-app"
+cd "$(dirname "$0")/.."
 
 APP_THEME_PATH="lib/theme/app_theme.dart"
 
