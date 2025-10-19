@@ -59,9 +59,13 @@ jobs:
 
     # 9. Run repair scripts
     - name: Run fix_files.sh
-      run: bash mobile-app/scripts/fix_files.sh
+    - name: Make fix scripts executable
+      run:  chmod +x mobile-app/scripts/*.sh
+      run:  bash mobile-app/scripts/fix_files.sh
 
     - name: Run fix_app_theme_imports.sh
+    - name: Make fix scripts executable
+      run:  chmod +x mobile-app/scripts/*.sh
       run: bash mobile-app/scripts/fix_app_theme_imports.sh
 
     # 10. Commit any fixes
@@ -119,7 +123,7 @@ jobs:
         
     - name: Get dependencies
       run: |
-        cd mobile-app
+        
         flutter pub get
 # 6. Run Project Repair Scripts
     - name: 🧰 Make repair scripts executable
@@ -151,7 +155,32 @@ jobs:
         else
           echo "ℹ️ No changes to commit."
         fi
-        
+     # 🧩 --- REPAIR & PREP SECTION ---
+- name: Ensure repair scripts are executable
+  run: |
+    chmod +x mobile-app/scripts/*.sh
+    echo "✅ Scripts marked as executable"
+
+# 🧰 --- RUN FIX SCRIPTS ---
+- name: Run file repair scripts
+  run: |
+    echo "🚀 Running file repair scripts..."
+    cd mobile-app
+    chmod +x mobile-app/scripts/*.sh
+    ./scripts/fix_file_permissions.sh || echo "⚠️ fix_file_permissions.sh not found, skipping"
+    ./scripts/fix_dart_imports.sh || echo "⚠️ fix_dart_imports.sh not found, skipping"
+    ./scripts/fix_app_theme_imports.sh || echo "⚠️ fix_app_theme_imports.sh not found, skipping"
+    echo "✅ Repair scripts completed"
+
+    # 📝 --- COMMIT ANY AUTO FIXES ---
+    - name: Commit AppTheme & Import fixes
+      run: |
+        cd mobile-app
+    git config user.name "GitHub Actions"
+    git config user.email "actions@github.com"
+    git add .
+    git commit -m "Auto-fix AppTheme and imports" || echo "ℹ️ No changes to commit"
+    echo "✅ Auto fixes committed (if any)"   
     # 12. Build APKs (Debug + Release)
     - name: Build Debug APK
       run: |
