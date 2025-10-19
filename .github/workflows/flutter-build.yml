@@ -34,8 +34,10 @@ jobs:
         git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git $HOME/flutter
         echo "$HOME/flutter/bin" >> $GITHUB_PATH
         echo "FLUTTER_GIT_URL=https://github.com/flutter/flutter.git" >> $GITHUB_ENV
+           export PATH="$HOME/flutter/bin:$PATH"
+        echo "$HOME/flutter/bin" >> $GITHUB_PATH
+        echo "FLUTTER_GIT_URL=https://github.com/flutter/flutter.git" >> $GITHUB_ENV
         flutter --version
-
 
     # 5. Flutter preflight
     - name: Flutter Doctor
