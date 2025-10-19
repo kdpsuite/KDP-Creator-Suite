@@ -26,14 +26,16 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-    # 4. Install Flutter manually and persist PATH
-    - name: Install Flutter
+    # 4. Install Flutter (Beta channel to match SDK requirements)
+    - name: Install Flutter (beta channel)
       env:
-        FLUTTER_VERSION: stable
+        FLUTTER_VERSION: beta
       run: |
         git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git $HOME/flutter
         echo "$HOME/flutter/bin" >> $GITHUB_PATH
         echo "FLUTTER_GIT_URL=https://github.com/flutter/flutter.git" >> $GITHUB_ENV
+        flutter --version
+
 
     # 5. Flutter preflight
     - name: Flutter Doctor
