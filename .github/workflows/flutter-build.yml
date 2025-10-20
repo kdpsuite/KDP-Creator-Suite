@@ -155,7 +155,7 @@ jobs:
         else
           echo "ℹ️ No changes to commit."
         fi
-     # 🧩 --- REPAIR & PREP SECTION ---
+# 🧩 --- REPAIR & PREP SECTION ---
 - name: Ensure repair scripts are executable
   run: |
     chmod +x mobile-app/scripts/*.sh
