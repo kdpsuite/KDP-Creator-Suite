@@ -57,11 +57,10 @@ jobs:
       # 8. Run repair scripts
       # 4. Repair Scripts Behavior: fix_app_theme_imports.sh auto-creates and imports AppTheme.
       # 4. Repair Scripts Behavior: fix_files.sh handles missing imports and file permission corrections.
-      - name: Run Repair Script: fix_app_theme_imports.sh
-        run: ./mobile-app/scripts/fix_app_theme_imports.sh
-
-      - name: Run Repair Script: fix_files.sh
-        run: ./mobile-app/scripts/fix_files.sh
+      - name: Run Repair Scripts
+        run: |
+          ./mobile-app/scripts/fix_app_theme_imports.sh
+          ./mobile-app/scripts/fix_files.sh
       
       # 9. Commit repairs (and 7. Commit & Push Auto Repairs)
       - name: Commit and Push Repaired Files
