@@ -59,11 +59,9 @@ jobs:
       # 4. Repair Scripts Behavior: fix_files.sh handles missing imports and file permission corrections.
       - name: Run Repair Script: fix_app_theme_imports.sh
         run: ./mobile-app/scripts/fix_app_theme_imports.sh
-        # Assuming the script handles its own working directory or is run from root
 
       - name: Run Repair Script: fix_files.sh
         run: ./mobile-app/scripts/fix_files.sh
-        # Assuming the script handles its own working directory or is run from root
       
       # 9. Commit repairs (and 7. Commit & Push Auto Repairs)
       - name: Commit and Push Repaired Files
@@ -130,4 +128,4 @@ jobs:
 
       # 13. Confirm success (Final Integrity Check)
       - name: Final Integrity Check
-        run: echo "n Final Integrity Check: Workflow completed s
+        run: echo "n Final Integrity Check: Workflow completed successfully."
