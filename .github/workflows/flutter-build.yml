@@ -32,7 +32,6 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'beta'
-          flutter-version: '3.10.0'
 
       # 4. Run Flutter Doctor preflight
       - name: Flutter Doctor
