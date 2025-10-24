@@ -4,139 +4,123 @@ on:
   push:
     branches:
       - main
+      - beta
   pull_request:
     branches:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build_and_repair:
     runs-on: ubuntu-latest
-
-    env:
-      FLUTTER_VERSION: beta
 
     steps:
       # 1. Checkout Repository
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       # 2. Configure Git
       - name: Setup Git User
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # ensure push will work via token URL
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          echo "Git user configured"
 
-      # 3. Install Flutter (beta channel, explicit manual install)
-      - name: Install Flutter (beta)
+      # 3. Install Flutter (Beta Channel)
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'beta'
+          flutter-version: '3.10.0'
+
+      # 4. Run Flutter Doctor preflight
+      - name: Flutter Doctor
+        run: flutter doctor -v
+        working-directory: ./mobile-app
+
+      # 5. Mark repair scripts executable
+      - name: Mark Repair Scripts Executable
+        run: chmod +x mobile-app/scripts/*.sh
+
+      # 6. Fix Dart file permissions before running scripts
+      - name: Fix Dart Permissions
+        run: find mobile-app -type f -name "*.dart" -exec chmod 644 {} \;
+
+      # 7. Run repair scripts
+      - name: Run Repair Scripts
         run: |
-          rm -rf $HOME/flutter
-          git clone -b $FLUTTER_VERSION https://github.com/flutter/flutter.git $HOME/flutter --depth 1
-          echo "$HOME/flutter/bin" >> $GITHUB_PATH
-          echo "FLUTTER_GIT_URL=https://github.com/flutter/flutter.git" >> $GITHUB_ENV
-          export PATH="$HOME/flutter/bin:$PATH"
-          flutter --version
+          bash mobile-app/scripts/fix_files.sh
+          bash mobile-app/scripts/fix_app_theme_imports.sh
 
-      # 4. Initial Flutter doctor (sanity check)
-      - name: Flutter doctor (initial)
-        run: |
-          flutter doctor -v
-
-      # 5. Ensure file/script permissions
-      - name: Make repair scripts executable & set dart file perms
-        run: |
-          chmod +x mobile-app/scripts/*.sh || true
-          find mobile-app -type f -name "*.dart" -exec chmod 644 {} \; || true
-
-      # 6. Get dependencies early (so fixes run against resolved packages)
-      - name: Get Flutter dependencies
-        working-directory: mobile-app
-        run: |
-          flutter pub get
-
-      # 7. Run repair scripts (right before analyze/build)
-      - name: Run repair scripts (AppTheme + imports)
-        run: |
-          echo "🔧 Running repair scripts..."
-          cd mobile-app
-          ./scripts/fix_app_theme_imports.sh || echo "⚠️ fix_app_theme_imports.sh failed or missing"
-          ./scripts/fix_files.sh || echo "⚠️ fix_files.sh failed or missing"
-          echo "✅ Repair scripts finished"
-
-      # 8. Commit & push repaired files if any (only for push events)
-      - name: Commit and push repaired files (if any)
+      # 8. Commit any fixes back to repo
+      - name: Commit Repaired Files
         if: github.event_name == 'push'
         run: |
-          cd mobile-app
           git add .
-          if git diff --cached --quiet; then
-            echo "ℹ️ No changes to commit"
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(workflow): Auto-repair files via GitHub Actions [skip ci]"
+            git push
           else
-            git commit -m "chore(workflow): Auto-repair AppTheme/imports [skip ci]"
-            git push origin HEAD:${{ github.ref_name }}
-            echo "✅ Pushed repaired files"
-          fi
+            echo "No changes to commit."
 
-      # 9. Dependency check + upgrades (optional)
-      - name: Check outdated & upgrade (major)
-        working-directory: mobile-app
+      # 9. Get dependencies
+      - name: Get Flutter Dependencies
+        run: flutter pub get
+        working-directory: ./mobile-app
+
+      # 10. Check outdated dependencies
+      - name: Flutter Pub Outdated
+        run: flutter pub outdated
+        working-directory: ./mobile-app
+
+      # 11. Upgrade dependencies (major versions)
+      - name: Flutter Pub Upgrade
+        run: flutter pub upgrade --major-versions
+        working-directory: ./mobile-app
+
+      # 12. Flutter Analyze
+      - name: Flutter Analyze
+        run: flutter analyze
+        working-directory: ./mobile-app
+
+      # 13. Optional preflight: clean & format
+      - name: Optional Preflight
         run: |
-          flutter pub outdated || true
-          flutter pub upgrade --major-versions || true
-          flutter pub get
+          flutter clean
+          flutter format lib
+        working-directory: ./mobile-app
 
-      # 10. Prebuild analyze (doctor + analyze)
-      - name: Flutter doctor and analyze
-        working-directory: mobile-app
-        run: |
-          flutter doctor -v
-          flutter analyze || true
-
-      # 11. Optional preflight (clean & format)
-      - name: Optional preflight (clean & format)
-        working-directory: mobile-app
-        run: |
-          flutter clean || true
-          flutter format lib || true
-
-      # 12. Build Debug APK
+      # 14. Build APKs
       - name: Build Debug APK
-        working-directory: mobile-app
-        run: |
-          flutter build apk --debug
+        run: flutter build apk --debug
+        working-directory: ./mobile-app
 
-      # 13. Build Release APK
       - name: Build Release APK
-        working-directory: mobile-app
+        run: flutter build apk --release
+        working-directory: ./mobile-app
         env:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_ALIAS_PASSWORD: ${{ secrets.KEY_ALIAS_PASSWORD }}
-        run: |
-          flutter build apk --release
 
-      # 14. Package APKs into zip
-      - name: Create Zip Archive of APKs
+      # 15. Package APKs into zip
+      - name: Zip APKs
         run: |
           mkdir -p mobile-app/build/apks
-          cp mobile-app/build/app/outputs/flutter-apk/*.apk mobile-app/build/apks/ || true
+          cp mobile-app/build/app/outputs/flutter-apk/*.apk mobile-app/build/apks/
           cd mobile-app/build
-          zip -r apks.zip apks/ || true
+          zip -r apks.zip apks/
           cd ../..
+        shell: bash
 
-      # 15. Upload APKs artifact
+      # 16. Upload artifact
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: KDP-Creator-Suite-APKs
           path: mobile-app/build/apks.zip
 
-      # 16. Final Integrity Check
+      # 17. Final integrity check
       - name: Final Integrity Check
-        run: echo "🎉 Final Integrity Check: Workflow completed successfully."
+        run: echo "🎉 Final Integrity Check: Workflow completed successfully!"
