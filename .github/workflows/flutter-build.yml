@@ -18,7 +18,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          # Required for pushing changes back to the repository
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # 2. Configure Git
@@ -26,7 +25,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          echo "n Git user configured"
+          echo "✅ Git user configured"
 
       # 3. Install Flutter (using beta channel as requested)
       - name: Install Flutter (Beta Channel)
@@ -39,15 +38,15 @@ jobs:
       - name: Flutter Doctor - Verify Installation
         run: flutter doctor -v
       
-      # 5. Fix Dart permissions (Not explicitly needed for a standard Flutter project on Linux, but included for completeness)
+      # 5. Fix Dart permissions (optional)
       - name: Fix Permissions (Placeholder/No-op)
-        run: echo "n Permissions step complete (No-op on Linux for standard files)"
+        run: echo "✅ Permissions step complete (no-op on Linux)"
 
       # 6. Mark scripts executable
       - name: Mark Repair Scripts Executable
         run: |
           chmod +x mobile-app/scripts/*.sh
-          echo "n Scripts marked as executable"
+          echo "✅ Scripts marked as executable"
 
       # 7. Get dependencies
       - name: Get Flutter Dependencies
@@ -55,41 +54,38 @@ jobs:
         working-directory: ./mobile-app
 
       # 8. Run repair scripts
-      # 4. Repair Scripts Behavior: fix_app_theme_imports.sh auto-creates and imports AppTheme.
-      # 4. Repair Scripts Behavior: fix_files.sh handles missing imports and file permission corrections.
       - name: Run Repair Scripts
         run: |
           ./mobile-app/scripts/fix_app_theme_imports.sh
           ./mobile-app/scripts/fix_files.sh
       
-      # 9. Commit repairs (and 7. Commit & Push Auto Repairs)
+      # 9. Commit repairs (and push back if necessary)
       - name: Commit and Push Repaired Files
+        if: github.event_name == 'push'
         run: |
           if [ -n "$(git status --porcelain)" ]; then
-            echo "n Committing repaired files"
+            echo "🛠️ Committing repaired files"
             git add .
             git commit -m "chore(workflow): Auto-repair files via GitHub Actions [skip ci]"
             git push
-            echo "n Pushed repaired files"
+            echo "✅ Pushed repaired files"
           else
-            echo "No files to commit. Repository is clean."
+            echo "ℹ️ No files to commit. Repository is clean."
           fi
-        # Only push if it's a 'push' event to avoid modifying PR branches unexpectedly
-        if: github.event_name == 'push'
 
       # 10. Doctor + Analyze
       - name: Flutter Analyze
         run: flutter analyze
         working-directory: ./mobile-app
 
-      # Optional Preflight Checks (8. flutter clean and flutter format lib)
+      # 11. Optional Preflight Checks
       - name: Optional Preflight Checks
         run: |
           flutter clean
           flutter format lib
         working-directory: ./mobile-app
       
-      # 11. Build APKs (Debug + Release)
+      # 12. Build APKs (Debug + Release)
       - name: Build Debug APK
         run: flutter build apk --debug
         working-directory: ./mobile-app
@@ -98,26 +94,18 @@ jobs:
         run: flutter build apk --release
         working-directory: ./mobile-app
         env:
-          # Placeholder for potential secure keys required for release build
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_ALIAS_PASSWORD: ${{ secrets.KEY_ALIAS_PASSWORD }}
         
-      # 12. Zip & Upload
-      # 9. Build Output Validation: Artifact name: KDP-Creator-Suite-APKs.
+      # 13. Zip & Upload
       - name: Create Zip Archive of APKs
         run: |
-          # The build output path for APKs is usually mobile-app/build/app/outputs/flutter-apk/
-          # Copy to the requested path: mobile-app/build/apks/
           mkdir -p mobile-app/build/apks
           cp mobile-app/build/app/outputs/flutter-apk/*.apk mobile-app/build/apks/
-          
-          # Zip into build/apks.zip
           cd mobile-app/build
           zip -r apks.zip apks/
           cd ../..
-          
-          echo "n Build Release APK" # Log marker
-          echo "n Upload APKs complete" # Log marker
+          echo "✅ APKs zipped successfully"
           
       - name: Upload APKs
         uses: actions/upload-artifact@v4
@@ -125,6 +113,6 @@ jobs:
           name: KDP-Creator-Suite-APKs
           path: mobile-app/build/apks.zip
 
-      # 13. Confirm success (Final Integrity Check)
+      # 14. Final Integrity Check
       - name: Final Integrity Check
-        run: echo "🎉 Final Integrity Check: Workflow completed successfully."
+        run: echo "🎉 Final Integrity Check: Workflow completed successfully!"
