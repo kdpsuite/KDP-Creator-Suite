@@ -26,7 +26,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          echo "Git user configured"
 
       # 3. Install Flutter (Beta Channel)
       - name: Install Flutter
@@ -112,7 +111,6 @@ jobs:
           cd mobile-app/build
           zip -r apks.zip apks/
           cd ../..
-        shell: bash
 
       # 16. Upload artifact
       - name: Upload APKs
@@ -123,4 +121,4 @@ jobs:
 
       # 17. Final integrity check
       - name: Final Integrity Check
-        run: echo "🎉 Final Integrity Check: Workflow completed successfully!"
+        run: echo "🎉 Workflow completed successfully!"
