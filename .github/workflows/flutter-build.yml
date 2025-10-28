@@ -49,7 +49,7 @@ jobs:
         run: |
           if [ -n "$(git status --porcelain)" ]; then
             git add .
-            git commit -m "chore(workflow): Auto-repair files via GitHub Actions [skip ci]"
+            git commit -m "chore(workflow): Auto-repair files via GitHub Actions [skip ci]" || exit 1
             git push || exit 1
             echo "✅ Repaired files pushed"
           else
@@ -94,7 +94,7 @@ jobs:
           mkdir -p mobile-app/build/apks
           cp mobile-app/build/app/outputs/flutter-apk/*.apk mobile-app/build/apks/
           cd mobile-app/build
-          zip -r apks.zip apks/
+          zip -r apks.zip apks/ || exit 1
           cd ../..
           echo "✅ APKs zipped"
 
