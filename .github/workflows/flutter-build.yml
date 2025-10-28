@@ -31,27 +31,28 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: beta  # Set to beta channel
+          
+    #  - name: Setup Python Environment
+    #    uses: actions/setup-python@v4
+    #    with:
+      #    python-version: '3.x'  # Specify the Python version
 
-      - name: Setup Python Environment
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'  # Specify the Python version
+     # - name: Install Dependencies
+    #    run: |
+        #  python -m pip install --upgrade pip  # Upgrade pip
+       #   pip install -r mobile-app/scripts/requirements.txt  # Install dependencies
 
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip  # Upgrade pip
-          pip install -r mobile-app/scripts/requirements.txt  # Install dependencies
-
-      - name: Prepare Scripts & Run Python Scripts
-        run: |
-          if [ -d mobile-app/scripts ]; then
-            echo "✅ Scripts directory found. Running Python scripts."
-            python mobile-app/scripts/scan_apptheme.py || exit 1
-            python mobile-app/scripts/fix_flutter_issues.py || exit 1
-            echo "✅ Python scripts executed successfully."
-          else
-            echo "ℹ️ No scripts directory found; skipping script execution."
-          fi
+      # Commented out repair scripts for now
+      # - name: Prepare Scripts & Run Python Scripts
+      #   run: |
+      #     if [ -d mobile-app/scripts ]; then
+      #       echo "✅ Scripts directory found. Running Python scripts."
+      #       python mobile-app/scripts/scan_apptheme.py || exit 1
+      #       python mobile-app/scripts/fix_flutter_issues.py || exit 1
+      #       echo "✅ Python scripts executed successfully."
+      #     else
+      #       echo "ℹ️ No scripts directory found; skipping script execution."
+      #     fi
 
       - name: Flutter Doctor
         run: flutter doctor -v
