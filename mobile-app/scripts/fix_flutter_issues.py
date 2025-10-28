@@ -5,7 +5,7 @@ import argparse
 import sys
 
 # CONFIGURATION
-FLUTTER_ROOT_PATH = r"C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter"
+FLUTTER_ROOT_PATH = os.getenv("FLUTTER_ROOT") or r"C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter"
 PACKAGE_NAME = "kdp_creator_suite"
 APP_THEME_FILENAME = "app_theme.dart"
 
