@@ -1,5 +1,5 @@
+---
 name: KDP Creator Suite Master Workflow
-
 on:
   push:
     branches:
@@ -8,45 +8,38 @@ on:
   pull_request:
     branches:
       - main
-  workflow_dispatch:
-
+  workflow_dispatch: null
 jobs:
   build_and_repair:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Setup Git User
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           echo "✅ Git user configured"
-
       - name: Install Flutter (Beta Channel)
         uses: subosito/flutter-action@v2
         with:
           channel: beta
-
       - name: Prepare Scripts & Permissions
         run: |
           chmod +x mobile-app/scripts/*.sh
           find mobile-app -type f -name "*.dart" -exec chmod 644 {} \;
           echo "✅ Scripts marked executable and Dart permissions fixed"
-
       - name: Run Repair Scripts
         run: |
           ./mobile-app/scripts/fix_app_theme_imports.sh || exit 1
           ./mobile-app/scripts/fix_files.sh || exit 1
           echo "✅ Repair scripts completed"
-
       - name: Commit Repaired Files
         if: github.event_name == 'push'
-        run: |
+        run: >
           if [ -n "$(git status --porcelain)" ]; then
             git add .
             git commit -m "chore(workflow): Auto-repair files via GitHub Actions [skip ci]" || exit 1
@@ -55,55 +48,50 @@ jobs:
           else
             echo "ℹ️ No files to commit"
           fi
-
       - name: Flutter Doctor
         run: flutter doctor -v
         working-directory: ./mobile-app
-
       - name: Flutter Analyze
         run: flutter analyze
         working-directory: ./mobile-app
-
       - name: Get Flutter Dependencies
         run: flutter pub get
         working-directory: ./mobile-app
-
       - name: Upgrade Dependencies
         run: flutter pub upgrade --major-versions
         working-directory: ./mobile-app
-
       - name: Optional Preflight Checks
         run: |
           flutter clean
           flutter format lib
         working-directory: ./mobile-app
-
       - name: Build Debug APK
         run: flutter build apk --debug
         working-directory: ./mobile-app
-
       - name: Build Release APK
         run: flutter build apk --release
         working-directory: ./mobile-app
         env:
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_ALIAS_PASSWORD: ${{ secrets.KEY_ALIAS_PASSWORD }}
-
       - name: Create Zip Archive of APKs
-        run: |
+        run: >
           mkdir -p mobile-app/build/apks
-          cp mobile-app/build/app/outputs/flutter-apk/*.apk mobile-app/build/apks/
-          cd mobile-app/build
-          zip -r apks.zip apks/ || exit 1
-          cd ../..
-          echo "✅ APKs zipped"
 
+          cp mobile-app/build/app/outputs/flutter-apk/*.apk mobile-app/build/apks/
+
+          cd mobile-app/build
+
+          zip -r apks.zip apks/ || exit 1
+
+          cd ../..
+
+          echo "✅ APKs zipped"
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: KDP-Creator-Suite-APKs
           path: mobile-app/build/apks.zip
-
       - name: Final Integrity Check
-        run: echo "🎉 Workflow completed successfully and all
-        steps preserved!"
+        run: echo "🎉 Workflow completed successfully and all steps preser
+        ved!"
