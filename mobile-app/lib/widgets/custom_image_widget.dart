@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:kdp_creator_suite/lib\theme\app_theme.dart';
 
 class CustomImageWidget extends StatelessWidget {
   final String? imageUrl;

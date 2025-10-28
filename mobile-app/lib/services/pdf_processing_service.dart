@@ -5,6 +5,7 @@ import 'package:flutter_tesseract_ocr/flutter_tesseract_ocr.dart';
 import 'package:crypto/crypto.dart';
 import 'package:uuid/uuid.dart';
 import '../utils/supabase_service.dart';
+import 'package:kdp_creator_suite/lib\theme\app_theme.dart';
 
 class PdfProcessingService {
   static final PdfProcessingService _instance =

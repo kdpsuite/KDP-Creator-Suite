@@ -1,6 +1,7 @@
 import '../utils/supabase_service.dart';
 import '../models/project.dart';
 import '../models/format_conversion.dart';
+import 'package:kdp_creator_suite/lib\theme\app_theme.dart';
 
 class ProjectService {
   static final ProjectService _instance = ProjectService._internal();

@@ -1,4 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:kdp_creator_suite/lib\theme\app_theme.dart';
 
 class SupabaseService {
   static final SupabaseService _instance = SupabaseService._internal();
