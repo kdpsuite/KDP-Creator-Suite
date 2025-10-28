@@ -50,7 +50,7 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             git add .
             git commit -m "chore(workflow): Auto-repair files via GitHub Actions [skip ci]"
-            git push
+            git push || exit 1
             echo "✅ Repaired files pushed"
           else
             echo "ℹ️ No files to commit"
@@ -105,5 +105,5 @@ jobs:
           path: mobile-app/build/apks.zip
 
       - name: Final Integrity Check
-        run: echo "🎉 Workflow completed successfully and all 16+
+        run: echo "🎉 Workflow completed successfully and all
         steps preserved!"
