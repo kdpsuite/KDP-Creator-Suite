@@ -93,5 +93,4 @@ jobs:
           name: KDP-Creator-Suite-APKs
           path: mobile-app/build/apks.zip
       - name: Final Integrity Check
-        run: echo "🎉 Workflow completed successfully and all steps preser
-        ved!"
+        run: echo "🎉 Workflow completed successfully and all steps preserved!"
