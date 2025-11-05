@@ -12,7 +12,7 @@ import sys
 # If you are getting "flutter executable not found", set this to the full path 
 # of your Flutter installation folder (e.g., r"C:\src\flutter").
 # Leave it as "" to rely on the system's PATH variable.
-FLUTTER_ROOT_PATH = r"C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter"
+FLUTTER_ROOT_PATH = os.getenv("FLUTTER_ROOT") or r"C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter"
 # The package name from your pubspec.yaml (e.g., kdp_creator_suite)
 PACKAGE_NAME = "kdp_creator_suite"
 
