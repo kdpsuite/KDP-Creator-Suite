@@ -1,0 +1,3 @@
+requests
+pandas
+# Any additional libraries based on your script content

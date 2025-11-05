@@ -1,0 +1,291 @@
+Microsoft Windows [Version 10.0.19045.6396]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\WINDOWS\system32>cd C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts
+
+C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts> python scan_apptheme.py
+  File "C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts\scan_apptheme.py", line 15
+    FLUTTER_ROOT_PATH = r"C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter”
+                        ^
+SyntaxError: unterminated string literal (detected at line 15)
+
+C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts>python scan_apptheme.py -y
+  File "C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts\scan_apptheme.py", line 15
+    FLUTTER_ROOT_PATH =r"C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter”
+                       ^
+SyntaxError: unterminated string literal (detected at line 15)
+
+C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts>python scan_apptheme.py -y
+  File "C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts\scan_apptheme.py", line 15
+    FLUTTER_ROOT_PATH = r "C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter”
+                          ^
+SyntaxError: unterminated string literal (detected at line 15)
+
+C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts>python scan_apptheme.py -y
+  File "C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts\scan_apptheme.py", line 15
+    FLUTTER_ROOT_PATH = r"C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter”
+                        ^
+SyntaxError: unterminated string literal (detected at line 15)
+
+C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts>python scan_apptheme.py -y
+Flutter project root: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app
+Script starting point: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts
+AppTheme file path: lib\theme\app_theme.dart
+Target import statement: import 'package:kdp_creator_suite/lib\theme\app_theme.dart';
+Flutter executable: C:\Users\User\Documents\unlovedproductions\dev\SDK\flutter\flutter_windows_3.35.4-stable\flutter\bin\flutter.bat
+
+[STEP 1/4] Checking currency of lib\theme\app_theme.dart...
+Warning: lib\theme\app_theme.dart might not be current or has syntax errors:
+Analyzing app_theme.dart...
+
+  error - The argument type 'CardTheme' can't be assigned to the parameter type 'CardThemeData?'.  - lib\theme\app_theme.dart:105:16 - argument_type_not_assignable
+  error - The constructor being called isn't a const constructor - lib\theme\app_theme.dart:110:23 - const_with_non_const
+  error - The argument type 'TabBarTheme' can't be assigned to the parameter type 'TabBarThemeData?'.  - lib\theme\app_theme.dart:274:18 - argument_type_not_assignable
+  error - The argument type 'CardTheme' can't be assigned to the parameter type 'CardThemeData?'.  - lib\theme\app_theme.dart:376:16 - argument_type_not_assignable
+  error - The constructor being called isn't a const constructor - lib\theme\app_theme.dart:381:23 - const_with_non_const
+  error - The argument type 'TabBarTheme' can't be assigned to the parameter type 'TabBarThemeData?'.  - lib\theme\app_theme.dart:545:18 - argument_type_not_assignable6 issues found. (ran in 191.9s)
+
+[STEP 2/4] Initial scan and categorization...
+
+Number of files with AppTheme defined: 0
+Number of files with AppTheme not defined: 60
+
+[STEP 3/4] Performing syntax validation on all Dart files (This is the longest step)...
+Progress: |██████████████████████████████████████████████████| 100.0% Complete
+
+7 files have non-trivial syntax errors or warnings:
+- custom_inspector.dart (C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\custom_inspector.dart):
+Analyzing custom_inspector.dart...
+
+   info - 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead - lib\custom_inspector.dart:3:1 - deprecated_member_use
+warning - The value of the local variable 'fileName' isn't used - lib\custom_inspector.dart:387:22 - unused_local_variable2 issues found. (ran in 67.2s)
+- main-updated.dart (C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\main-updated.dart):
+Analyzing main-updated.dart...
+
+   info - 'dart:html' is deprecated and shouldn't be used. Use package:web and dart:js_interop instead - lib\main-updated.dart:7:1 - deprecated_member_use1 issue found. (ran in 249.5s)
+- format_selection.dart (C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\format_selection.dart):
+Analyzing format_selection.dart...
+
+warning - The declaration '_exportToCloudStorage' isn't referenced - lib\presentation\format_selection\format_selection.dart:174:16 - unused_element
+warning - The declaration '_getFileExtension' isn't referenced - lib\presentation\format_selection\format_selection.dart:218:10 - unused_element2 issues found. (ran in 12.5s)
+- pdf_import.dart (C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\pdf_import.dart):
+Analyzing pdf_import.dart...
+
+warning - The value of the field '_processingService' isn't used - lib\presentation\pdf_import\pdf_import.dart:63:30 - unused_field1 issue found. (ran in 26.2s)
+- google_drive_service.dart (C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\google_drive_service.dart):
+Analyzing google_drive_service.dart...
+
+warning - The method doesn't override an inherited method - lib\services\google_drive_service.dart:236:16 - override_on_non_overriding_member1 issue found. (ran in 8.7s)
+- pdf_processing_service.dart (C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\pdf_processing_service.dart):
+Analyzing pdf_processing_service.dart...
+
+warning - The value of the field '_supabaseService' isn't used - lib\services\pdf_processing_service.dart:15:25 - unused_field
+warning - The value of the local variable 'sourcePage' isn't used - lib\services\pdf_processing_service.dart:546:15 - unused_local_variable
+warning - The value of the local variable 'coloringPage' isn't used - lib\services\pdf_processing_service.dart:547:15 - unused_local_variable3 issues found. (ran in 70.8s)
+- project_service.dart (C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\project_service.dart):
+Analyzing project_service.dart...
+
+warning - Dead code - lib\services\project_service.dart:310:46 - dead_code
+warning - The left operand can't be null, so the right operand is never executed - lib\services\project_service.dart:310:49 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\services\project_service.dart:311:53 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\services\project_service.dart:312:54 - dead_null_aware_expression
+warning - The left operand can't be null, so the right operand is never executed - lib\services\project_service.dart:313:52 - dead_null_aware_expression
+warning - Dead code - lib\services\project_service.dart:338:57 - dead_code
+warning - The left operand can't be null, so the right operand is never executed - lib\services\project_service.dart:338:60 - dead_null_aware_expression7 issues found. (ran in 8.9s)
+
+Files where AppTheme is NOT defined:
+- custom_inspector.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\custom_inspector.dart
+- main-updated.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\main-updated.dart
+- main.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\main.dart
+- app_export.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\core\app_export.dart
+- format_conversion.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\models\format_conversion.dart
+- project.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\models\project.dart
+- user_profile.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\models\user_profile.dart
+- amazon_kdp_integration.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\amazon_kdp_integration.dart
+- authentication_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\authentication_section_widget.dart
+- cover_image_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\cover_image_section_widget.dart
+- preview_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\preview_section_widget.dart
+- publishing_actions_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\publishing_actions_widget.dart
+- publishing_form_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\publishing_form_widget.dart
+- status_indicator_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\status_indicator_widget.dart
+- cloud_export_screen.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\cloud_export\cloud_export_screen.dart
+- format_selection.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\format_selection.dart
+- advanced_format_options_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\advanced_format_options_widget.dart
+- advanced_settings_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\advanced_settings_widget.dart
+- bottom_action_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\bottom_action_widget.dart
+- coloring_book_options_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\coloring_book_options_widget.dart
+- format_card_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\format_card_widget.dart
+- kindle_options_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\kindle_options_widget.dart
+- pdf_preview_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\pdf_preview_widget.dart
+- onboarding_flow.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\onboarding_flow.dart
+- navigation_controls_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\widgets\navigation_controls_widget.dart
+- onboarding_page_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\widgets\onboarding_page_widget.dart
+- page_indicator_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\widgets\page_indicator_widget.dart
+- pdf_import.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\pdf_import.dart
+- cloud_storage_dialog_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\cloud_storage_dialog_widget.dart
+- conversion_progress_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\conversion_progress_widget.dart
+- file_preview_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\file_preview_widget.dart
+- import_method_button_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\import_method_button_widget.dart
+- processing_quality_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\processing_quality_widget.dart
+- recent_files_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\recent_files_widget.dart
+- upload_area_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\upload_area_widget.dart
+- upload_progress_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\upload_progress_widget.dart
+- project_library.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\project_library.dart
+- empty_state_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\empty_state_widget.dart
+- filter_bottom_sheet_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\filter_bottom_sheet_widget.dart
+- project_card_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\project_card_widget.dart
+- search_bar_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\search_bar_widget.dart
+- sync_indicator_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\sync_indicator_widget.dart
+- settings.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\settings.dart
+- account_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\account_section_widget.dart
+- settings_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\settings_section_widget.dart
+- storage_management_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\storage_management_widget.dart
+- theme_selector_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\theme_selector_widget.dart
+- assets_res.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\res\assets_res.dart
+- app_routes.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\routes\app_routes.dart
+- analytics_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\analytics_service.dart
+- auth_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\auth_service.dart
+- cloud_storage_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\cloud_storage_service.dart
+- dropbox_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\dropbox_service.dart
+- google_drive_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\google_drive_service.dart
+- pdf_processing_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\pdf_processing_service.dart
+- project_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\project_service.dart
+- supabase_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\utils\supabase_service.dart
+- custom_error_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\widgets\custom_error_widget.dart
+- custom_icon_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\widgets\custom_icon_widget.dart
+- custom_image_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\widgets\custom_image_widget.dart
+
+Attempting to fix files...
+Fixed: custom_inspector.dart
+Fixed: main-updated.dart
+Fixed: main.dart
+Fixed: app_export.dart
+Fixed: format_conversion.dart
+Fixed: project.dart
+Fixed: user_profile.dart
+Fixed: amazon_kdp_integration.dart
+Fixed: authentication_section_widget.dart
+Fixed: cover_image_section_widget.dart
+Fixed: preview_section_widget.dart
+Fixed: publishing_actions_widget.dart
+Fixed: publishing_form_widget.dart
+Fixed: status_indicator_widget.dart
+Fixed: cloud_export_screen.dart
+Fixed: format_selection.dart
+Fixed: advanced_format_options_widget.dart
+Fixed: advanced_settings_widget.dart
+Fixed: bottom_action_widget.dart
+Fixed: coloring_book_options_widget.dart
+Fixed: format_card_widget.dart
+Fixed: kindle_options_widget.dart
+Fixed: pdf_preview_widget.dart
+Fixed: onboarding_flow.dart
+Fixed: navigation_controls_widget.dart
+Fixed: onboarding_page_widget.dart
+Fixed: page_indicator_widget.dart
+Fixed: pdf_import.dart
+Fixed: cloud_storage_dialog_widget.dart
+Fixed: conversion_progress_widget.dart
+Fixed: file_preview_widget.dart
+Fixed: import_method_button_widget.dart
+Fixed: processing_quality_widget.dart
+Fixed: recent_files_widget.dart
+Fixed: upload_area_widget.dart
+Fixed: upload_progress_widget.dart
+Fixed: project_library.dart
+Fixed: empty_state_widget.dart
+Fixed: filter_bottom_sheet_widget.dart
+Fixed: project_card_widget.dart
+Fixed: search_bar_widget.dart
+Fixed: sync_indicator_widget.dart
+Fixed: settings.dart
+Fixed: account_section_widget.dart
+Fixed: settings_section_widget.dart
+Fixed: storage_management_widget.dart
+Fixed: theme_selector_widget.dart
+Fixed: assets_res.dart
+Fixed: app_routes.dart
+Fixed: analytics_service.dart
+Fixed: auth_service.dart
+Fixed: cloud_storage_service.dart
+Fixed: dropbox_service.dart
+Fixed: google_drive_service.dart
+Fixed: pdf_processing_service.dart
+Fixed: project_service.dart
+Fixed: supabase_service.dart
+Fixed: custom_error_widget.dart
+Fixed: custom_icon_widget.dart
+Fixed: custom_image_widget.dart
+
+Number of files fixed: 60
+Files fixed:
+- custom_inspector.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\custom_inspector.dart
+- main-updated.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\main-updated.dart
+- main.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\main.dart
+- app_export.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\core\app_export.dart
+- format_conversion.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\models\format_conversion.dart
+- project.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\models\project.dart
+- user_profile.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\models\user_profile.dart
+- amazon_kdp_integration.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\amazon_kdp_integration.dart
+- authentication_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\authentication_section_widget.dart
+- cover_image_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\cover_image_section_widget.dart
+- preview_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\preview_section_widget.dart
+- publishing_actions_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\publishing_actions_widget.dart
+- publishing_form_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\publishing_form_widget.dart
+- status_indicator_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\amazon_kdp_integration\widgets\status_indicator_widget.dart
+- cloud_export_screen.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\cloud_export\cloud_export_screen.dart
+- format_selection.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\format_selection.dart
+- advanced_format_options_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\advanced_format_options_widget.dart
+- advanced_settings_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\advanced_settings_widget.dart
+- bottom_action_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\bottom_action_widget.dart
+- coloring_book_options_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\coloring_book_options_widget.dart
+- format_card_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\format_card_widget.dart
+- kindle_options_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\kindle_options_widget.dart
+- pdf_preview_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\format_selection\widgets\pdf_preview_widget.dart
+- onboarding_flow.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\onboarding_flow.dart
+- navigation_controls_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\widgets\navigation_controls_widget.dart
+- onboarding_page_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\widgets\onboarding_page_widget.dart
+- page_indicator_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\onboarding_flow\widgets\page_indicator_widget.dart
+- pdf_import.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\pdf_import.dart
+- cloud_storage_dialog_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\cloud_storage_dialog_widget.dart
+- conversion_progress_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\conversion_progress_widget.dart
+- file_preview_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\file_preview_widget.dart
+- import_method_button_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\import_method_button_widget.dart
+- processing_quality_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\processing_quality_widget.dart
+- recent_files_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\recent_files_widget.dart
+- upload_area_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\upload_area_widget.dart
+- upload_progress_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\pdf_import\widgets\upload_progress_widget.dart
+- project_library.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\project_library.dart
+- empty_state_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\empty_state_widget.dart
+- filter_bottom_sheet_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\filter_bottom_sheet_widget.dart
+- project_card_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\project_card_widget.dart
+- search_bar_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\search_bar_widget.dart
+- sync_indicator_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\project_library\widgets\sync_indicator_widget.dart
+- settings.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\settings.dart
+- account_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\account_section_widget.dart
+- settings_section_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\settings_section_widget.dart
+- storage_management_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\storage_management_widget.dart
+- theme_selector_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\presentation\settings\widgets\theme_selector_widget.dart
+- assets_res.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\res\assets_res.dart
+- app_routes.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\routes\app_routes.dart
+- analytics_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\analytics_service.dart
+- auth_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\auth_service.dart
+- cloud_storage_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\cloud_storage_service.dart
+- dropbox_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\dropbox_service.dart
+- google_drive_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\google_drive_service.dart
+- pdf_processing_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\pdf_processing_service.dart
+- project_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\services\project_service.dart
+- supabase_service.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\utils\supabase_service.dart
+- custom_error_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\widgets\custom_error_widget.dart
+- custom_icon_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\widgets\custom_icon_widget.dart
+- custom_image_widget.dart: C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\lib\widgets\custom_image_widget.dart
+
+[STEP 4/4] Rechecking directory for files still not defined...
+
+Number of files still not defined after fix attempt: 0
+All previously 'not defined' files are now fixed.
+
+All files initially identified as 'not defined' were successfully fixed or remained fixed.
+
+C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts>
+C:\Users\User\Documents\unlovedproductions\kdp-creator-suite\mobile-app\scripts>
