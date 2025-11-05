@@ -1,0 +1,112 @@
+name: Build Android APKs
+
+on:
+  push:
+    branches:
+      - main
+      - beta
+      - develop
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_android:
+    name: Build Android APKs (Debug & Release)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'beta'
+          cache: true
+
+      - name: Flutter Doctor
+        run: flutter doctor -v
+        working-directory: ./mobile-app
+
+      - name: Get Flutter Dependencies
+        run: flutter pub get
+        working-directory: ./mobile-app
+
+      - name: Run Flutter Analyze
+        run: flutter analyze
+        working-directory: ./mobile-app
+        continue-on-error: true
+
+      - name: Clean Build
+        run: flutter clean
+        working-directory: ./mobile-app
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+        working-directory: ./mobile-app
+
+      - name: Build Release APK
+        run: flutter build apk --release
+        working-directory: ./mobile-app
+        env:
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS_PASSWORD: ${{ secrets.KEY_ALIAS_PASSWORD }}
+
+      - name: Rename APK Files
+        run: |
+          mkdir -p mobile-app/build/outputs
+          cp mobile-app/build/app/outputs/flutter-apk/app-debug.apk mobile-app/build/outputs/kdp-creator-suite-debug.apk || true
+          cp mobile-app/build/app/outputs/flutter-apk/app-release.apk mobile-app/build/outputs/kdp-creator-suite-release.apk || true
+          ls -lah mobile-app/build/outputs/
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kdp-creator-suite-debug-apk
+          path: mobile-app/build/outputs/kdp-creator-suite-debug.apk
+          if-no-files-found: warn
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kdp-creator-suite-release-apk
+          path: mobile-app/build/outputs/kdp-creator-suite-release.apk
+          if-no-files-found: warn
+
+      - name: Create APK Archive
+        run: |
+          cd mobile-app/build/outputs
+          zip -r kdp-creator-suite-apks.zip *.apk
+          ls -lah
+
+      - name: Upload APK Archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: kdp-creator-suite-apks-archive
+          path: mobile-app/build/outputs/kdp-creator-suite-apks.zip
+          if-no-files-found: warn
+
+      - name: Build Summary
+        run: |
+          echo "### Build Summary :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Status:** ✅ Success" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Artifacts Generated:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Debug APK: kdp-creator-suite-debug.apk" >> $GITHUB_STEP_SUMMARY
+          echo "- Release APK: kdp-creator-suite-release.apk" >> $GITHUB_STEP_SUMMARY
+          echo "- Archive: kdp-creator-suite-apks.zip" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Flutter Version:**" >> $GITHUB_STEP_SUMMARY
+          flutter --version >> $GITHUB_STEP_SUMMARY
