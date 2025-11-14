@@ -13,7 +13,7 @@ import 'package:sizer/sizer.dart';
 import '../core/app_export.dart';
 import '../utils/supabase_service.dart';
 import '../widgets/custom_error_widget.dart';
-import 'package:kdp_creator_suite/lib\theme\app_theme.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 var backendURL = "https://kindleforg9207back.builtwithrocket.new/log-error";
 

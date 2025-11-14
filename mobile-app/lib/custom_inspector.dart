@@ -7,7 +7,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:web/web.dart' as web;
-import 'package:kdp_creator_suite/lib\theme\app_theme.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 var backendURL = "https://kindleforg9207back.builtwithrocket.new/log-inspected-widget";
 
