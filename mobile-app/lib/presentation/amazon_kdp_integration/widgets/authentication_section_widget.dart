@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kdp_creator_suite/widgets/custom_icon_widget.dart';
 import 'package:kdp_creator_suite/theme/app_theme.dart';
-import 'package:kdp_creator_suite/widgets/custom_icon_widget.dart';
 import 'package:sizer/sizer.dart';
-import 'package:kdp_creator_suite/widgets/custom_icon_widget.dart';
 
 class AuthenticationSectionWidget extends StatefulWidget {
   final bool isAuthenticated;

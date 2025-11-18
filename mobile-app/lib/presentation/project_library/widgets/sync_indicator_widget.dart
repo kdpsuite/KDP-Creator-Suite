@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../../core/app_export.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class SyncIndicatorWidget extends StatefulWidget {
   final bool isOnline;
