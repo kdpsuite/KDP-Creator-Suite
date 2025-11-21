@@ -10,6 +10,7 @@ import './widgets/coloring_book_options_widget.dart';
 import './widgets/format_card_widget.dart';
 import './widgets/kindle_options_widget.dart';
 import './widgets/pdf_preview_widget.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class FormatSelection extends StatefulWidget {
   const FormatSelection({super.key});

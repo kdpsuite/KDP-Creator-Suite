@@ -6,6 +6,7 @@ import '../../core/app_export.dart';
 import '../../theme/app_theme.dart';
 import './widgets/navigation_controls_widget.dart';
 import './widgets/onboarding_page_widget.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class OnboardingFlow extends StatefulWidget {
   const OnboardingFlow({super.key});

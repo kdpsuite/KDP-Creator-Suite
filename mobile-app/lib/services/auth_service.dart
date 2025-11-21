@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/supabase_service.dart';
 import '../models/user_profile.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
