@@ -1,5 +1,6 @@
 import 'dart:io' if (dart.library.io) 'dart:io';
 
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -20,7 +21,6 @@ import './widgets/processing_quality_widget.dart';
 import './widgets/recent_files_widget.dart';
 import './widgets/upload_area_widget.dart';
 import './widgets/upload_progress_widget.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class PdfImport extends StatefulWidget {
   const PdfImport({super.key});

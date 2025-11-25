@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';import './widgets/account_section_widget.dart';import '../../core/app_export.dart';import './widgets/storage_management_widget.dart';import 'package:sizer/sizer.dart';import './widgets/settings_section_widget.dart';import './widgets/theme_selector_widget.dart';
+import 'package:sizer/sizer.dart';
+
+import 'package:kdp_creator_suite/theme/app_theme.dart';
+import '../../core/app_export.dart';
+import './widgets/account_section_widget.dart';
+import './widgets/settings_section_widget.dart';
+import './widgets/storage_management_widget.dart';
+import './widgets/theme_selector_widget.dart';
 
 class Settings extends StatefulWidget {
   const Settings({super.key});

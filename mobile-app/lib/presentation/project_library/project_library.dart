@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 
@@ -12,7 +13,6 @@ import './widgets/filter_bottom_sheet_widget.dart';
 import './widgets/project_card_widget.dart';
 import './widgets/search_bar_widget.dart';
 import './widgets/sync_indicator_widget.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class ProjectLibrary extends StatefulWidget {
   const ProjectLibrary({super.key});

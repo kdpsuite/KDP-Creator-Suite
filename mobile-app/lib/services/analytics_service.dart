@@ -1,5 +1,4 @@
 import '../utils/supabase_service.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class AnalyticsService {
   static final AnalyticsService _instance = AnalyticsService._internal();

@@ -7,7 +7,6 @@ import '../core/app_export.dart';
 import '../utils/supabase_service.dart';
 import '../widgets/custom_error_widget.dart';
 import 'package:kdp_creator_suite/theme/app_theme.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

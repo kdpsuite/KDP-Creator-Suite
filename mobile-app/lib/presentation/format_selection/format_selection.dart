@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
 import 'dart:convert';
 
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 import '../../core/app_export.dart';
 import './widgets/advanced_settings_widget.dart';
 import './widgets/bottom_action_widget.dart';
@@ -10,7 +11,6 @@ import './widgets/coloring_book_options_widget.dart';
 import './widgets/format_card_widget.dart';
 import './widgets/kindle_options_widget.dart';
 import './widgets/pdf_preview_widget.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class FormatSelection extends StatefulWidget {
   const FormatSelection({super.key});

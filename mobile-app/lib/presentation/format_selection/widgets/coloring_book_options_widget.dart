@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 import 'package:sizer/sizer.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';import '../../../theme/app_theme.dart';
+
+import '../../../core/app_export.dart';
+import '../../../theme/app_theme.dart';
 
 class ColoringBookOptionsWidget extends StatelessWidget {
   final bool includePrintable;

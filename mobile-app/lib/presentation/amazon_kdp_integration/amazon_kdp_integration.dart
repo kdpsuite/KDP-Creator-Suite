@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:kdp_creator_suite/theme/app_theme.dart';
 import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
@@ -8,7 +9,6 @@ import './widgets/preview_section_widget.dart';
 import './widgets/publishing_actions_widget.dart';
 import './widgets/publishing_form_widget.dart';
 import './widgets/status_indicator_widget.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class AmazonKdpIntegration extends StatefulWidget {
   const AmazonKdpIntegration({super.key});

@@ -5,7 +5,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 
 import './cloud_storage_service.dart';
-import 'package:kdp_creator_suite/theme/app_theme.dart';
 
 class DropboxService extends CloudStorageService {
   static const String _appKey = 'YOUR_DROPBOX_APP_KEY';
