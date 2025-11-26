@@ -16,7 +16,7 @@ A modern Flutter-based mobile application utilizing the latest mobile developmen
 flutter pub get
 ```
 
-2. Run the application:
+1. Run the application:
 
 To run the app with environment variables defined in an env.json file, follow the steps mentioned below:
 1. Through CLI
