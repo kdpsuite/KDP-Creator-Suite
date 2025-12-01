@@ -44,6 +44,10 @@ dependencies:
   uuid: ^4.5.1                      # UUID generation for file management
   convert: ^3.1.2                   # Data conversion utilities
   
+  # Monetization and In-App Purchases
+  google_mobile_ads: ^5.1.0 # AdMob Integration
+  purchases_flutter: ^7.7.0 # RevenueCat Integration
+
   # Cloud Storage Integration
   googleapis: ^15.0.0               # Google APIs client library
   googleapis_auth: ^2.0.0           # Google OAuth2 authentication
@@ -70,5 +74,3 @@ flutter:
   # 🚨 CRITICAL FONTS RULE: 
   # - THIS PROJECT USES GOOGLE FONTS INSTEAD OF LOCAL FONTS
   # - DO NOT ADD ANY LOCAL FONTS SECTION OR FONT FILES
-flutter_intl:
-  enabled: true

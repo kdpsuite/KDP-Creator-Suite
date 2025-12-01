@@ -7,7 +7,7 @@ class AssetsRes {
   AssetsRes._();
 
   static const String PROJECT_NAME = 'kdp_creator_suite';
-  static const String PROJECT_VERSION = '1.0.0+1';
+  static const String PROJECT_VERSION = '3.0.0';
   static const String IMG_APP_LOGO = 'packages/kdp_creator_suite/assets/images/img_app_logo.svg';
   static const String NO_IMAGE = 'packages/kdp_creator_suite/assets/images/no-image.jpg';
   static const String SAD_FACE = 'packages/kdp_creator_suite/assets/images/sad_face.svg';

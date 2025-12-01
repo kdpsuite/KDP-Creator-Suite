@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
+import 'services/admob_service.dart'; // Import AdMob Service
+import 'services/revenuecat_service.dart'; // Import RevenueCat Service
 
 import '../core/app_export.dart';
 import '../utils/supabase_service.dart';
@@ -9,6 +11,12 @@ import '../widgets/custom_error_widget.dart';
 import 'package:kdp_creator_suite/theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize AdMob
+  await AdMobService.initialize();
+
+  // Initialize RevenueCat
+  await RevenueCatService.initialize();
 
   // Initialize Supabase
   try {
