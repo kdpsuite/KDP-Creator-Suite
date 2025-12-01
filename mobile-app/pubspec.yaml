@@ -32,7 +32,7 @@ dependencies:
   
   # Enhanced PDF Processing Dependencies
   pdf: ^3.11.3                      # PDF creation and manipulation
-  syncfusion_flutter_pdf: ^31.1.23  # Advanced PDF reading and editing
+  syncfusion_flutter_pdf: ^31.2.2  # Advanced PDF reading and editing
   image: ^4.5.4                     # Image processing and optimization
   flutter_tesseract_ocr: ^0.4.29    # OCR for scanned PDFs
   printing: ^5.14.2                 # PDF printing and layout preservation
@@ -70,5 +70,3 @@ flutter:
   # 🚨 CRITICAL FONTS RULE: 
   # - THIS PROJECT USES GOOGLE FONTS INSTEAD OF LOCAL FONTS
   # - DO NOT ADD ANY LOCAL FONTS SECTION OR FONT FILES
-flutter_intl:
-  enabled: true

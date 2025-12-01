@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:sizer/sizer.dart';
 import 'package:kdp_creator_suite/theme/app_theme.dart';
-import 'package:kdp_creator_suite/widgets/custom_image_widget.dart';
+import 'package:sizer/sizer.dart';
+
+import '../../../core/app_export.dart';
 
 class OnboardingPageWidget extends StatelessWidget {
   final String title;
