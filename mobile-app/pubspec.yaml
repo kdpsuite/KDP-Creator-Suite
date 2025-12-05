@@ -46,7 +46,7 @@ dependencies:
   
   # Monetization and In-App Purchases
   google_mobile_ads: ^5.1.0 # AdMob Integration
-  purchases_flutter: ^7.7.0 # RevenueCat Integration
+  purchases_flutter: ^9.9.10 # RevenueCat Integration
 
   # Cloud Storage Integration
   googleapis: ^15.0.0               # Google APIs client library
