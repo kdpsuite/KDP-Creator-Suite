@@ -45,7 +45,11 @@ dependencies:
   convert: ^3.1.2                   # Data conversion utilities
   
   # Monetization and In-App Purchases
+<<<<<<< HEAD
   google_mobile_ads: ^6.0.0 # AdMob Integration
+=======
+  google_mobile_ads: ^5.1.0 # AdMob Integration
+>>>>>>> ff23cb0d29da03df5d33fc855e8b7e11cfc5d77c
   purchases_flutter: ^9.9.10 # RevenueCat Integration
 
   # Cloud Storage Integration
