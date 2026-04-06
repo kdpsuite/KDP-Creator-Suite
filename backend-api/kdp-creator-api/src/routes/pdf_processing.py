@@ -82,6 +82,7 @@ def convert_image_to_coloring():
         return jsonify({
             'success': True,
             'image_data': encoded_image,
+            'preview': generate_preview(output_bytes, 'image'),
             'file_size_mb': len(output_bytes) / (1024 * 1024),
             'processing_options': {
                 'threshold': threshold,
@@ -208,6 +209,7 @@ def convert_to_kdp_format():
         return jsonify({
             'success': True,
             'pdf_data': encoded_pdf,
+            'preview': generate_preview(final_bytes, 'pdf'),
             'file_size_mb': len(final_bytes) / (1024 * 1024),
             'page_count': page_count,
             'target_format': target_format,
@@ -366,12 +368,52 @@ def apply_kdp_formatting(page, target_format, margins, trim_size):
         return page
 
 def validate_coloring_book_requirements(pdf_reader, issues, warnings, compliance_score):
-    """Validate coloring book specific requirements"""
-    # Check for appropriate line thickness
-    # Check for sufficient white space
-    # Validate that images are suitable for coloring
-    # These would require advanced PDF content analysis
-    pass
+    """Validate coloring book specific requirements (Line Thickness & White Space)"""
+    try:
+        from pdf2image import convert_from_bytes
+        import tempfile
+
+        # To analyze content, we need to rasterize a sample page
+        with tempfile.TemporaryDirectory() as path:
+            # We'll only analyze the first page for efficiency
+            # Convert first page to image for analysis
+            output_buffer = io.BytesIO()
+            writer = PdfWriter()
+            writer.add_page(pdf_reader.pages[0])
+            writer.write(output_buffer)
+            
+            images = convert_from_bytes(output_buffer.getvalue(), first_page=1, last_page=1)
+            if not images:
+                return
+
+            img = np.array(images[0].convert('L')) # Grayscale
+            
+            # 1. Check for White Space (Coloring area)
+            # Threshold to find white areas (assuming 255 is white)
+            white_pixels = np.sum(img > 240)
+            total_pixels = img.size
+            white_ratio = white_pixels / total_pixels
+            
+            if white_ratio < 0.4:
+                issues.append(f"Low coloring area detected ({white_ratio:.1%}). Coloring books should have significant white space.")
+                # compliance_score is passed by reference but integers are immutable in Python, 
+                # however we're in a helper so we can't easily return it without changing the signature.
+                # For now, we'll just add the issue.
+            elif white_ratio < 0.6:
+                warnings.append(f"Moderate coloring area ({white_ratio:.1%}). Consider increasing white space for better user experience.")
+
+            # 2. Check for Line Thickness (using edge detection)
+            edges = cv2.Canny(img, 100, 200)
+            edge_pixels = np.sum(edges > 0)
+            
+            if edge_pixels < (total_pixels * 0.01):
+                warnings.append("Lines appear very thin or sparse. Ensure lines are bold enough for coloring.")
+            elif edge_pixels > (total_pixels * 0.2):
+                warnings.append("Page appears very 'busy' or dark. This may be difficult to color.")
+
+    except Exception as e:
+        current_app.logger.error(f"Coloring book validation failed: {str(e)}")
+        warnings.append("Could not perform advanced content analysis. Basic compliance only.")
 
 def apply_watermark_if_needed(pdf_bytes, user_id):
     """Apply watermark for free tier users"""
@@ -448,6 +490,33 @@ def process_image_file(image_bytes, target_format):
             'error': str(e),
         }
 
+def generate_preview(content_bytes, content_type='pdf'):
+    """Generate a low-res image preview for real-time display"""
+    try:
+        if content_type == 'pdf':
+            from pdf2image import convert_from_bytes
+            images = convert_from_bytes(content_bytes, first_page=1, last_page=1)
+            if not images:
+                return None
+            preview_img = images[0]
+        else:
+            # Assuming it's an image
+            preview_img = Image.open(io.BytesIO(content_bytes))
+        
+        # Resize to standard preview size (e.g., 600px height)
+        max_height = 600
+        w, h = preview_img.size
+        ratio = max_height / h
+        preview_img = preview_img.resize((int(w * ratio), max_height), Image.Resampling.LANCZOS)
+        
+        # Save as low-quality JPEG for speed
+        output = io.BytesIO()
+        preview_img.convert('RGB').save(output, format='JPEG', quality=70)
+        return base64.b64encode(output.getvalue()).decode('utf-8')
+    except Exception as e:
+        current_app.logger.error(f"Preview generation failed: {str(e)}")
+        return None
+
 def process_pdf_file(pdf_bytes, target_format, user_id):
     """Process a PDF file for batch processing"""
     try:
@@ -460,10 +529,12 @@ def process_pdf_file(pdf_bytes, target_format, user_id):
         
         output_buffer = io.BytesIO()
         pdf_writer.write(output_buffer)
+        output_bytes = output_buffer.getvalue()
         
         return {
             'success': True,
-            'data': base64.b64encode(output_buffer.getvalue()).decode('utf-8'),
+            'data': base64.b64encode(output_bytes).decode('utf-8'),
+            'preview': generate_preview(output_bytes, 'pdf'),
             'type': 'pdf',
         }
     except Exception as e:
