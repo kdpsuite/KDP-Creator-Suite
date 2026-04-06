@@ -1,4 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
+from src.models.user import User
+from reportlab.lib.colors import grey
 import os
 import io
 import base64
@@ -314,15 +316,54 @@ def calculate_dynamic_margins(page_count, format_type):
     }
 
 def apply_kdp_formatting(page, target_format, margins, trim_size):
-    """Apply KDP-specific formatting to a page"""
-    # This would involve complex PDF manipulation
-    # For now, return the page as-is
-    # In a full implementation, this would:
-    # - Adjust page size to trim size
-    # - Apply margins
-    # - Add bleed if required
-    # - Optimize for target format
-    return page
+    """Apply KDP-specific formatting to a page (Resizing & Margins)"""
+    try:
+        # 1. Determine target dimensions in points (1 inch = 72 points)
+        if trim_size and trim_size in KDP_TRIM_SIZES:
+            target_w = KDP_TRIM_SIZES[trim_size]['width'] * 72
+            target_h = KDP_TRIM_SIZES[trim_size]['height'] * 72
+        else:
+            # Default to current page size if no trim specified
+            target_w = float(page.mediabox.width)
+            target_h = float(page.mediabox.height)
+
+        # 2. Add bleed if it's a print format
+        if 'print' in target_format or 'paperback' in target_format:
+            target_w += (BLEED_SIZE * 72)
+            target_h += (BLEED_SIZE * 2 * 72) # Top and bottom
+
+        # 3. Create a new blank page with target dimensions
+        packet = io.BytesIO()
+        can = canvas.Canvas(packet, pagesize=(target_w, target_h))
+        
+        # In a real implementation, we would draw the original page content here
+        # but for this iteration, we'll focus on the container transformation.
+        can.save()
+        packet.seek(0)
+        
+        new_pdf = PdfReader(packet)
+        new_page = new_pdf.pages[0]
+        
+        # 4. Scale and Merge the original content onto the new page
+        # Calculate scale to fit within margins
+        safe_w = target_w - (margins['left'] + margins['right']) * 72
+        safe_h = target_h - (margins['top'] + margins['bottom']) * 72
+        
+        orig_w = float(page.mediabox.width)
+        orig_h = float(page.mediabox.height)
+        
+        scale = min(safe_w / orig_w, safe_h / orig_h)
+        
+        # Merge with scaling and centering
+        new_page.merge_transformed_page(
+            page,
+            [scale, 0, 0, scale, margins['left'] * 72, margins['bottom'] * 72]
+        )
+        
+        return new_page
+    except Exception as e:
+        current_app.logger.error(f"Formatting failed: {str(e)}")
+        return page
 
 def validate_coloring_book_requirements(pdf_reader, issues, warnings, compliance_score):
     """Validate coloring book specific requirements"""
@@ -334,9 +375,51 @@ def validate_coloring_book_requirements(pdf_reader, issues, warnings, compliance
 
 def apply_watermark_if_needed(pdf_bytes, user_id):
     """Apply watermark for free tier users"""
-    # In a full implementation, this would check user subscription tier
-    # and apply watermark if needed
-    return pdf_bytes
+    if not user_id:
+        return pdf_bytes
+        
+    try:
+        user = User.query.get(user_id)
+        if not user or user.subscription_tier != 'free':
+            return pdf_bytes
+            
+        # Create watermark PDF
+        pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
+        pdf_writer = PdfWriter()
+        
+        for page in pdf_reader.pages:
+            # Get page dimensions
+            width = float(page.mediabox.width)
+            height = float(page.mediabox.height)
+            
+            # Create a temporary PDF with the watermark
+            packet = io.BytesIO()
+            can = canvas.Canvas(packet, pagesize=(width, height))
+            can.setFont("Helvetica", 40)
+            can.setStrokeColor(grey)
+            can.setFillGray(0.5, 0.3) # 30% opacity
+            
+            # Draw diagonal watermark
+            can.saveState()
+            can.translate(width/2, height/2)
+            can.rotate(45)
+            can.drawCentredString(0, 0, "KDP CREATOR SUITE - FREE TIER")
+            can.restoreState()
+            can.save()
+            
+            # Merge watermark with original page
+            packet.seek(0)
+            watermark_pdf = PdfReader(packet)
+            watermark_page = watermark_pdf.pages[0]
+            page.merge_page(watermark_page)
+            pdf_writer.add_page(page)
+            
+        output = io.BytesIO()
+        pdf_writer.write(output)
+        return output.getvalue()
+    except Exception as e:
+        current_app.logger.error(f"Watermarking failed: {str(e)}")
+        return pdf_bytes
 
 def process_image_file(image_bytes, target_format):
     """Process an image file for batch processing"""
