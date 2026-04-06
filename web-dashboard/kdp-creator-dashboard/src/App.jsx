@@ -24,7 +24,7 @@ import {
   LogOut,
   Loader2
 } from 'lucide-react'
-import { authApi, subscriptionApi, analyticsApi } from '@/lib/api'
+import { authApi, subscriptionApi, analyticsApi, pdfApi } from '@/lib/api'
 import './App.css'
 
 function App() {
@@ -158,6 +158,72 @@ function Dashboard({ user, handleLogout }) {
   const [subscription, setSubscription] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [previewImage, setPreviewImage] = useState(null)
+  const [resultData, setResultData] = useState(null)
+  const [resultType, setResultType] = useState('image')
+
+  const handleImageConvert = async (file) => {
+    if (!file) return;
+    try {
+      setIsProcessing(true);
+      setPreviewImage(null);
+      const formData = new FormData();
+      formData.append('image', file);
+      formData.append('user_id', user.id);
+      
+      const response = await pdfApi.convertImage(formData);
+      if (response.data.success) {
+        setPreviewImage(response.data.preview);
+        setResultData(response.data.image_data);
+        setResultType('image');
+        const metricsRes = await analyticsApi.getUserMetrics();
+        setMetrics(metricsRes.data.metrics);
+      }
+    } catch (error) {
+      console.error('Conversion failed', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePdfProcess = async (file) => {
+    if (!file) return;
+    try {
+      setIsProcessing(true);
+      setPreviewImage(null);
+      setResultType('pdf');
+      const formData = new FormData();
+      formData.append('pdf', file);
+      formData.append('user_id', user.id);
+      formData.append('trim_size', document.getElementById('trim-size').value);
+      formData.append('target_format', document.getElementById('target-format').value);
+      
+      const response = await pdfApi.convertToKdp(formData);
+      if (response.data.success) {
+        setPreviewImage(response.data.preview);
+        setResultData(response.data.pdf_data);
+        const metricsRes = await analyticsApi.getUserMetrics();
+        setMetrics(metricsRes.data.metrics);
+      }
+    } catch (error) {
+      console.error('PDF processing failed', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const downloadResult = () => {
+    if (!resultData) return;
+    const link = document.createElement('a');
+    const mime = resultType === 'pdf' ? 'application/pdf' : 'image/png';
+    const ext = resultType === 'pdf' ? 'pdf' : 'png';
+    link.href = `data:${mime};base64,${resultData}`;
+    link.download = `kdp_conversion_${Date.now()}.${ext}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -312,11 +378,11 @@ function Dashboard({ user, handleLogout }) {
                 <CardDescription>Start converting your content for Amazon KDP</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button className="w-full justify-start" variant="outline">
+                <Button className="w-full justify-start" variant="outline" onClick={() => setActiveTab('convert')}>
                   <FileText className="w-4 h-4 mr-2" />
                   Convert PDF to KDP Format
                 </Button>
-                <Button className="w-full justify-start" variant="outline">
+                <Button className="w-full justify-start" variant="outline" onClick={() => setActiveTab('convert')}>
                   <Image className="w-4 h-4 mr-2" />
                   Image to Coloring Book
                 </Button>
@@ -356,6 +422,87 @@ function Dashboard({ user, handleLogout }) {
           </div>
         </TabsContent>
         
+        <TabsContent value="convert" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Image to Coloring Book</CardTitle>
+                <CardDescription>Upload an image to convert it to a KDP-ready coloring page</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer" onClick={() => document.getElementById('image-upload').click()}>
+                  <Upload className="w-10 h-10 text-gray-400 mx-auto mb-4" />
+                  <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</p>
+                  <input id="image-upload" type="file" className="hidden" accept="image/*" onChange={(e) => handleImageConvert(e.target.files[0])} />
+                </div>
+                {isProcessing && resultType === 'image' && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+                    <span className="text-sm font-medium">Processing your image...</span>
+                  </div>
+                )}
+                {previewImage && resultType === 'image' && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">Preview:</p>
+                    <img src={`data:image/jpeg;base64,${previewImage}`} alt="Preview" className="w-full rounded-lg border shadow-sm" />
+                    <Button className="w-full mt-4 bg-green-600 hover:bg-green-700" onClick={downloadResult}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download High-Res
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>PDF Compliance & Formatting</CardTitle>
+                <CardDescription>Validate and format your PDF for Amazon KDP specifications</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer" onClick={() => document.getElementById('pdf-upload').click()}>
+                  <FileText className="w-10 h-10 text-gray-400 mx-auto mb-4" />
+                  <p className="text-sm text-gray-600">Upload your manuscript (PDF)</p>
+                  <input id="pdf-upload" type="file" className="hidden" accept=".pdf" onChange={(e) => handlePdfProcess(e.target.files[0])} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-500">Trim Size</label>
+                    <select className="w-full text-sm border rounded p-1" id="trim-size">
+                      <option value="paperback_6x9">6" x 9"</option>
+                      <option value="paperback_8.5x11">8.5" x 11"</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-500">Format</label>
+                    <select className="w-full text-sm border rounded p-1" id="target-format">
+                      <option value="paperback">Paperback</option>
+                      <option value="kindle_ebook">E-Book</option>
+                    </select>
+                  </div>
+                </div>
+                {isProcessing && resultType === 'pdf' && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+                    <span className="text-sm font-medium">Processing your PDF...</span>
+                  </div>
+                )}
+                {previewImage && resultType === 'pdf' && (
+                  <div className="mt-4">
+                    <p className="text-sm font-medium mb-2">Preview (First Page):</p>
+                    <img src={`data:image/jpeg;base64,${previewImage}`} alt="Preview" className="w-full rounded-lg border shadow-sm" />
+                    <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700" onClick={downloadResult}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Formatted PDF
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         <TabsContent value="analytics">
           <Card>
             <CardHeader>

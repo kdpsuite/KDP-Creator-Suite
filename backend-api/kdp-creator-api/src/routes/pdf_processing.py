@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models.user import User
+from src.models.user import User, db
 from reportlab.lib.colors import grey
 import os
 import io
@@ -79,6 +79,14 @@ def convert_image_to_coloring():
         # Encode as base64 for response
         encoded_image = base64.b64encode(output_bytes).decode('utf-8')
         
+        # Track usage in database
+        user_id = request.form.get('user_id')
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                user.conversions_this_month += 1
+                db.session.commit()
+
         return jsonify({
             'success': True,
             'image_data': encoded_image,
@@ -203,6 +211,13 @@ def convert_to_kdp_format():
         # Apply watermark if needed (for free tier users)
         final_bytes = apply_watermark_if_needed(output_bytes, user_id)
         
+        # Track usage in database
+        if user_id:
+            user = User.query.get(user_id)
+            if user:
+                user.conversions_this_month += 1
+                db.session.commit()
+
         # Encode as base64 for response
         encoded_pdf = base64.b64encode(final_bytes).decode('utf-8')
         

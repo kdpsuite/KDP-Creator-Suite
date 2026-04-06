@@ -50,4 +50,16 @@ export const analyticsApi = {
   getUserMetrics: () => api.get('/user-metrics'),
 };
 
+export const pdfApi = {
+  convertImage: (formData) => api.post('/convert-image-to-coloring', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  convertToKdp: (formData) => api.post('/convert-to-kdp-format', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  validateCompliance: (formData) => api.post('/validate-kdp-compliance', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+};
+
 export default api;
