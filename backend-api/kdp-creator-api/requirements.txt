@@ -12,3 +12,9 @@ Werkzeug==3.1.3
 gunicorn==23.0.0
 Pillow
 
+flask-jwt-extended
+flask-bcrypt
+PyPDF2
+reportlab
+opencv-python-headless
+numpy
