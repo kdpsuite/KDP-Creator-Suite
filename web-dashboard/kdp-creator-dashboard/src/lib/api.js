@@ -38,6 +38,8 @@ export const authApi = {
   register: (username, email, password) => api.post('/register', { username, email, password }),
   getMe: () => api.get('/me'),
   logout: () => api.post('/logout'),
+  requestPasswordReset: (email) => api.post('/request-password-reset', { email }),
+  resetPassword: (token, newPassword) => api.post('/reset-password', { token, new_password: newPassword }),
 };
 
 export const subscriptionApi = {

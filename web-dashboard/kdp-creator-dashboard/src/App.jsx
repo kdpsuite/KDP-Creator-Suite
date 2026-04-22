@@ -22,7 +22,8 @@ import {
   DollarSign,
   Activity,
   LogOut,
-  Loader2
+  Loader2,
+  Key
 } from 'lucide-react'
 import { authApi, subscriptionApi, analyticsApi, pdfApi } from '@/lib/api'
 import './App.css'
@@ -91,62 +92,134 @@ function Login({ setIsAuthenticated }) {
   const [username, setUsername] = useState('demo_user')
   const [password, setPassword] = useState('password123')
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const [email, setEmail] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleLogin = async (e) => {
     e.preventDefault()
+    setError('')
+    setIsSubmitting(true)
     try {
       const response = await authApi.login(username, password)
       localStorage.setItem('kdp_token', response.data.access_token)
       setIsAuthenticated(true)
     } catch (err) {
       setError('Invalid username or password')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleRegister = async (e) => {
     e.preventDefault()
+    setError('')
+    setIsSubmitting(true)
     try {
       await authApi.register(username, email, password)
       setIsRegistering(false)
-      setError('Account created! Please login.')
+      setSuccess('Account created! Please login.')
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed')
+    } finally {
+      setIsSubmitting(false)
     }
+  }
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    setIsSubmitting(true)
+    try {
+      await authApi.requestPasswordReset(email)
+      setSuccess('Password reset link has been sent to your email.')
+      setTimeout(() => setIsResetting(false), 3000)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to request password reset')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const getTitle = () => {
+    if (isResetting) return 'Reset Password'
+    if (isRegistering) return 'Create Account'
+    return 'Login to KDP Suite'
+  }
+
+  const getDescription = () => {
+    if (isResetting) return 'Enter your email to receive a reset link'
+    return 'Enter your credentials to access the dashboard'
   }
 
   return (
     <div className="flex h-screen items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl font-bold">{isRegistering ? 'Create Account' : 'Login to KDP Suite'}</CardTitle>
-          <CardDescription>Enter your credentials to access the dashboard</CardDescription>
+          <CardTitle className="text-2xl font-bold">{getTitle()}</CardTitle>
+          <CardDescription>{getDescription()}</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Username</label>
-              <Input value={username} onChange={(e) => setUsername(e.target.value)} required />
-            </div>
-            {isRegistering && (
+          {isResetting ? (
+            <form onSubmit={handlePasswordReset} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <label className="text-sm font-medium">Email Address</label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required />
               </div>
-            )}
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Password</label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">
-              {isRegistering ? 'Register' : 'Login'}
-            </Button>
-            <Button type="button" variant="link" className="w-full" onClick={() => setIsRegistering(!isRegistering)}>
-              {isRegistering ? 'Already have an account? Login' : "Don't have an account? Register"}
-            </Button>
-          </form>
+              {error && <p className="text-sm text-red-500">{error}</p>}
+              {success && <p className="text-sm text-green-600">{success}</p>}
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Key className="mr-2 h-4 w-4" />}
+                Send Reset Link
+              </Button>
+              <Button type="button" variant="link" className="w-full" onClick={() => setIsResetting(false)}>
+                Back to Login
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Username</label>
+                <Input value={username} onChange={(e) => setUsername(e.target.value)} required />
+              </div>
+              {isRegistering && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Email</label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                </div>
+              )}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium">Password</label>
+                  {!isRegistering && (
+                    <button 
+                      type="button" 
+                      onClick={() => setIsResetting(true)}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </div>
+              {error && <p className="text-sm text-red-500">{error}</p>}
+              {success && <p className="text-sm text-green-600">{success}</p>}
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isRegistering ? 'Register' : 'Login')}
+              </Button>
+              <Button type="button" variant="link" className="w-full" onClick={() => {
+                setIsRegistering(!isRegistering);
+                setError('');
+                setSuccess('');
+              }}>
+                {isRegistering ? 'Already have an account? Login' : "Don't have an account? Register"}
+              </Button>
+            </form>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -296,223 +369,303 @@ function Dashboard({ user, handleLogout }) {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Conversions This Month</p>
-                <p className="text-2xl font-bold text-gray-900">{current_usage.conversions}</p>
+                <p className="text-sm font-medium text-gray-500">Monthly Revenue</p>
+                <h3 className="text-2xl font-bold text-gray-900">${metrics.monthly_revenue}</h3>
               </div>
-              <FileText className="w-8 h-8 text-blue-600" />
+              <div className="p-3 bg-green-100 rounded-full">
+                <DollarSign className="w-6 h-6 text-green-600" />
+              </div>
             </div>
-            {tier_details.monthly_conversions !== -1 && (
-              <>
-                <Progress 
-                  value={(current_usage.conversions / tier_details.monthly_conversions) * 100} 
-                  className="mt-3"
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  {remaining_usage.conversions} remaining
-                </p>
-              </>
-            )}
-            {tier_details.monthly_conversions === -1 && (
-              <p className="text-xs text-green-500 mt-2 font-medium">Unlimited Access</p>
-            )}
+            <div className="mt-4 flex items-center text-sm text-green-600">
+              <TrendingUp className="w-4 h-4 mr-1" />
+              <span>+12.5% from last month</span>
+            </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Batch Operations</p>
-                <p className="text-2xl font-bold text-gray-900">{current_usage.batch_operations}</p>
+                <p className="text-sm font-medium text-gray-500">Books Published</p>
+                <h3 className="text-2xl font-bold text-gray-900">{metrics.books_published}</h3>
               </div>
-              <Zap className="w-8 h-8 text-yellow-600" />
+              <div className="p-3 bg-blue-100 rounded-full">
+                <FileText className="w-6 h-6 text-blue-600" />
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {tier === 'free' ? 'Upgrade for batch processing' : `${remaining_usage.batch_operations} remaining`}
-            </p>
+            <div className="mt-4 flex items-center text-sm text-blue-600">
+              <Activity className="w-4 h-4 mr-1" />
+              <span>{remaining_usage.pdf_conversions} conversions left</span>
+            </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                <p className="text-2xl font-bold text-green-600">96%</p>
+                <p className="text-sm font-medium text-gray-500">Active Ads</p>
+                <h3 className="text-2xl font-bold text-gray-900">{metrics.active_ads}</h3>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-600" />
+              <div className="p-3 bg-purple-100 rounded-full">
+                <BarChart3 className="w-6 h-6 text-purple-600" />
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Last 30 days</p>
+            <div className="mt-4 flex items-center text-sm text-purple-600">
+              <Users className="w-4 h-4 mr-1" />
+              <span>{metrics.total_reach.toLocaleString()} total reach</span>
+            </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">KDP Compliance</p>
-                <p className="text-2xl font-bold text-blue-600">100%</p>
+                <p className="text-sm font-medium text-gray-500">Efficiency Score</p>
+                <h3 className="text-2xl font-bold text-gray-900">{metrics.efficiency_score}%</h3>
               </div>
-              <Activity className="w-8 h-8 text-blue-600" />
+              <div className="p-3 bg-orange-100 rounded-full">
+                <Zap className="w-6 h-6 text-orange-600" />
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">All conversions compliant</p>
+            <div className="mt-4">
+              <Progress value={metrics.efficiency_score} className="h-2" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="convert">Convert</TabsTrigger>
+          <TabsTrigger value="tools">AI Tools</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Quick Actions */}
-            <Card>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card className="lg:col-span-2">
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-                <CardDescription>Start converting your content for Amazon KDP</CardDescription>
+                <CardTitle>Recent Conversions</CardTitle>
+                <CardDescription>Your latest PDF and image processing activity</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Button className="w-full justify-start" variant="outline" onClick={() => setActiveTab('convert')}>
-                  <FileText className="w-4 h-4 mr-2" />
-                  Convert PDF to KDP Format
-                </Button>
-                <Button className="w-full justify-start" variant="outline" onClick={() => setActiveTab('convert')}>
-                  <Image className="w-4 h-4 mr-2" />
-                  Image to Coloring Book
-                </Button>
-                <Button 
-                  className="w-full justify-start" 
-                  variant="outline"
-                  disabled={tier === 'free'}
-                >
-                  <Zap className="w-4 h-4 mr-2" />
-                  Batch Processing
-                  {tier === 'free' && <Crown className="w-4 h-4 ml-auto" />}
-                </Button>
+              <CardContent>
+                <div className="space-y-4">
+                  {metrics.recent_activity.map((activity, index) => (
+                    <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="flex items-center space-x-4">
+                        <div className={`p-2 rounded-full ${activity.type === 'pdf' ? 'bg-red-100' : 'bg-blue-100'}`}>
+                          {activity.type === 'pdf' ? <FileText className="w-4 h-4 text-red-600" /> : <Image className="w-4 h-4 text-blue-600" />}
+                        </div>
+                        <div>
+                          <p className="font-medium text-gray-900">{activity.filename}</p>
+                          <p className="text-sm text-gray-500">{activity.date}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">
+                        {activity.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
-
-            {/* Account Info */}
             <Card>
               <CardHeader>
-                <CardTitle>Account Details</CardTitle>
-                <CardDescription>Member since {new Date(user.created_at).toLocaleDateString()}</CardDescription>
+                <CardTitle>Usage Limits</CardTitle>
+                <CardDescription>Current billing cycle usage</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="text-sm font-medium text-gray-600">Email</span>
-                  <span className="text-sm text-gray-900">{user.email}</span>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>PDF Conversions</span>
+                    <span className="font-medium">{current_usage.pdf_conversions} / {tier_details.limits.pdf_conversions}</span>
+                  </div>
+                  <Progress value={(current_usage.pdf_conversions / tier_details.limits.pdf_conversions) * 100} />
                 </div>
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="text-sm font-medium text-gray-600">Current Plan</span>
-                  <span className="text-sm font-bold text-blue-600">{tier_details.name}</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Image Processing</span>
+                    <span className="font-medium">{current_usage.image_processing} / {tier_details.limits.image_processing}</span>
+                  </div>
+                  <Progress value={(current_usage.image_processing / tier_details.limits.image_processing) * 100} />
                 </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm font-medium text-gray-600">API Status</span>
-                  <Badge className="bg-green-100 text-green-800 border-green-200">Connected</Badge>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Cloud Storage</span>
+                    <span className="font-medium">{current_usage.storage_gb}GB / {tier_details.limits.storage_gb}GB</span>
+                  </div>
+                  <Progress value={(current_usage.storage_gb / tier_details.limits.storage_gb) * 100} />
                 </div>
+                <Button variant="outline" className="w-full">View Billing Details</Button>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
-        
-        <TabsContent value="convert" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <TabsContent value="tools" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>Image to Coloring Book</CardTitle>
-                <CardDescription>Upload an image to convert it to a KDP-ready coloring page</CardDescription>
+                <CardTitle className="flex items-center">
+                  <Image className="w-5 h-5 mr-2 text-blue-600" />
+                  PDF to Coloring Book
+                </CardTitle>
+                <CardDescription>Convert any PDF page into a high-quality KDP coloring page</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer" onClick={() => document.getElementById('image-upload').click()}>
-                  <Upload className="w-10 h-10 text-gray-400 mx-auto mb-4" />
+                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-sm text-gray-600">Click to upload or drag and drop</p>
-                  <p className="text-xs text-gray-400 mt-1">PNG, JPG up to 10MB</p>
-                  <input id="image-upload" type="file" className="hidden" accept="image/*" onChange={(e) => handleImageConvert(e.target.files[0])} />
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG, PDF up to 10MB</p>
+                  <input type="file" id="image-upload" className="hidden" accept="image/*,application/pdf" onChange={(e) => handleImageConvert(e.target.files[0])} />
                 </div>
-                {isProcessing && resultType === 'image' && (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-                    <span className="text-sm font-medium">Processing your image...</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Line Weight</label>
+                    <select className="w-full p-2 border rounded-md text-sm">
+                      <option>Medium (Default)</option>
+                      <option>Thin</option>
+                      <option>Thick</option>
+                    </select>
                   </div>
-                )}
-                {previewImage && resultType === 'image' && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Preview:</p>
-                    <img src={`data:image/jpeg;base64,${previewImage}`} alt="Preview" className="w-full rounded-lg border shadow-sm" />
-                    <Button className="w-full mt-4 bg-green-600 hover:bg-green-700" onClick={downloadResult}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download High-Res
-                    </Button>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Detail Level</label>
+                    <select className="w-full p-2 border rounded-md text-sm">
+                      <option>High</option>
+                      <option>Balanced</option>
+                      <option>Simplified</option>
+                    </select>
                   </div>
-                )}
+                </div>
+                <Button className="w-full bg-blue-600" onClick={() => document.getElementById('image-upload').click()} disabled={isProcessing}>
+                  {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
+                  Convert to Coloring Page
+                </Button>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>PDF Compliance & Formatting</CardTitle>
-                <CardDescription>Validate and format your PDF for Amazon KDP specifications</CardDescription>
+                <CardTitle className="flex items-center">
+                  <FileText className="w-5 h-5 mr-2 text-red-600" />
+                  KDP Interior Formatter
+                </CardTitle>
+                <CardDescription>Auto-format your PDF interior for standard KDP trim sizes</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer" onClick={() => document.getElementById('pdf-upload').click()}>
-                  <FileText className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-                  <p className="text-sm text-gray-600">Upload your manuscript (PDF)</p>
-                  <input id="pdf-upload" type="file" className="hidden" accept=".pdf" onChange={(e) => handlePdfProcess(e.target.files[0])} />
+                <div className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center hover:border-red-400 transition-colors cursor-pointer" onClick={() => document.getElementById('pdf-upload').click()}>
+                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-sm text-gray-600">Upload your book interior</p>
+                  <p className="text-xs text-gray-400 mt-1">PDF only up to 50MB</p>
+                  <input type="file" id="pdf-upload" className="hidden" accept="application/pdf" onChange={(e) => handlePdfProcess(e.target.files[0])} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-500">Trim Size</label>
-                    <select className="w-full text-sm border rounded p-1" id="trim-size">
-                      <option value="paperback_6x9">6" x 9"</option>
-                      <option value="paperback_8.5x11">8.5" x 11"</option>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Trim Size</label>
+                    <select id="trim-size" className="w-full p-2 border rounded-md text-sm">
+                      <option value="8.5x11">8.5" x 11"</option>
+                      <option value="6x9">6" x 9"</option>
+                      <option value="8.25x8.25">8.25" x 8.25"</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-xs font-medium text-gray-500">Format</label>
-                    <select className="w-full text-sm border rounded p-1" id="target-format">
-                      <option value="paperback">Paperback</option>
-                      <option value="kindle_ebook">E-Book</option>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Bleed</label>
+                    <select id="target-format" className="w-full p-2 border rounded-md text-sm">
+                      <option value="bleed">Bleed (Recommended)</option>
+                      <option value="no-bleed">No Bleed</option>
                     </select>
                   </div>
                 </div>
-                {isProcessing && resultType === 'pdf' && (
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-                    <span className="text-sm font-medium">Processing your PDF...</span>
-                  </div>
-                )}
-                {previewImage && resultType === 'pdf' && (
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Preview (First Page):</p>
-                    <img src={`data:image/jpeg;base64,${previewImage}`} alt="Preview" className="w-full rounded-lg border shadow-sm" />
-                    <Button className="w-full mt-4 bg-blue-600 hover:bg-blue-700" onClick={downloadResult}>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Formatted PDF
-                    </Button>
-                  </div>
-                )}
+                <Button className="w-full bg-red-600" onClick={() => document.getElementById('pdf-upload').click()} disabled={isProcessing}>
+                  {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
+                  Format for KDP
+                </Button>
               </CardContent>
             </Card>
           </div>
+
+          {previewImage && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Processing Result</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center">
+                <div className="max-w-md w-full border rounded-lg overflow-hidden mb-4">
+                  <img src={previewImage} alt="Preview" className="w-full h-auto" />
+                </div>
+                <div className="flex space-x-4">
+                  <Button onClick={downloadResult}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Download {resultType.toUpperCase()}
+                  </Button>
+                  <Button variant="outline" onClick={() => setPreviewImage(null)}>Clear</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="analytics">
           <Card>
             <CardHeader>
-              <CardTitle>Usage Analytics</CardTitle>
-              <CardDescription>Real-time data from your account</CardDescription>
+              <CardTitle>Publishing Performance</CardTitle>
+              <CardDescription>Track your KDP sales and organic reach</CardDescription>
             </CardHeader>
             <CardContent>
-               <div className="h-[300px] flex items-center justify-center text-gray-500 border-2 border-dashed rounded-lg">
-                  Analytics Visualization Ready (Backend Data Linked)
-               </div>
+              <div className="h-[400px] flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed">
+                <div className="text-center">
+                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                  <p className="text-gray-500 font-medium">Advanced Analytics Dashboard</p>
+                  <p className="text-sm text-gray-400">Connect your KDP account to view real-time data</p>
+                  <Button className="mt-4" variant="outline">Connect KDP Account</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings">
+          <Card>
+            <CardHeader>
+              <CardTitle>Account Settings</CardTitle>
+              <CardDescription>Manage your profile and subscription</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-900">Profile Information</h4>
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-500">Username</label>
+                    <Input value={user?.username} disabled />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm text-gray-500">Email</label>
+                    <Input value={user?.email} disabled />
+                  </div>
+                  <Button variant="outline">Update Profile</Button>
+                </div>
+                <div className="space-y-4">
+                  <h4 className="font-medium text-gray-900">Subscription</h4>
+                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                    <p className="text-sm font-medium text-blue-900">Current Plan: {tier_details.name}</p>
+                    <p className="text-xs text-blue-700 mt-1">Next billing date: May 22, 2026</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Button className="w-full bg-blue-600">Change Plan</Button>
+                    <Button variant="ghost" className="w-full text-red-600">Cancel Subscription</Button>
+                  </div>
+                </div>
+              </div>
+              <div className="pt-6 border-t">
+                <h4 className="font-medium text-gray-900 mb-4">API Access</h4>
+                <div className="flex items-center space-x-2">
+                  <Input value="sk_live_51P8Xk2L8j..." type="password" readOnly />
+                  <Button variant="outline">Copy Key</Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Use this key to integrate KDP Suite with your custom workflows.</p>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
