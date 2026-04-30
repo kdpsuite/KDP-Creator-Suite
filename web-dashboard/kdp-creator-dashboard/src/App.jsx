@@ -26,6 +26,7 @@ import {
   Key
 } from 'lucide-react'
 import { authApi, subscriptionApi, analyticsApi, pdfApi } from '@/lib/api'
+import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import './App.css'
 
 function App() {
@@ -80,6 +81,7 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         <Routes>
           <Route path="/login" element={!isAuthenticated ? <Login setIsAuthenticated={setIsAuthenticated} /> : <Navigate to="/" />} />
+          <Route path="/auth/callback" element={<UpdatePasswordPage />} />
           <Route path="/" element={isAuthenticated ? <Dashboard user={user} handleLogout={handleLogout} /> : <Navigate to="/login" />} />
           <Route path="/dashboard" element={<Navigate to="/" replace />} />
         </Routes>
