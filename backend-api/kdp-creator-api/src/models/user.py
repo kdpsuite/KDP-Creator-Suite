@@ -18,6 +18,10 @@ class User(db.Model):
     batch_operations_this_month = db.Column(db.Integer, default=0)
     last_usage_reset = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Password Reset Fields
+    reset_token = db.Column(db.String(100), unique=True, nullable=True)
+    reset_token_expires = db.Column(db.DateTime, nullable=True)
+    
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

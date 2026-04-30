@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, get_jwt
 from src.models.user import User, Session, db
 from datetime import datetime, timedelta
+import secrets
 
 user_bp = Blueprint('user', __name__)
 
@@ -110,3 +111,49 @@ def delete_user(user_id):
     db.session.delete(user)
     db.session.commit()
     return '', 204
+
+@user_bp.route('/request-password-reset', methods=['POST'])
+def request_password_reset():
+    data = request.get_json()
+    email = data.get('email')
+    
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+        
+    user = User.query.filter_by(email=email).first()
+    
+    # For security, we return the same message even if the user doesn't exist
+    # to prevent email enumeration.
+    if user:
+        # Generate a random token
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        db.session.commit()
+        
+        # In a real application, you would send an email here.
+        # For now, we'll just log it or return it in development.
+        print(f"Password reset token for {email}: {token}")
+        
+    return jsonify({'message': 'If an account exists with that email, a reset link has been sent.'}), 200
+
+@user_bp.route('/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('new_password')
+    
+    if not token or not new_password:
+        return jsonify({'error': 'Token and new password are required'}), 400
+        
+    user = User.query.filter_by(reset_token=token).first()
+    
+    if not user or user.reset_token_expires < datetime.utcnow():
+        return jsonify({'error': 'Invalid or expired reset token'}), 400
+        
+    user.set_password(new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.session.commit()
+    
+    return jsonify({'message': 'Password has been reset successfully'}), 200
