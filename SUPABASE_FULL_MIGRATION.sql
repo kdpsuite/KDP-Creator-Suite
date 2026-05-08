@@ -5,8 +5,16 @@
 -- ============================================================================
 
 -- ============================================================================
--- 1. USER_PROFILES TABLE (should already exist)
+-- 1. USER_PROFILES TABLE
 -- ============================================================================
+
+CREATE TABLE IF NOT EXISTS public.user_profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    username TEXT UNIQUE,
+    email TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 -- Add 2FA columns if they don't exist
 DO $$
