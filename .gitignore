@@ -30,3 +30,5 @@ Thumbs.db
 coverage/
 *.log
 mobile-app/commandlinetools-linux-11076708_latest.zip
+__pycache__/
+*.pyc
