@@ -23,9 +23,13 @@ import {
   Activity,
   LogOut,
   Loader2,
-  Key
+  Key,
+  Moon,
+  Sun,
+  Save,
+  Trash2
 } from 'lucide-react'
-import { authApi, subscriptionApi, analyticsApi, pdfApi, totpApi, batchApi } from '@/lib/api'
+import { authApi, subscriptionApi, analyticsApi, pdfApi, totpApi, batchApi, templateApi } from '@/lib/api'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import './App.css'
@@ -251,6 +255,47 @@ function Dashboard({ user, handleLogout }) {
   const [previewImage, setPreviewImage] = useState(null)
   const [resultData, setResultData] = useState(null)
   const [resultType, setResultType] = useState('image')
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('kdp_dark_mode') === 'true')
+  const [templates, setTemplates] = useState([])
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+    localStorage.setItem('kdp_dark_mode', darkMode)
+  }, [darkMode])
+
+  useEffect(() => {
+    templateApi.getAll().then(res => setTemplates(res.data.templates))
+  }, [])
+
+  const saveTemplate = async (name, trimSize, bleed) => {
+    await templateApi.save({ name, trim_size: trimSize, bleed })
+    const res = await templateApi.getAll()
+    setTemplates(res.data.templates)
+  }
+
+  const deleteTemplate = async (id) => {
+    await templateApi.delete(id)
+    const res = await templateApi.getAll()
+    setTemplates(res.data.templates)
+  }
+
+  const exportMetricsCSV = () => {
+    if (!metrics) return
+    const daily = metrics.daily_activity || []
+    let csv = 'Date,Conversions,Batch Operations\n'
+    daily.forEach(d => { csv += `${d.date},${d.conversions},${d.batch_ops}\n` })
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `kdp_analytics_${new Date().toISOString().slice(0,10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const handleImageConvert = async (file) => {
     if (!file) return;
@@ -359,8 +404,8 @@ function Dashboard({ user, handleLogout }) {
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">KDP Creator Suite</h1>
-            <p className="text-lg text-gray-600">Welcome back, {user?.username}!</p>
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">KDP Creator Suite</h1>
+            <p className="text-lg text-gray-600 dark:text-gray-300">Welcome back, {user?.username}!</p>
           </div>
           <div className="flex items-center space-x-4">
             <Badge variant={tier === 'free' ? 'secondary' : 'default'} className="text-sm px-3 py-1">
@@ -372,6 +417,9 @@ function Dashboard({ user, handleLogout }) {
                 Upgrade
               </Button>
             )}
+            <Button variant="ghost" onClick={() => setDarkMode(!darkMode)} className="text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
             <Button variant="ghost" onClick={handleLogout} className="text-gray-600 hover:text-red-600">
               <LogOut className="w-4 h-4" />
             </Button>
@@ -599,6 +647,37 @@ function Dashboard({ user, handleLogout }) {
                   {isProcessing ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                   Format for KDP
                 </Button>
+                <div className="pt-4 border-t mt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium">Save as Template</p>
+                    <Button size="sm" variant="outline" onClick={() => {
+                      const name = prompt('Template name:')
+                      if (name) {
+                        const trimSize = document.getElementById('trim-size').value
+                        const bleed = document.getElementById('target-format').value
+                        saveTemplate(name, trimSize, bleed)
+                      }
+                    }}>
+                      <Save className="w-3 h-3 mr-1" /> Save
+                    </Button>
+                  </div>
+                  {templates.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-500 mb-1">Load template:</p>
+                      {templates.map(t => (
+                        <div key={t.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                          <button className="text-blue-600 hover:underline" onClick={() => {
+                            document.getElementById('trim-size').value = t.trim_size
+                            document.getElementById('target-format').value = t.bleed
+                          }}>{t.name}</button>
+                          <button className="text-red-400 hover:text-red-600" onClick={() => deleteTemplate(t.id)}>
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -630,6 +709,12 @@ function Dashboard({ user, handleLogout }) {
 
         <TabsContent value="analytics">
           <div className="space-y-6">
+            <div className="flex justify-end">
+              <Button variant="outline" onClick={exportMetricsCSV}>
+                <Download className="w-4 h-4 mr-2" />
+                Export CSV
+              </Button>
+            </div>
             <Card>
               <CardHeader>
                 <CardTitle>Conversion Trends (Last 30 Days)</CardTitle>

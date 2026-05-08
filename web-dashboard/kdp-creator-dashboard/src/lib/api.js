@@ -65,6 +65,27 @@ export const batchApi = {
   cancel: (id) => api.post(`/batch/jobs/${id}/cancel`),
 };
 
+export const templateApi = {
+  getAll: () => {
+    const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]')
+    return Promise.resolve({ data: { templates } })
+  },
+  save: (template) => {
+    const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]')
+    template.id = Date.now()
+    template.created_at = new Date().toISOString()
+    templates.push(template)
+    localStorage.setItem('kdp_templates', JSON.stringify(templates))
+    return Promise.resolve({ data: { template } })
+  },
+  delete: (id) => {
+    let templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]')
+    templates = templates.filter(t => t.id !== id)
+    localStorage.setItem('kdp_templates', JSON.stringify(templates))
+    return Promise.resolve({ data: { success: true } })
+  },
+}
+
 export const pdfApi = {
   convertImage: (formData) => api.post('/convert-image-to-coloring', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
