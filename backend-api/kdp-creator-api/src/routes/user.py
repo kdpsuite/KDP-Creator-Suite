@@ -36,6 +36,16 @@ def login():
     if not user or not user.check_password(data['password']):
         return jsonify({'error': 'Invalid username or password'}), 401
     
+    # If 2FA is enabled, require TOTP code
+    if user.totp_enabled:
+        totp_code = data.get('totp_code')
+        if not totp_code:
+            return jsonify({'requires_2fa': True, 'user_id': user.id}), 200
+        import pyotp
+        totp = pyotp.TOTP(user.totp_secret)
+        if not totp.verify(totp_code, valid_window=1):
+            return jsonify({'error': 'Invalid 2FA code'}), 401
+
     access_token = create_access_token(identity=str(user.id))
     
     # Store session in database

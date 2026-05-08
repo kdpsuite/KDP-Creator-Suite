@@ -34,7 +34,7 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  login: (username, password) => api.post('/login', { username, password }),
+  login: (username, password, totp_code) => api.post('/login', { username, password, totp_code }),
   register: (username, email, password) => api.post('/register', { username, email, password }),
   getMe: () => api.get('/me'),
   logout: () => api.post('/logout'),
@@ -50,6 +50,19 @@ export const subscriptionApi = {
 
 export const analyticsApi = {
   getUserMetrics: () => api.get('/user-metrics'),
+};
+
+export const totpApi = {
+  setup: () => api.post('/2fa/setup'),
+  verify: (code) => api.post('/2fa/verify', { code }),
+  disable: (code) => api.post('/2fa/disable', { code }),
+};
+
+export const batchApi = {
+  getJobs: () => api.get('/batch/jobs'),
+  getJob: (id) => api.get(`/batch/jobs/${id}`),
+  submit: (jobType, totalFiles) => api.post('/batch/submit', { job_type: jobType, total_files: totalFiles }),
+  cancel: (id) => api.post(`/batch/jobs/${id}/cancel`),
 };
 
 export const pdfApi = {

@@ -18,6 +18,10 @@ class User(db.Model):
     batch_operations_this_month = db.Column(db.Integer, default=0)
     last_usage_reset = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # 2FA Fields
+    totp_secret = db.Column(db.String(32), nullable=True)
+    totp_enabled = db.Column(db.Boolean, default=False)
+    
     # Password Reset Fields
     reset_token = db.Column(db.String(100), unique=True, nullable=True)
     reset_token_expires = db.Column(db.DateTime, nullable=True)
@@ -41,6 +45,7 @@ class User(db.Model):
             'username': self.username,
             'email': self.email,
             'subscription_tier': self.subscription_tier,
+            'totp_enabled': self.totp_enabled,
             'usage': {
                 'conversions': self.conversions_this_month,
                 'batch_operations': self.batch_operations_this_month,
@@ -48,6 +53,33 @@ class User(db.Model):
             },
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+
+class BatchJob(db.Model):
+    __tablename__ = 'batch_jobs'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    status = db.Column(db.String(20), default='queued')  # queued, processing, completed, failed
+    total_files = db.Column(db.Integer, default=0)
+    processed_files = db.Column(db.Integer, default=0)
+    job_type = db.Column(db.String(50), nullable=False)  # convert_image, convert_pdf, validate
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    error_message = db.Column(db.Text, nullable=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'status': self.status,
+            'total_files': self.total_files,
+            'processed_files': self.processed_files,
+            'job_type': self.job_type,
+            'progress': round((self.processed_files / self.total_files * 100) if self.total_files > 0 else 0),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'error_message': self.error_message
+        }
+
 
 class Session(db.Model):
     __tablename__ = 'sessions'

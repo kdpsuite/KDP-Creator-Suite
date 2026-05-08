@@ -11,6 +11,8 @@ from src.routes.user import user_bp
 from src.routes.pdf_processing import pdf_bp
 from src.routes.subscription import subscription_bp
 from src.routes.analytics import analytics_bp
+from src.routes.totp import totp_bp
+from src.routes.batch import batch_bp
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'kdp-creator-suite-secret-key-2024')
@@ -25,6 +27,8 @@ app.register_blueprint(user_bp, url_prefix='/api')
 app.register_blueprint(pdf_bp, url_prefix='/api')
 app.register_blueprint(subscription_bp, url_prefix='/api')
 app.register_blueprint(analytics_bp, url_prefix='/api')
+app.register_blueprint(totp_bp, url_prefix='/api')
+app.register_blueprint(batch_bp, url_prefix='/api')
 
 # uncomment if you need to use database
 app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"

@@ -18,3 +18,4 @@ PyPDF2
 reportlab
 opencv-python-headless
 numpy
+pyotp

@@ -25,7 +25,8 @@ import {
   Loader2,
   Key
 } from 'lucide-react'
-import { authApi, subscriptionApi, analyticsApi, pdfApi } from '@/lib/api'
+import { authApi, subscriptionApi, analyticsApi, pdfApi, totpApi, batchApi } from '@/lib/api'
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import './App.css'
 
@@ -97,6 +98,8 @@ function Login({ setIsAuthenticated }) {
   const [success, setSuccess] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+  const [needs2FA, setNeeds2FA] = useState(false)
+  const [totpCode, setTotpCode] = useState('')
   const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -105,11 +108,16 @@ function Login({ setIsAuthenticated }) {
     setError('')
     setIsSubmitting(true)
     try {
-      const response = await authApi.login(username, password)
+      const response = await authApi.login(username, password, needs2FA ? totpCode : undefined)
+      if (response.data.requires_2fa) {
+        setNeeds2FA(true)
+        setIsSubmitting(false)
+        return
+      }
       localStorage.setItem('kdp_token', response.data.access_token)
       setIsAuthenticated(true)
     } catch (err) {
-      setError('Invalid username or password')
+      setError(err.response?.data?.error || 'Invalid username or password')
     } finally {
       setIsSubmitting(false)
     }
@@ -208,6 +216,12 @@ function Login({ setIsAuthenticated }) {
                 </div>
                 <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
+              {needs2FA && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">2FA Code</label>
+                  <Input type="text" inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value)} placeholder="Enter 6-digit code" required />
+                </div>
+              )}
               {error && <p className="text-sm text-red-500">{error}</p>}
               {success && <p className="text-sm text-green-600">{success}</p>}
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
@@ -438,9 +452,10 @@ function Dashboard({ user, handleLogout }) {
 
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
+        <TabsList className="grid w-full grid-cols-5 lg:w-[750px]">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="tools">AI Tools</TabsTrigger>
+          <TabsTrigger value="queue">Batch Queue</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
@@ -609,23 +624,74 @@ function Dashboard({ user, handleLogout }) {
           )}
         </TabsContent>
 
+        <TabsContent value="queue">
+          <BatchQueuePanel />
+        </TabsContent>
+
         <TabsContent value="analytics">
-          <Card>
-            <CardHeader>
-              <CardTitle>Publishing Performance</CardTitle>
-              <CardDescription>Track your KDP sales and organic reach</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[400px] flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed">
-                <div className="text-center">
-                  <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                  <p className="text-gray-500 font-medium">Advanced Analytics Dashboard</p>
-                  <p className="text-sm text-gray-400">Connect your KDP account to view real-time data</p>
-                  <Button className="mt-4" variant="outline">Connect KDP Account</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Conversion Trends (Last 30 Days)</CardTitle>
+                <CardDescription>Daily conversions and batch operations</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={metrics?.daily_activity || []}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" tickFormatter={(d) => d.slice(5)} />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="conversions" stroke="#2563eb" strokeWidth={2} name="Conversions" />
+                    <Line type="monotone" dataKey="batch_ops" stroke="#7c3aed" strokeWidth={2} name="Batch Ops" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>File Type Breakdown</CardTitle>
+                  <CardDescription>Success rates by format</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={metrics?.file_types || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="type" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="count" fill="#2563eb" name="Files Processed" />
+                      <Bar dataKey="success_rate" fill="#16a34a" name="Success %" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Usage vs Quota</CardTitle>
+                  <CardDescription>Current month usage against your plan limits</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-4">
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Conversions</span>
+                      <span>{metrics?.usage_quota?.conversions_used || 0} / {metrics?.usage_quota?.conversions_limit === -1 ? '∞' : metrics?.usage_quota?.conversions_limit}</span>
+                    </div>
+                    <Progress value={metrics?.usage_quota?.conversions_limit === -1 ? 10 : ((metrics?.usage_quota?.conversions_used || 0) / (metrics?.usage_quota?.conversions_limit || 1) * 100)} className="h-3" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>Batch Operations</span>
+                      <span>{metrics?.usage_quota?.batch_used || 0} / {metrics?.usage_quota?.batch_limit === -1 ? '∞' : metrics?.usage_quota?.batch_limit}</span>
+                    </div>
+                    <Progress value={metrics?.usage_quota?.batch_limit === -1 ? 10 : ((metrics?.usage_quota?.batch_used || 0) / (metrics?.usage_quota?.batch_limit || 1) * 100)} className="h-3" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="settings">
@@ -661,6 +727,42 @@ function Dashboard({ user, handleLogout }) {
                 </div>
               </div>
               <div className="pt-6 border-t">
+                <h4 className="font-medium text-gray-900 mb-4">Two-Factor Authentication</h4>
+                {user?.totp_enabled ? (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800 font-medium">2FA is enabled</p>
+                    <p className="text-xs text-green-600 mt-1">Your account is protected with TOTP authentication.</p>
+                    <Button variant="outline" className="mt-3 text-red-600 border-red-200" onClick={async () => {
+                      const code = prompt('Enter your 2FA code to disable:')
+                      if (code) {
+                        try {
+                          await totpApi.disable(code)
+                          alert('2FA disabled')
+                          window.location.reload()
+                        } catch(e) { alert(e.response?.data?.error || 'Failed') }
+                      }
+                    }}>Disable 2FA</Button>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800 font-medium">2FA is not enabled</p>
+                    <p className="text-xs text-yellow-600 mt-1">Enable two-factor authentication for extra security.</p>
+                    <Button variant="outline" className="mt-3" onClick={async () => {
+                      try {
+                        const res = await totpApi.setup()
+                        const secret = res.data.secret
+                        const code = prompt(`Add this secret to your authenticator app:\n\n${secret}\n\nThen enter the 6-digit code to verify:`)
+                        if (code) {
+                          await totpApi.verify(code)
+                          alert('2FA enabled successfully!')
+                          window.location.reload()
+                        }
+                      } catch(e) { alert(e.response?.data?.error || 'Failed') }
+                    }}>Enable 2FA</Button>
+                  </div>
+                )}
+              </div>
+              <div className="pt-6 border-t">
                 <h4 className="font-medium text-gray-900 mb-4">API Access</h4>
                 <div className="flex items-center space-x-2">
                   <Input value="sk_live_51P8Xk2L8j..." type="password" readOnly />
@@ -672,6 +774,122 @@ function Dashboard({ user, handleLogout }) {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function BatchQueuePanel() {
+  const [jobs, setJobs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+
+  const fetchJobs = async () => {
+    try {
+      const res = await batchApi.getJobs()
+      setJobs(res.data.jobs || [])
+    } catch(e) { console.error(e) }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => {
+    fetchJobs()
+    const interval = setInterval(fetchJobs, 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const handleSubmit = async (jobType, count) => {
+    setSubmitting(true)
+    try {
+      await batchApi.submit(jobType, count)
+      await fetchJobs()
+    } catch(e) { alert(e.response?.data?.error || 'Failed to submit job') }
+    finally { setSubmitting(false) }
+  }
+
+  const handleCancel = async (id) => {
+    try {
+      await batchApi.cancel(id)
+      await fetchJobs()
+    } catch(e) { alert(e.response?.data?.error || 'Failed to cancel') }
+  }
+
+  const statusColor = (s) => {
+    if (s === 'completed') return 'bg-green-100 text-green-800'
+    if (s === 'processing') return 'bg-blue-100 text-blue-800'
+    if (s === 'failed') return 'bg-red-100 text-red-800'
+    return 'bg-gray-100 text-gray-800'
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Submit Batch Job</CardTitle>
+          <CardDescription>Queue multiple files for processing</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-end gap-4">
+            <div className="space-y-2 flex-1">
+              <label className="text-sm font-medium">Job Type</label>
+              <select id="batch-type" className="w-full p-2 border rounded-md text-sm">
+                <option value="convert_image">Image to Coloring Page</option>
+                <option value="convert_pdf">PDF KDP Format</option>
+                <option value="validate">KDP Compliance Check</option>
+              </select>
+            </div>
+            <div className="space-y-2 w-32">
+              <label className="text-sm font-medium">Files</label>
+              <Input id="batch-count" type="number" min="1" max="50" defaultValue="5" />
+            </div>
+            <Button className="bg-blue-600" disabled={submitting} onClick={() => {
+              const type = document.getElementById('batch-type').value
+              const count = parseInt(document.getElementById('batch-count').value) || 5
+              handleSubmit(type, count)
+            }}>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Upload className="w-4 h-4 mr-2" />}
+              Submit
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Job Queue</CardTitle>
+          <CardDescription>Real-time status of your batch operations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+          ) : jobs.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-8">No batch jobs yet. Submit one above.</p>
+          ) : (
+            <div className="space-y-3">
+              {jobs.map(job => (
+                <div key={job.id} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColor(job.status)}`}>{job.status}</span>
+                      <span className="text-sm font-medium">{job.job_type.replace('_', ' ')}</span>
+                      <span className="text-xs text-gray-400">#{job.id}</span>
+                    </div>
+                    {job.status === 'processing' && (
+                      <div className="mt-2">
+                        <Progress value={job.progress} className="h-2" />
+                        <p className="text-xs text-gray-500 mt-1">{job.processed_files}/{job.total_files} files ({job.progress}%)</p>
+                      </div>
+                    )}
+                    {job.status === 'completed' && <p className="text-xs text-green-600 mt-1">{job.total_files} files processed</p>}
+                    {job.error_message && <p className="text-xs text-red-500 mt-1">{job.error_message}</p>}
+                  </div>
+                  {(job.status === 'queued' || job.status === 'processing') && (
+                    <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleCancel(job.id)}>Cancel</Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
