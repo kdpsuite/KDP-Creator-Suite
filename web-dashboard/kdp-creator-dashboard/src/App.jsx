@@ -29,23 +29,41 @@ import {
   Save,
   Trash2
 } from 'lucide-react'
-import { authApi, subscriptionApi, analyticsApi, pdfApi, totpApi, batchApi, templateApi } from '@/lib/api'
+import { authApi, subscriptionApi, analyticsApi, pdfApi, totpApi, batchApi, templateApi, supabase } from '@/lib/api'
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import './App.css'
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('kdp_token'))
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchUserData()
-    } else {
-      setLoading(false)
-    }
-  }, [isAuthenticated])
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setIsAuthenticated(true)
+        fetchUserData()
+      } else {
+        setLoading(false)
+      }
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        setIsAuthenticated(true)
+        fetchUserData()
+      } else {
+        setIsAuthenticated(false)
+        setUser(null)
+        setLoading(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
 
   const fetchUserData = async () => {
     try {
@@ -65,11 +83,7 @@ function App() {
     try {
       await authApi.logout()
     } catch (error) {
-      console.error('Logout failed on server', error)
-    } finally {
-      localStorage.removeItem('kdp_token')
-      setIsAuthenticated(false)
-      setUser(null)
+      console.error('Logout failed', error)
     }
   }
 
@@ -112,16 +126,11 @@ function Login({ setIsAuthenticated }) {
     setError('')
     setIsSubmitting(true)
     try {
-      const response = await authApi.login(username, password, needs2FA ? totpCode : undefined)
-      if (response.data.requires_2fa) {
-        setNeeds2FA(true)
-        setIsSubmitting(false)
-        return
-      }
-      localStorage.setItem('kdp_token', response.data.access_token)
-      setIsAuthenticated(true)
+      const { data, error } = await authApi.login(email || username, password)
+      if (error) throw error
+      // Session change listener will handle state update
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid username or password')
+      setError(err.message || 'Invalid email or password')
     } finally {
       setIsSubmitting(false)
     }
@@ -132,11 +141,12 @@ function Login({ setIsAuthenticated }) {
     setError('')
     setIsSubmitting(true)
     try {
-      await authApi.register(username, email, password)
+      const { data, error } = await authApi.register(email, password, username)
+      if (error) throw error
       setIsRegistering(false)
-      setSuccess('Account created! Please login.')
+      setSuccess('Account created! Please check your email to confirm.')
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed')
+      setError(err.message || 'Registration failed')
     } finally {
       setIsSubmitting(false)
     }

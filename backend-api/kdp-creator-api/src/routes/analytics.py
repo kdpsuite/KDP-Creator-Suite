@@ -1,7 +1,6 @@
-from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask import Blueprint, request, jsonify
+from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
-from src.models.user import User, db
 import random
 
 analytics_bp = Blueprint('analytics', __name__)
@@ -10,17 +9,22 @@ analytics_bp = Blueprint('analytics', __name__)
 @jwt_required()
 def get_user_metrics():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user:
+    profile = UserProfile.get_by_id(user_id)
+    if not profile:
         return jsonify({'error': 'User not found'}), 404
 
     from src.routes.subscription import SUBSCRIPTION_TIERS
-    tier_info = SUBSCRIPTION_TIERS.get(user.subscription_tier, SUBSCRIPTION_TIERS['free'])
+    tier = profile.get('subscription_tier', 'free')
+    tier_info = SUBSCRIPTION_TIERS.get(tier, SUBSCRIPTION_TIERS['free'])
     max_conversions = tier_info['monthly_conversions']
     max_batch = tier_info['batch_processing_limit']
 
-    # Generate daily activity for the past 30 days (in production, track in separate table)
-    random.seed(user.id)  # Deterministic per user for consistency
+    conversions = profile.get('conversions_this_month', 0)
+    batch_ops = profile.get('batch_operations_this_month', 0)
+
+    # Generate daily activity (mock for now, or query analytics_events table if exists)
+    # Using a hash of user_id for deterministic seed
+    random.seed(hash(user_id))
     daily_activity = []
     for i in range(30):
         d = datetime.now() - timedelta(days=29 - i)
@@ -30,27 +34,26 @@ def get_user_metrics():
             'batch_ops': random.randint(0, 2)
         })
 
-    # File type breakdown
     file_types = [
-        {'type': 'PDF', 'count': max(1, user.conversions_this_month * 60 // 100), 'success_rate': 94},
-        {'type': 'Image', 'count': max(1, user.conversions_this_month * 30 // 100), 'success_rate': 98},
-        {'type': 'EPUB', 'count': max(1, user.conversions_this_month * 10 // 100), 'success_rate': 87},
+        {'type': 'PDF', 'count': max(1, conversions * 60 // 100), 'success_rate': 94},
+        {'type': 'Image', 'count': max(1, conversions * 30 // 100), 'success_rate': 98},
+        {'type': 'EPUB', 'count': max(1, conversions * 10 // 100), 'success_rate': 87},
     ]
 
     return jsonify({
         'success': True,
-        'user_id': user.id,
+        'user_id': user_id,
         'metrics': {
-            'total_conversions': user.conversions_this_month,
-            'total_batch_operations': user.batch_operations_this_month,
-            'subscription_tier': user.subscription_tier,
-            'last_active': user.updated_at.isoformat() if user.updated_at else datetime.now().isoformat(),
+            'total_conversions': conversions,
+            'total_batch_operations': batch_ops,
+            'subscription_tier': tier,
+            'last_active': profile.get('updated_at', datetime.now().isoformat()),
             'daily_activity': daily_activity,
             'file_types': file_types,
             'usage_quota': {
-                'conversions_used': user.conversions_this_month,
+                'conversions_used': conversions,
                 'conversions_limit': max_conversions,
-                'batch_used': user.batch_operations_this_month,
+                'batch_used': batch_ops,
                 'batch_limit': max_batch
             }
         }
@@ -59,11 +62,15 @@ def get_user_metrics():
 @analytics_bp.route('/business-metrics', methods=['GET'])
 @jwt_required()
 def get_business_metrics():
-    total_users = User.query.count()
+    # Admin only check could be added here
+    res = supabase.table('user_profiles').select('subscription_tier').execute()
+    profiles = res.data
+    
+    total_users = len(profiles)
     users_by_tier = {
-        'free': User.query.filter_by(subscription_tier='free').count(),
-        'pro': User.query.filter_by(subscription_tier='pro').count(),
-        'studio': User.query.filter_by(subscription_tier='studio').count(),
+        'free': sum(1 for p in profiles if p['subscription_tier'] == 'free'),
+        'pro': sum(1 for p in profiles if p['subscription_tier'] == 'pro'),
+        'studio': sum(1 for p in profiles if p['subscription_tier'] == 'studio'),
     }
 
     return jsonify({

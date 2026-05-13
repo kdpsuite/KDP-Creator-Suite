@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models.user import User, db
+from src.models.user import supabase, jwt_required, get_jwt_identity
 from reportlab.lib.colors import grey
 import os
 import io
@@ -33,6 +33,7 @@ PRINT_DPI = 300
 DIGITAL_DPI = 150
 
 @pdf_bp.route('/convert-image-to-coloring', methods=['POST'])
+@jwt_required()
 def convert_image_to_coloring():
     """Convert an image to a coloring book page"""
     try:
@@ -80,12 +81,12 @@ def convert_image_to_coloring():
         encoded_image = base64.b64encode(output_bytes).decode('utf-8')
         
         # Track usage in database
-        user_id = request.form.get('user_id')
+        user_id = get_jwt_identity()
         if user_id:
-            user = User.query.get(user_id)
-            if user:
-                user.conversions_this_month += 1
-                db.session.commit()
+            res = supabase.table('user_profiles').select('conversions_this_month').eq('id', user_id).single().execute()
+            if res.data:
+                current = res.data.get('conversions_this_month', 0)
+                supabase.table('user_profiles').update({'conversions_this_month': current + 1}).eq('id', user_id).execute()
 
         return jsonify({
             'success': True,
@@ -106,6 +107,7 @@ def convert_image_to_coloring():
         return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
 
 @pdf_bp.route('/validate-kdp-compliance', methods=['POST'])
+@jwt_required()
 def validate_kdp_compliance():
     """Validate PDF for KDP compliance"""
     try:
@@ -176,6 +178,7 @@ def validate_kdp_compliance():
         return jsonify({'error': f'Validation failed: {str(e)}'}), 500
 
 @pdf_bp.route('/convert-to-kdp-format', methods=['POST'])
+@jwt_required()
 def convert_to_kdp_format():
     """Convert PDF to KDP-compliant format"""
     try:
@@ -212,11 +215,12 @@ def convert_to_kdp_format():
         final_bytes = apply_watermark_if_needed(output_bytes, user_id)
         
         # Track usage in database
+        user_id = get_jwt_identity()
         if user_id:
-            user = User.query.get(user_id)
-            if user:
-                user.conversions_this_month += 1
-                db.session.commit()
+            res = supabase.table('user_profiles').select('conversions_this_month').eq('id', user_id).single().execute()
+            if res.data:
+                current = res.data.get('conversions_this_month', 0)
+                supabase.table('user_profiles').update({'conversions_this_month': current + 1}).eq('id', user_id).execute()
 
         # Encode as base64 for response
         encoded_pdf = base64.b64encode(final_bytes).decode('utf-8')
@@ -236,6 +240,7 @@ def convert_to_kdp_format():
         return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
 
 @pdf_bp.route('/batch-process', methods=['POST'])
+@jwt_required()
 def batch_process():
     """Process multiple files in batch"""
     try:

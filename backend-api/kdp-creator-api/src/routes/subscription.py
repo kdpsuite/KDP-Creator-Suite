@@ -1,7 +1,5 @@
-from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from datetime import datetime, timedelta
-from src.models.user import User, db
+from flask import Blueprint, request, jsonify
+from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
 
 subscription_bp = Blueprint('subscription', __name__)
 
@@ -53,31 +51,35 @@ def get_subscription_tiers():
 @jwt_required()
 def get_subscription_status():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user:
+    profile = UserProfile.get_by_id(user_id)
+    if not profile:
         return jsonify({'error': 'User not found'}), 404
         
-    tier_limits = SUBSCRIPTION_TIERS.get(user.subscription_tier, SUBSCRIPTION_TIERS['free'])
+    tier = profile.get('subscription_tier', 'free')
+    tier_limits = SUBSCRIPTION_TIERS.get(tier, SUBSCRIPTION_TIERS['free'])
     
+    conversions = profile.get('conversions_this_month', 0)
+    batch_ops = profile.get('batch_operations_this_month', 0)
+
     # Calculate remaining usage
     remaining_conversions = (
         -1 if tier_limits['monthly_conversions'] == -1 
-        else max(0, tier_limits['monthly_conversions'] - user.conversions_this_month)
+        else max(0, tier_limits['monthly_conversions'] - conversions)
     )
     
     remaining_batch_operations = (
         -1 if tier_limits['batch_processing_limit'] == -1 
-        else max(0, tier_limits['batch_processing_limit'] - user.batch_operations_this_month)
+        else max(0, tier_limits['batch_processing_limit'] - batch_ops)
     )
     
     return jsonify({
         'success': True,
-        'user_id': user.id,
-        'tier': user.subscription_tier,
+        'user_id': user_id,
+        'tier': tier,
         'tier_details': tier_limits,
         'current_usage': {
-            'conversions': user.conversions_this_month,
-            'batch_operations': user.batch_operations_this_month
+            'conversions': conversions,
+            'batch_operations': batch_ops
         },
         'remaining_usage': {
             'conversions': remaining_conversions,
@@ -89,23 +91,19 @@ def get_subscription_status():
 @jwt_required()
 def upgrade_subscription():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'error': 'User not found'}), 404
-        
     data = request.get_json()
     new_tier = data.get('tier')
     
     if new_tier not in SUBSCRIPTION_TIERS:
         return jsonify({'error': 'Invalid subscription tier'}), 400
     
-    # In a real implementation, you would process payment here
-    user.subscription_tier = new_tier
-    db.session.commit()
+    res = supabase.table('user_profiles').update({'subscription_tier': new_tier}).eq('id', user_id).execute()
+    if not res.data:
+        return jsonify({'error': 'User not found'}), 404
     
     return jsonify({
         'success': True,
-        'user_id': user.id,
+        'user_id': user_id,
         'new_tier': new_tier,
         'tier_details': SUBSCRIPTION_TIERS[new_tier]
     })

@@ -1,36 +1,32 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.models.user import User, BatchJob, db
+from src.models.user import supabase, UserProfile, BatchJob, jwt_required, get_jwt_identity
 from datetime import datetime
 import threading
 
 batch_bp = Blueprint('batch', __name__)
 
-
 @batch_bp.route('/batch/jobs', methods=['GET'])
 @jwt_required()
 def get_batch_jobs():
     user_id = get_jwt_identity()
-    jobs = BatchJob.query.filter_by(user_id=user_id).order_by(BatchJob.created_at.desc()).limit(50).all()
-    return jsonify({'success': True, 'jobs': [j.to_dict() for j in jobs]})
+    res = supabase.table('batch_jobs').select('*').eq('user_id', user_id).order('created_at', desc=True).limit(50).execute()
+    return jsonify({'success': True, 'jobs': [BatchJob.to_dict(j) for j in res.data]})
 
-
-@batch_bp.route('/batch/jobs/<int:job_id>', methods=['GET'])
+@batch_bp.route('/batch/jobs/<job_id>', methods=['GET'])
 @jwt_required()
 def get_batch_job(job_id):
     user_id = get_jwt_identity()
-    job = BatchJob.query.filter_by(id=job_id, user_id=user_id).first()
-    if not job:
+    res = supabase.table('batch_jobs').select('*').eq('id', job_id).eq('user_id', user_id).single().execute()
+    if not res.data:
         return jsonify({'error': 'Job not found'}), 404
-    return jsonify({'success': True, 'job': job.to_dict()})
-
+    return jsonify({'success': True, 'job': BatchJob.to_dict(res.data)})
 
 @batch_bp.route('/batch/submit', methods=['POST'])
 @jwt_required()
 def submit_batch_job():
     user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-    if not user:
+    profile = UserProfile.get_by_id(user_id)
+    if not profile:
         return jsonify({'error': 'User not found'}), 404
 
     data = request.get_json()
@@ -42,62 +38,79 @@ def submit_batch_job():
 
     # Check batch limits based on subscription
     from src.routes.subscription import SUBSCRIPTION_TIERS
-    tier = SUBSCRIPTION_TIERS.get(user.subscription_tier, SUBSCRIPTION_TIERS['free'])
+    tier_name = profile.get('subscription_tier', 'free')
+    tier = SUBSCRIPTION_TIERS.get(tier_name, SUBSCRIPTION_TIERS['free'])
     batch_limit = tier['batch_processing_limit']
-    if batch_limit != -1 and user.batch_operations_this_month >= batch_limit:
+    current_batch_ops = profile.get('batch_operations_this_month', 0)
+    
+    if batch_limit != -1 and current_batch_ops >= batch_limit:
         return jsonify({'error': 'Batch processing limit reached for your tier'}), 403
 
-    job = BatchJob(
-        user_id=int(user_id),
-        job_type=job_type,
-        total_files=total_files,
-        status='queued'
-    )
-    db.session.add(job)
-    user.batch_operations_this_month += 1
-    db.session.commit()
+    job_data = {
+        'user_id': user_id,
+        'job_type': job_type,
+        'total_files': total_files,
+        'status': 'queued'
+    }
+    res = supabase.table('batch_jobs').insert(job_data).execute()
+    if not res.data:
+        return jsonify({'error': 'Failed to create job'}), 500
+    
+    job = res.data[0]
+    
+    # Increment user batch operations
+    supabase.table('user_profiles').update({
+        'batch_operations_this_month': current_batch_ops + 1
+    }).eq('id', user_id).execute()
 
-    # Simulate async processing in background thread
-    threading.Thread(target=_process_batch_job, args=(job.id,), daemon=True).start()
+    # Simulate async processing
+    threading.Thread(target=_process_batch_job, args=(job['id'],), daemon=True).start()
 
-    return jsonify({'success': True, 'job': job.to_dict()}), 201
+    return jsonify({'success': True, 'job': BatchJob.to_dict(job)}), 201
 
-
-@batch_bp.route('/batch/jobs/<int:job_id>/cancel', methods=['POST'])
+@batch_bp.route('/batch/jobs/<job_id>/cancel', methods=['POST'])
 @jwt_required()
 def cancel_batch_job(job_id):
     user_id = get_jwt_identity()
-    job = BatchJob.query.filter_by(id=job_id, user_id=user_id).first()
-    if not job:
+    res = supabase.table('batch_jobs').select('*').eq('id', job_id).eq('user_id', user_id).single().execute()
+    if not res.data:
         return jsonify({'error': 'Job not found'}), 404
-    if job.status in ('completed', 'failed'):
+    
+    job = res.data
+    if job['status'] in ('completed', 'failed', 'cancelled'):
         return jsonify({'error': 'Cannot cancel a finished job'}), 400
-    job.status = 'failed'
-    job.error_message = 'Cancelled by user'
-    job.completed_at = datetime.utcnow()
-    db.session.commit()
-    return jsonify({'success': True, 'job': job.to_dict()})
-
+    
+    update_data = {
+        'status': 'cancelled',
+        'error_message': 'Cancelled by user',
+        'completed_at': datetime.utcnow().isoformat()
+    }
+    res = supabase.table('batch_jobs').update(update_data).eq('id', job_id).execute()
+    
+    return jsonify({'success': True, 'job': BatchJob.to_dict(res.data[0])})
 
 def _process_batch_job(job_id):
     """Simulate batch processing with incremental progress"""
     import time
-    from src.main import app
-    with app.app_context():
-        job = BatchJob.query.get(job_id)
-        if not job:
+    
+    # Update status to processing
+    supabase.table('batch_jobs').update({'status': 'processing'}).eq('id', job_id).execute()
+
+    res = supabase.table('batch_jobs').select('total_files').eq('id', job_id).single().execute()
+    if not res.data:
+        return
+    total_files = res.data['total_files']
+
+    for i in range(1, total_files + 1):
+        time.sleep(0.5)
+        # Check if cancelled
+        check_res = supabase.table('batch_jobs').select('status').eq('id', job_id).single().execute()
+        if not check_res.data or check_res.data['status'] == 'cancelled':
             return
-        job.status = 'processing'
-        db.session.commit()
+        
+        supabase.table('batch_jobs').update({'processed_files': i}).eq('id', job_id).execute()
 
-        for i in range(1, job.total_files + 1):
-            time.sleep(0.5)  # Simulate processing time per file
-            job = BatchJob.query.get(job_id)
-            if job.status == 'failed':  # cancelled
-                return
-            job.processed_files = i
-            db.session.commit()
-
-        job.status = 'completed'
-        job.completed_at = datetime.utcnow()
-        db.session.commit()
+    supabase.table('batch_jobs').update({
+        'status': 'completed',
+        'completed_at': datetime.utcnow().isoformat()
+    }).eq('id', job_id).execute()

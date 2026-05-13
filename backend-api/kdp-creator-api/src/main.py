@@ -1,12 +1,15 @@
 import os
 import sys
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 # DON'T CHANGE THIS !!!
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager
-from src.models.user import db, bcrypt
 from src.routes.user import user_bp
 from src.routes.pdf_processing import pdf_bp
 from src.routes.subscription import subscription_bp
@@ -16,8 +19,6 @@ from src.routes.batch import batch_bp
 
 app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'kdp-creator-suite-secret-key-2024')
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'kdp-jwt-secret-key-2024')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600 * 24 # 24 hours
 
 # Enable CORS for all routes
 CORS(app, origins="*")
@@ -29,15 +30,6 @@ app.register_blueprint(subscription_bp, url_prefix='/api')
 app.register_blueprint(analytics_bp, url_prefix='/api')
 app.register_blueprint(totp_bp, url_prefix='/api')
 app.register_blueprint(batch_bp, url_prefix='/api')
-
-# uncomment if you need to use database
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-bcrypt.init_app(app)
-jwt = JWTManager(app)
-with app.app_context():
-    db.create_all()
 
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')

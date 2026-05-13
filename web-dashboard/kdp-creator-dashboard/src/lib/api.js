@@ -1,6 +1,11 @@
 import axios from 'axios';
+import { createClient } from '@supabase/supabase-js';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,12 +14,18 @@ const api = axios.create({
   },
 });
 
-// Add a request interceptor to include the JWT token
+// Add a request interceptor to include the Supabase token
 api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('kdp_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      config.headers.Authorization = `Bearer ${session.access_token}`;
+    } else {
+      // Fallback to localStorage for compatibility during transition
+      const token = localStorage.getItem('kdp_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
     return config;
   },
@@ -26,20 +37,31 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('kdp_token');
-      // Redirect to login if necessary, but for now we'll just clear the token
+      // Session might be expired
+      console.warn('Unauthorized request, session may be expired');
     }
     return Promise.reject(error);
   }
 );
 
 export const authApi = {
-  login: (username, password, totp_code) => api.post('/login', { username, password, totp_code }),
-  register: (username, email, password) => api.post('/register', { username, email, password }),
+  login: (email, password) => supabase.auth.signInWithPassword({ email, password }),
+  register: (email, password, username) => supabase.auth.signUp({ 
+    email, 
+    password,
+    options: {
+      data: {
+        username: username,
+        full_name: username // Fallback
+      }
+    }
+  }),
   getMe: () => api.get('/me'),
-  logout: () => api.post('/logout'),
-  requestPasswordReset: (email) => api.post('/request-password-reset', { email }),
-  resetPassword: (token, newPassword) => api.post('/reset-password', { token, new_password: newPassword }),
+  logout: () => supabase.auth.signOut(),
+  requestPasswordReset: (email) => supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+  }),
+  resetPassword: (newPassword) => supabase.auth.updateUser({ password: newPassword }),
 };
 
 export const subscriptionApi = {
