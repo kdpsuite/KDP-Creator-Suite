@@ -19,3 +19,5 @@ reportlab
 opencv-python-headless
 numpy
 pyotp
+psycopg2-binary
+python-dotenv
