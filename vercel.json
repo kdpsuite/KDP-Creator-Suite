@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend-api/kdp-creator-api/src/main.py",
+      "use": "@vercel/python",
+      "config": { "maxDuration": 60 }
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "backend-api/kdp-creator-api/src/main.py"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "backend-api/kdp-creator-api/src/main.py"
+    }
+  ]
+}
