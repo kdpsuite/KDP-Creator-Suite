@@ -21,3 +21,4 @@ numpy
 pyotp
 psycopg2-binary
 python-dotenv
+supabase
