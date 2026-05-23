@@ -2,19 +2,18 @@
   "version": 2,
   "builds": [
     {
-      "src": "backend-api/kdp-creator-api/src/main.py",
-      "use": "@vercel/python",
-      "config": { "maxDuration": 60 }
+      "src": "api/index.py",
+      "use": "@vercel/python"
     }
   ],
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "backend-api/kdp-creator-api/src/main.py"
+      "destination": "api/index.py"
     },
     {
       "source": "/(.*)",
-      "destination": "backend-api/kdp-creator-api/src/main.py"
+      "destination": "api/index.py"
     }
   ]
 }
