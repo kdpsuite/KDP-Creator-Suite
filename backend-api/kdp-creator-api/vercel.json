@@ -1,0 +1,6 @@
+{
+  "framework": "flask",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "src/main.py" }
+  ]
+}
