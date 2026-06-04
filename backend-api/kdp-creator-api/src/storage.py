@@ -8,10 +8,15 @@ from supabase import create_client, Client
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY')
 
-if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY environment variables are required")
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_ANON_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+    except Exception as e:
+        print(f"Warning: Failed to initialize Supabase client: {str(e)}")
+        supabase = None
+else:
+    print("Warning: SUPABASE_URL and/or SUPABASE_ANON_KEY environment variables not set. File uploads will be disabled.")
 
 BUCKET_NAME = 'kdp-created-files'
 SIGNED_URL_EXPIRY = 3600  # 1 hour in seconds
@@ -30,6 +35,9 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
     Returns:
         dict with 'path', 'url', and 'signed_url' keys
     """
+    if not supabase:
+        raise Exception("Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.")
+    
     try:
         # Create a unique path: user_id/file_type/timestamp_uuid_filename
         timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')

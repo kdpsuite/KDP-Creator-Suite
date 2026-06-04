@@ -14,6 +14,7 @@ Pillow
 
 flask-jwt-extended
 flask-bcrypt
+PyJWT
 PyPDF2
 reportlab
 opencv-python-headless

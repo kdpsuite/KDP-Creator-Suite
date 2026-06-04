@@ -8,9 +8,10 @@ bcrypt = Bcrypt()
 class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
+    supabase_uuid = db.Column(db.String(36), unique=True, nullable=True)  # Supabase Auth user UUID
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(128), nullable=True)  # Nullable for Supabase-synced users
     
     # Subscription & Usage Fields
     subscription_tier = db.Column(db.String(20), default='free') # free, pro, studio
