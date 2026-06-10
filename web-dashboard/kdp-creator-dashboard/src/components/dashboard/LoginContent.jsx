@@ -3,18 +3,16 @@ import { Key, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
-import { authApi } from '@/lib/api'
+import { authApi, supabase } from '@/lib/api'
 
 export default function LoginContent({ setIsAuthenticated }) {
-  const [username, setUsername] = useState('demo_user')
-  const [password, setPassword] = useState('password123')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [isRegistering, setIsRegistering] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
-  const [needs2FA, setNeeds2FA] = useState(false)
-  const [totpCode, setTotpCode] = useState('')
-  const [email, setEmail] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleLogin = async (e) => {
@@ -22,16 +20,25 @@ export default function LoginContent({ setIsAuthenticated }) {
     setError('')
     setIsSubmitting(true)
     try {
-      const response = await authApi.login(username, password, needs2FA ? totpCode : undefined)
-      if (response.data.requires_2fa) {
-        setNeeds2FA(true)
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      })
+      
+      if (authError) {
+        setError(authError.message)
         setIsSubmitting(false)
         return
       }
-      localStorage.setItem('kdp_token', response.data.access_token)
-      setIsAuthenticated(true)
+      
+      if (data.session) {
+        localStorage.setItem('kdp_token', data.session.access_token)
+        setIsAuthenticated(true)
+      } else {
+        setError('Login succeeded but no session was returned')
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Invalid username or password')
+      setError(err.message || 'Login failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -42,11 +49,33 @@ export default function LoginContent({ setIsAuthenticated }) {
     setError('')
     setIsSubmitting(true)
     try {
-      await authApi.register(username, email, password)
-      setIsRegistering(false)
-      setSuccess('Account created! Please login.')
+      const { data, error: authError } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            username: username,
+            full_name: username
+          }
+        }
+      })
+      
+      if (authError) {
+        setError(authError.message)
+        setIsSubmitting(false)
+        return
+      }
+      
+      // If email confirmation is disabled, user is logged in immediately
+      if (data.session) {
+        localStorage.setItem('kdp_token', data.session.access_token)
+        setIsAuthenticated(true)
+      } else {
+        setIsRegistering(false)
+        setSuccess('Account created! Please check your email to confirm, then login.')
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed')
+      setError(err.message || 'Registration failed')
     } finally {
       setIsSubmitting(false)
     }
@@ -58,11 +87,18 @@ export default function LoginContent({ setIsAuthenticated }) {
     setSuccess('')
     setIsSubmitting(true)
     try {
-      await authApi.requestPasswordReset(email)
-      setSuccess('Password reset link has been sent to your email.')
-      setTimeout(() => setIsResetting(false), 3000)
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
+      })
+      
+      if (resetError) {
+        setError(resetError.message)
+      } else {
+        setSuccess('Password reset link has been sent to your email.')
+        setTimeout(() => setIsResetting(false), 3000)
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to request password reset')
+      setError(err.message || 'Failed to request password reset')
     } finally {
       setIsSubmitting(false)
     }
@@ -106,13 +142,13 @@ export default function LoginContent({ setIsAuthenticated }) {
           ) : (
             <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Username</label>
-                <Input value={username} onChange={(e) => setUsername(e.target.value)} required />
+                <label className="text-sm font-medium">Email</label>
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required />
               </div>
               {isRegistering && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Email</label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                  <label className="text-sm font-medium">Username</label>
+                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Choose a username" required />
                 </div>
               )}
               <div className="space-y-2">
@@ -130,12 +166,6 @@ export default function LoginContent({ setIsAuthenticated }) {
                 </div>
                 <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
               </div>
-              {needs2FA && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">2FA Code</label>
-                  <Input type="text" inputMode="numeric" maxLength={6} value={totpCode} onChange={(e) => setTotpCode(e.target.value)} placeholder="Enter 6-digit code" required />
-                </div>
-              )}
               {error && <p className="text-sm text-red-500">{error}</p>}
               {success && <p className="text-sm text-green-600">{success}</p>}
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
