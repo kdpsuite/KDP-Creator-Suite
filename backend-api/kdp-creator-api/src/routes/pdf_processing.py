@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models.user import supabase, jwt_required, get_jwt_identity
+from src.models.user import User, db
+from src.storage import upload_file
 from reportlab.lib.colors import grey
 import os
 import io
@@ -33,7 +34,6 @@ PRINT_DPI = 300
 DIGITAL_DPI = 150
 
 @pdf_bp.route('/convert-image-to-coloring', methods=['POST'])
-@jwt_required()
 def convert_image_to_coloring():
     """Convert an image to a coloring book page"""
     try:
@@ -77,18 +77,27 @@ def convert_image_to_coloring():
         processed_pil.save(output_buffer, format='PNG', dpi=(PRINT_DPI, PRINT_DPI))
         output_bytes = output_buffer.getvalue()
         
-        # Encode as base64 for response
-        encoded_image = base64.b64encode(output_bytes).decode('utf-8')
+        # Track usage in database and upload to Supabase
+        user_id = request.form.get('user_id')
+        storage_info = None
         
-        # Track usage in database
-        user_id = get_jwt_identity()
         if user_id:
-            res = supabase.table('user_profiles').select('conversions_this_month').eq('id', user_id).single().execute()
-            if res.data:
-                current = res.data.get('conversions_this_month', 0)
-                supabase.table('user_profiles').update({'conversions_this_month': current + 1}).eq('id', user_id).execute()
+            user = User.query.get(user_id)
+            if user:
+                user.conversions_this_month += 1
+                db.session.commit()
+                
+                # Upload to Supabase Storage
+                try:
+                    filename = f"coloring_page_{uuid.uuid4().hex[:8]}.png"
+                    storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
+                except Exception as e:
+                    current_app.logger.warning(f"Failed to upload to storage: {str(e)}")
+        
+        # Encode as base64 for backward compatibility
+        encoded_image = base64.b64encode(output_bytes).decode('utf-8')
 
-        return jsonify({
+        response_data = {
             'success': True,
             'image_data': encoded_image,
             'preview': generate_preview(output_bytes, 'image'),
@@ -100,14 +109,19 @@ def convert_image_to_coloring():
                 'invert_colors': invert_colors,
                 'enhance_lines': enhance_lines,
             }
-        })
+        }
+        
+        # Add storage info if upload was successful
+        if storage_info:
+            response_data['storage'] = storage_info
+        
+        return jsonify(response_data)
         
     except Exception as e:
         current_app.logger.error(f"Image to coloring conversion failed: {str(e)}")
         return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
 
 @pdf_bp.route('/validate-kdp-compliance', methods=['POST'])
-@jwt_required()
 def validate_kdp_compliance():
     """Validate PDF for KDP compliance"""
     try:
@@ -178,7 +192,6 @@ def validate_kdp_compliance():
         return jsonify({'error': f'Validation failed: {str(e)}'}), 500
 
 @pdf_bp.route('/convert-to-kdp-format', methods=['POST'])
-@jwt_required()
 def convert_to_kdp_format():
     """Convert PDF to KDP-compliant format"""
     try:
@@ -214,18 +227,25 @@ def convert_to_kdp_format():
         # Apply watermark if needed (for free tier users)
         final_bytes = apply_watermark_if_needed(output_bytes, user_id)
         
-        # Track usage in database
-        user_id = get_jwt_identity()
+        # Track usage in database and upload to Supabase
+        storage_info = None
         if user_id:
-            res = supabase.table('user_profiles').select('conversions_this_month').eq('id', user_id).single().execute()
-            if res.data:
-                current = res.data.get('conversions_this_month', 0)
-                supabase.table('user_profiles').update({'conversions_this_month': current + 1}).eq('id', user_id).execute()
+            user = User.query.get(user_id)
+            if user:
+                user.conversions_this_month += 1
+                db.session.commit()
+                
+                # Upload to Supabase Storage
+                try:
+                    filename = f"kdp_formatted_{uuid.uuid4().hex[:8]}.pdf"
+                    storage_info = upload_file(final_bytes, str(user_id), filename, 'kdp_formatted_pdf')
+                except Exception as e:
+                    current_app.logger.warning(f"Failed to upload to storage: {str(e)}")
 
-        # Encode as base64 for response
+        # Encode as base64 for response (backward compatibility)
         encoded_pdf = base64.b64encode(final_bytes).decode('utf-8')
         
-        return jsonify({
+        response_data = {
             'success': True,
             'pdf_data': encoded_pdf,
             'preview': generate_preview(final_bytes, 'pdf'),
@@ -233,14 +253,19 @@ def convert_to_kdp_format():
             'page_count': page_count,
             'target_format': target_format,
             'applied_margins': margins,
-        })
+        }
+        
+        # Add storage info if upload was successful
+        if storage_info:
+            response_data['storage'] = storage_info
+        
+        return jsonify(response_data)
         
     except Exception as e:
         current_app.logger.error(f"PDF conversion failed: {str(e)}")
         return jsonify({'error': f'Conversion failed: {str(e)}'}), 500
 
 @pdf_bp.route('/batch-process', methods=['POST'])
-@jwt_required()
 def batch_process():
     """Process multiple files in batch"""
     try:
@@ -261,7 +286,7 @@ def batch_process():
                 # Determine file type and process accordingly
                 if file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
                     # Process as image to coloring book
-                    result = process_image_file(file_bytes, target_format)
+                    result = process_image_file(file_bytes, target_format, user_id)
                 else:
                     # Process as PDF
                     result = process_pdf_file(file_bytes, target_format, user_id)
@@ -483,7 +508,7 @@ def apply_watermark_if_needed(pdf_bytes, user_id):
         current_app.logger.error(f"Watermarking failed: {str(e)}")
         return pdf_bytes
 
-def process_image_file(image_bytes, target_format):
+def process_image_file(image_bytes, target_format, user_id=None):
     """Process an image file for batch processing"""
     try:
         # Convert image to coloring book
@@ -498,12 +523,25 @@ def process_image_file(image_bytes, target_format):
         result_image = Image.fromarray(cv2.cvtColor(processed, cv2.COLOR_BGR2RGB))
         output_buffer = io.BytesIO()
         result_image.save(output_buffer, format='PNG')
+        output_bytes = output_buffer.getvalue()
         
-        return {
+        # Upload to Supabase if user_id provided
+        storage_info = None
+        if user_id:
+            try:
+                filename = f"batch_coloring_{uuid.uuid4().hex[:8]}.png"
+                storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
+            except Exception as e:
+                current_app.logger.warning(f"Failed to upload batch image: {str(e)}")
+        
+        result = {
             'success': True,
-            'data': base64.b64encode(output_buffer.getvalue()).decode('utf-8'),
+            'data': base64.b64encode(output_bytes).decode('utf-8'),
             'type': 'image',
         }
+        if storage_info:
+            result['storage'] = storage_info
+        return result
     except Exception as e:
         return {
             'success': False,
@@ -551,12 +589,24 @@ def process_pdf_file(pdf_bytes, target_format, user_id):
         pdf_writer.write(output_buffer)
         output_bytes = output_buffer.getvalue()
         
-        return {
+        # Upload to Supabase if user_id provided
+        storage_info = None
+        if user_id:
+            try:
+                filename = f"batch_pdf_{uuid.uuid4().hex[:8]}.pdf"
+                storage_info = upload_file(output_bytes, str(user_id), filename, 'kdp_formatted_pdf')
+            except Exception as e:
+                current_app.logger.warning(f"Failed to upload batch PDF: {str(e)}")
+        
+        result = {
             'success': True,
             'data': base64.b64encode(output_bytes).decode('utf-8'),
             'preview': generate_preview(output_bytes, 'pdf'),
             'type': 'pdf',
         }
+        if storage_info:
+            result['storage'] = storage_info
+        return result
     except Exception as e:
         return {
             'success': False,
