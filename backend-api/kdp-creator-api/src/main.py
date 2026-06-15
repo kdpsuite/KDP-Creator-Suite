@@ -25,7 +25,14 @@ app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'kdp-jwt-secret-
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600 * 24  # 24 hours
 
 # Enable CORS for all routes
-CORS(app, origins="*")
+CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # Register blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
