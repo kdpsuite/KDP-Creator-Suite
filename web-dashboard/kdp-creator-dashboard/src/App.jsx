@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Loader2 } from 'lucide-react'
+import { Analytics } from '@vercel/analytics/react'
 import { authApi, supabase } from '@/lib/api'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import DashboardContent from '@/components/dashboard/DashboardContent.jsx'
@@ -99,6 +100,7 @@ function App() {
           <Route path="/" element={isAuthenticated ? <DashboardContent user={user} handleLogout={handleLogout} /> : <Navigate to="/login" />} />
           <Route path="/dashboard" element={<Navigate to="/" replace />} />
         </Routes>
+        <Analytics />
       </div>
     </Router>
   )
