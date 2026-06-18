@@ -7,6 +7,28 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+# ============================================================================
+# Environment Variable Validation
+# ============================================================================
+# Check for required environment variables at startup
+REQUIRED_ENV_VARS = [
+    'SUPABASE_URL',
+    'SUPABASE_KEY',
+    'JWT_SECRET_KEY',
+]
+
+missing_vars = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
+if missing_vars:
+    raise RuntimeError(
+        f"Missing required environment variables: {', '.join(missing_vars)}. "
+        f"Please check your .env file or Vercel environment settings."
+    )
+
+# Log startup information
+print(f"[STARTUP] Environment: {os.environ.get('ENVIRONMENT', 'development')}")
+print(f"[STARTUP] Debug mode: {os.environ.get('DEBUG', 'False')}")
+print(f"[STARTUP] Supabase URL: {os.environ.get('SUPABASE_URL', 'NOT SET')}")
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager

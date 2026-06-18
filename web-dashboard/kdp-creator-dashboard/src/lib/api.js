@@ -32,15 +32,49 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Add a response interceptor to handle unauthorized errors
+// ============================================================================
+// Retry Logic for Failed Requests
+// ============================================================================
+// Retry on server errors (5xx) with exponential backoff
+const MAX_RETRIES = 3;
+const INITIAL_RETRY_DELAY = 1000;
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      // Session might be expired
-      console.warn('Unauthorized request, session may be expired');
+  async (error) => {
+    const config = error.config;
+
+    if (!config) {
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    config.retryCount = config.retryCount || 0;
+
+    if (config.retryCount >= MAX_RETRIES) {
+      return Promise.reject(error);
+    }
+
+    const shouldRetry =
+      !error.response || (error.response && error.response.status >= 500);
+
+    if (!shouldRetry) {
+      if (error.response && error.response.status === 401) {
+        console.warn('[AUTH] Unauthorized request, session may be expired');
+      } else if (error.response && error.response.status >= 400) {
+        console.warn(`[CLIENT_ERROR] HTTP ${error.response.status}:`, error.response.data?.error || error.message);
+      }
+      return Promise.reject(error);
+    }
+
+    const delay = INITIAL_RETRY_DELAY * Math.pow(2, config.retryCount);
+    console.warn(
+      `[RETRY] Attempt ${config.retryCount + 1}/${MAX_RETRIES} for ${config.method?.toUpperCase()} ${config.url} after ${delay}ms`
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    config.retryCount += 1;
+    return api(config);
   }
 );
 
