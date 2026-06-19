@@ -1,0 +1,558 @@
+<testsuites id="" name="" tests="15" failures="0" skipped="0" errors="14" time="12.207119">
+<testsuite name="critical-flows.spec.js" timestamp="2026-06-19T10:43:20.985Z" hostname="chromium" tests="15" failures="0" skipped="0" time="6.048" errors="14">
+<testcase name="KDP Creator Suite - Critical Flows › Landing Page › should load the main domain without errors" classname="critical-flows.spec.js" time="0.555">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-150ff--main-domain-without-errors-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-150ff--main-domain-without-errors-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-150ff--main-domain-without-errors-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:16:5 › KDP Creator Suite - Critical Flows › Landing Page › should load the main domain without errors 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/
+    Call log:
+      - navigating to "https://unlovedproductions.com/", waiting until "networkidle"
+
+
+      16 |     test('should load the main domain without errors', async ({ page }) => {
+      17 |       // Navigate to main domain
+    > 18 |       const response = await page.goto('/', { waitUntil: 'networkidle' });
+         |                                   ^
+      19 |       
+      20 |       // Check response status
+      21 |       expect(response.status()).toBeLessThan(400);
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:18:35
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-150ff--main-domain-without-errors-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-150ff--main-domain-without-errors-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-150ff--main-domain-without-errors-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Landing Page › should have navigation links" classname="critical-flows.spec.js" time="0.564">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-6de48-hould-have-navigation-links-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-6de48-hould-have-navigation-links-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-6de48-hould-have-navigation-links-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:37:5 › KDP Creator Suite - Critical Flows › Landing Page › should have navigation links 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/
+    Call log:
+      - navigating to "https://unlovedproductions.com/", waiting until "networkidle"
+
+
+      36 |
+      37 |     test('should have navigation links', async ({ page }) => {
+    > 38 |       await page.goto('/', { waitUntil: 'networkidle' });
+         |                  ^
+      39 |       
+      40 |       // Check for common navigation elements
+      41 |       const navLinks = page.locator('nav a, header a, [role="navigation"] a');
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:38:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-6de48-hould-have-navigation-links-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-6de48-hould-have-navigation-links-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-6de48-hould-have-navigation-links-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Landing Page › should have login button or link" classname="critical-flows.spec.js" time="0.561">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-409b0-d-have-login-button-or-link-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-409b0-d-have-login-button-or-link-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-409b0-d-have-login-button-or-link-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:47:5 › KDP Creator Suite - Critical Flows › Landing Page › should have login button or link 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/
+    Call log:
+      - navigating to "https://unlovedproductions.com/", waiting until "networkidle"
+
+
+      46 |
+      47 |     test('should have login button or link', async ({ page }) => {
+    > 48 |       await page.goto('/', { waitUntil: 'networkidle' });
+         |                  ^
+      49 |       
+      50 |       // Look for login button/link
+      51 |       const loginButton = page.locator('button:has-text("Login"), a:has-text("Login"), button:has-text("Sign In"), a:has-text("Sign In")');
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:48:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-409b0-d-have-login-button-or-link-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-409b0-d-have-login-button-or-link-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-409b0-d-have-login-button-or-link-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Login Flow › should navigate to login page" classname="critical-flows.spec.js" time="0.376">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-c5e85-ould-navigate-to-login-page-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-c5e85-ould-navigate-to-login-page-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-c5e85-ould-navigate-to-login-page-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:58:5 › KDP Creator Suite - Critical Flows › Login Flow › should navigate to login page 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      57 |   test.describe('Login Flow', () => {
+      58 |     test('should navigate to login page', async ({ page }) => {
+    > 59 |       await page.goto('/login', { waitUntil: 'networkidle' });
+         |                  ^
+      60 |       
+      61 |       // Check for login form elements
+      62 |       const emailInput = page.locator('input[type="email"]');
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:59:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-c5e85-ould-navigate-to-login-page-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-c5e85-ould-navigate-to-login-page-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-c5e85-ould-navigate-to-login-page-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Login Flow › should show validation errors for empty form" classname="critical-flows.spec.js" time="0.36">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-c38a6-ation-errors-for-empty-form-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-c38a6-ation-errors-for-empty-form-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-c38a6-ation-errors-for-empty-form-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:69:5 › KDP Creator Suite - Critical Flows › Login Flow › should show validation errors for empty form 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      68 |
+      69 |     test('should show validation errors for empty form', async ({ page }) => {
+    > 70 |       await page.goto('/login', { waitUntil: 'networkidle' });
+         |                  ^
+      71 |       
+      72 |       // Try to submit empty form
+      73 |       const submitButton = page.locator('button[type="submit"], button:has-text("Login"), button:has-text("Sign In")');
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:70:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-c38a6-ation-errors-for-empty-form-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-c38a6-ation-errors-for-empty-form-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-c38a6-ation-errors-for-empty-form-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Login Flow › should reject invalid credentials" classname="critical-flows.spec.js" time="0.368">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-5f5b6--reject-invalid-credentials-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-5f5b6--reject-invalid-credentials-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-5f5b6--reject-invalid-credentials-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:84:5 › KDP Creator Suite - Critical Flows › Login Flow › should reject invalid credentials 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      83 |
+      84 |     test('should reject invalid credentials', async ({ page }) => {
+    > 85 |       await page.goto('/login', { waitUntil: 'networkidle' });
+         |                  ^
+      86 |       
+      87 |       // Fill with invalid credentials
+      88 |       await page.fill('input[type="email"]', 'invalid@test.com');
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:85:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-5f5b6--reject-invalid-credentials-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-5f5b6--reject-invalid-credentials-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-5f5b6--reject-invalid-credentials-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Login Flow › should successfully login with valid credentials" classname="critical-flows.spec.js" time="0.399">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-7dce5-ogin-with-valid-credentials-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-7dce5-ogin-with-valid-credentials-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-7dce5-ogin-with-valid-credentials-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:106:5 › KDP Creator Suite - Critical Flows › Login Flow › should successfully login with valid credentials 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      105 |
+      106 |     test('should successfully login with valid credentials', async ({ page }) => {
+    > 107 |       await page.goto('/login', { waitUntil: 'networkidle' });
+          |                  ^
+      108 |       
+      109 |       const email = process.env.TEST_USER_EMAIL || 'unlovedproducts@gmail.com';
+      110 |       const password = process.env.TEST_USER_PASSWORD || 'Appl3p1376!';
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:107:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-7dce5-ogin-with-valid-credentials-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-7dce5-ogin-with-valid-credentials-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-7dce5-ogin-with-valid-credentials-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Dashboard › should load dashboard without spinner stuck" classname="critical-flows.spec.js" time="0.4">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-38ad0-board-without-spinner-stuck-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-38ad0-board-without-spinner-stuck-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-38ad0-board-without-spinner-stuck-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:147:5 › KDP Creator Suite - Critical Flows › Dashboard › should load dashboard without spinner stuck 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      129 |     test.beforeEach(async ({ page }) => {
+      130 |       // Login before each test
+    > 131 |       await page.goto('/login', { waitUntil: 'networkidle' });
+          |                  ^
+      132 |       
+      133 |       const email = process.env.TEST_USER_EMAIL || 'unlovedproducts@gmail.com';
+      134 |       const password = process.env.TEST_USER_PASSWORD || 'Appl3p1376!';
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:131:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-38ad0-board-without-spinner-stuck-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-38ad0-board-without-spinner-stuck-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-38ad0-board-without-spinner-stuck-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Dashboard › should display user information" classname="critical-flows.spec.js" time="0.365">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-480f9-ld-display-user-information-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-480f9-ld-display-user-information-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-480f9-ld-display-user-information-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:162:5 › KDP Creator Suite - Critical Flows › Dashboard › should display user information 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      129 |     test.beforeEach(async ({ page }) => {
+      130 |       // Login before each test
+    > 131 |       await page.goto('/login', { waitUntil: 'networkidle' });
+          |                  ^
+      132 |       
+      133 |       const email = process.env.TEST_USER_EMAIL || 'unlovedproducts@gmail.com';
+      134 |       const password = process.env.TEST_USER_PASSWORD || 'Appl3p1376!';
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:131:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-480f9-ld-display-user-information-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-480f9-ld-display-user-information-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-480f9-ld-display-user-information-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Dashboard › should have logout button" classname="critical-flows.spec.js" time="0.386">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-4a6d8-d-should-have-logout-button-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-4a6d8-d-should-have-logout-button-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-4a6d8-d-should-have-logout-button-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:171:5 › KDP Creator Suite - Critical Flows › Dashboard › should have logout button 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      129 |     test.beforeEach(async ({ page }) => {
+      130 |       // Login before each test
+    > 131 |       await page.goto('/login', { waitUntil: 'networkidle' });
+          |                  ^
+      132 |       
+      133 |       const email = process.env.TEST_USER_EMAIL || 'unlovedproducts@gmail.com';
+      134 |       const password = process.env.TEST_USER_PASSWORD || 'Appl3p1376!';
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:131:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-4a6d8-d-should-have-logout-button-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-4a6d8-d-should-have-logout-button-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-4a6d8-d-should-have-logout-button-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Dashboard › should handle logout" classname="critical-flows.spec.js" time="0.373">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-d1516-hboard-should-handle-logout-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-d1516-hboard-should-handle-logout-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-d1516-hboard-should-handle-logout-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:177:5 › KDP Creator Suite - Critical Flows › Dashboard › should handle logout 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/login
+    Call log:
+      - navigating to "https://unlovedproductions.com/login", waiting until "networkidle"
+
+
+      129 |     test.beforeEach(async ({ page }) => {
+      130 |       // Login before each test
+    > 131 |       await page.goto('/login', { waitUntil: 'networkidle' });
+          |                  ^
+      132 |       
+      133 |       const email = process.env.TEST_USER_EMAIL || 'unlovedproducts@gmail.com';
+      134 |       const password = process.env.TEST_USER_PASSWORD || 'Appl3p1376!';
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:131:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-d1516-hboard-should-handle-logout-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-d1516-hboard-should-handle-logout-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-d1516-hboard-should-handle-logout-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › API Health › should have working health endpoint" classname="critical-flows.spec.js" time="0.326">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-6dbe1-ave-working-health-endpoint-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-6dbe1-ave-working-health-endpoint-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-6dbe1-ave-working-health-endpoint-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="apiRequestContext.get: getaddrinfo ENOTFOUND unlovedproductions.com" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:191:5 › KDP Creator Suite - Critical Flows › API Health › should have working health endpoint 
+
+    Error: apiRequestContext.get: getaddrinfo ENOTFOUND unlovedproductions.com
+    Call log:
+      - → GET https://unlovedproductions.com/api/health
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.7827.55 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      190 |   test.describe('API Health', () => {
+      191 |     test('should have working health endpoint', async ({ page }) => {
+    > 192 |       const response = await page.request.get('/api/health');
+          |                                           ^
+      193 |       
+      194 |       expect(response.status()).toBeLessThan(400);
+      195 |       
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:192:43
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-6dbe1-ave-working-health-endpoint-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-6dbe1-ave-working-health-endpoint-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-6dbe1-ave-working-health-endpoint-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › API Health › should have working root endpoint" classname="critical-flows.spec.js" time="0.341">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-92035--have-working-root-endpoint-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-92035--have-working-root-endpoint-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-92035--have-working-root-endpoint-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="apiRequestContext.get: getaddrinfo ENOTFOUND unlovedproductions.com" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:200:5 › KDP Creator Suite - Critical Flows › API Health › should have working root endpoint 
+
+    Error: apiRequestContext.get: getaddrinfo ENOTFOUND unlovedproductions.com
+    Call log:
+      - → GET https://unlovedproductions.com/api
+        - user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.7827.55 Safari/537.36
+        - accept: */*
+        - accept-encoding: gzip,deflate,br
+
+
+      199 |
+      200 |     test('should have working root endpoint', async ({ page }) => {
+    > 201 |       const response = await page.request.get('/api');
+          |                                           ^
+      202 |       
+      203 |       expect(response.status()).toBeLessThan(400);
+      204 |       
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:201:43
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-92035--have-working-root-endpoint-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-92035--have-working-root-endpoint-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-92035--have-working-root-endpoint-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Error Handling › should handle 404 gracefully" classname="critical-flows.spec.js" time="0.375">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|critical-flows-KDP-Creator-11920-hould-handle-404-gracefully-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-11920-hould-handle-404-gracefully-chromium/video.webm]]
+
+[[ATTACHMENT|critical-flows-KDP-Creator-11920-hould-handle-404-gracefully-chromium/error-context.md]]
+]]>
+</system-out>
+<error message="page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/nonexistent-page" type="Error">
+<![CDATA[  [chromium] › critical-flows.spec.js:211:5 › KDP Creator Suite - Critical Flows › Error Handling › should handle 404 gracefully 
+
+    Error: page.goto: net::ERR_NAME_NOT_RESOLVED at https://unlovedproductions.com/nonexistent-page
+    Call log:
+      - navigating to "https://unlovedproductions.com/nonexistent-page", waiting until "networkidle"
+
+
+      210 |   test.describe('Error Handling', () => {
+      211 |     test('should handle 404 gracefully', async ({ page }) => {
+    > 212 |       const response = await page.goto('/nonexistent-page', { waitUntil: 'networkidle' });
+          |                                   ^
+      213 |       
+      214 |       // Should either show 404 page or redirect
+      215 |       // Status should be 404 or 200 (if redirected)
+        at /home/ubuntu/KDP-Creator-Suite/tests/e2e/critical-flows.spec.js:212:35
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-11920-hould-handle-404-gracefully-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/critical-flows-KDP-Creator-11920-hould-handle-404-gracefully-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/critical-flows-KDP-Creator-11920-hould-handle-404-gracefully-chromium/error-context.md
+]]>
+</error>
+</testcase>
+<testcase name="KDP Creator Suite - Critical Flows › Error Handling › should handle network errors gracefully" classname="critical-flows.spec.js" time="0.299">
+</testcase>
+</testsuite>
+</testsuites>

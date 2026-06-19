@@ -1,0 +1,19 @@
+{
+  "name": "kdp-creator-suite",
+  "version": "1.0.0",
+  "description": "KDP Creator Suite - Comprehensive testing and automation",
+  "scripts": {
+    "test": "playwright test",
+    "test:debug": "playwright test --debug",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "test:mobile": "playwright test --project='Mobile Chrome' --project='Mobile Safari'"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}
