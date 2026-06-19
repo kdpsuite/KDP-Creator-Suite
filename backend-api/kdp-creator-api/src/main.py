@@ -40,6 +40,7 @@ from src.routes.analytics import analytics_bp
 from src.routes.totp import totp_bp
 from src.routes.batch import batch_bp
 from src.routes.auth_sync import auth_sync_bp
+from src.utils.validation import success_response
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'kdp-creator-suite-secret-key-2024')
@@ -82,12 +83,20 @@ with app.app_context():
 
 @app.route('/api/health')
 def health():
-    return jsonify({"status": "ok", "message": "KDP Creator Suite API is running"})
+    return success_response(
+        data={'status': 'ok'},
+        message='KDP Creator Suite API is running',
+        status=200
+    )
 
 
 @app.route('/')
 def root():
-    return jsonify({"message": "KDP Creator Suite API", "version": "1.0.0"})
+    return success_response(
+        data={'version': '1.0.0'},
+        message='KDP Creator Suite API',
+        status=200
+    )
 
 
 if __name__ == '__main__':
