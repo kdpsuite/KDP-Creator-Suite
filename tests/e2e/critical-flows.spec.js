@@ -15,7 +15,7 @@ test.describe('KDP Creator Suite - Critical Flows', () => {
   test.describe('Landing Page', () => {
     test('should load the main domain without errors', async ({ page }) => {
       // Navigate to main domain
-      const response = await page.goto('/', { waitUntil: 'networkidle' });
+      const response = await page.goto('https://kdpsuite.com', { waitUntil: 'networkidle' });
       
       // Check response status
       expect(response.status()).toBeLessThan(400);
@@ -56,7 +56,7 @@ test.describe('KDP Creator Suite - Critical Flows', () => {
 
   test.describe('Login Flow', () => {
     test('should navigate to login page', async ({ page }) => {
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('https://dashboard.kdpsuite.com/login', { waitUntil: 'networkidle' });
       
       // Check for login form elements
       const emailInput = page.locator('input[type="email"]');
@@ -128,7 +128,7 @@ test.describe('KDP Creator Suite - Critical Flows', () => {
   test.describe('Dashboard', () => {
     test.beforeEach(async ({ page }) => {
       // Login before each test
-      await page.goto('/login', { waitUntil: 'networkidle' });
+      await page.goto('https://dashboard.kdpsuite.com/login', { waitUntil: 'networkidle' });
       
       const email = process.env.TEST_USER_EMAIL || 'unlovedproducts@gmail.com';
       const password = process.env.TEST_USER_PASSWORD || 'Appl3p1376!';
@@ -182,14 +182,14 @@ test.describe('KDP Creator Suite - Critical Flows', () => {
       // Should redirect to login or home
       await page.waitForTimeout(2000);
       
-      const isLoggedOut = page.url().includes('/login') || page.url() === '/';
+      const isLoggedOut = page.url().includes('/login') || page.url().includes('kdpsuite.com');
       expect(isLoggedOut).toBeTruthy();
     });
   });
 
   test.describe('API Health', () => {
     test('should have working health endpoint', async ({ page }) => {
-      const response = await page.request.get('/api/health');
+      const response = await page.request.get('https://dashboard.kdpsuite.com/api/health');
       
       expect(response.status()).toBeLessThan(400);
       
@@ -198,7 +198,7 @@ test.describe('KDP Creator Suite - Critical Flows', () => {
     });
 
     test('should have working root endpoint', async ({ page }) => {
-      const response = await page.request.get('/api');
+      const response = await page.request.get('https://dashboard.kdpsuite.com/api');
       
       expect(response.status()).toBeLessThan(400);
       

@@ -30,7 +30,9 @@ module.exports = defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: process.env.BASE_URL || 'https://unlovedproductions.com',
+    baseURL: process.env.BASE_URL || 'https://kdpsuite.com',
+    /* Dashboard URL for specific tests */
+    dashboardURL: process.env.DASHBOARD_URL || 'https://dashboard.kdpsuite.com',
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
