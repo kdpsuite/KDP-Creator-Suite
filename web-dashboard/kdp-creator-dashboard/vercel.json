@@ -12,5 +12,4 @@
       "destination": "/index.html"
     }
   ],
-  "env_comment": "Note: VITE_API_URL is set via environment variables in Vercel dashboard. The hardcoded rewrite above is a fallback."
 }
