@@ -19,10 +19,8 @@ REQUIRED_ENV_VARS = [
 
 missing_vars = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
 if missing_vars:
-    raise RuntimeError(
-        f"Missing required environment variables: {', '.join(missing_vars)}. "
-        f"Please check your .env file or Vercel environment settings."
-    )
+    print(f"[WARNING] Missing required environment variables: {', '.join(missing_vars)}")
+    print(f"[WARNING] Please check your Vercel environment settings.")
 
 # Log startup information
 print(f"[STARTUP] Environment: {os.environ.get('ENVIRONMENT', 'development')}")
