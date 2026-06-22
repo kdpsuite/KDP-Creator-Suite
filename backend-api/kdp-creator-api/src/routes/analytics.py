@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
+from src.utils.responses import success_response, error_response
 from datetime import datetime, timedelta
 import random
 
@@ -11,7 +12,7 @@ def get_user_metrics():
     user_id = get_jwt_identity()
     profile = UserProfile.get_by_id(user_id)
     if not profile:
-        return jsonify({'error': 'User not found'}), 404
+        return error_response('User not found', 'USER_NOT_FOUND', status_code=404)
 
     from src.routes.subscription import SUBSCRIPTION_TIERS
     tier = profile.get('subscription_tier', 'free')
@@ -40,8 +41,7 @@ def get_user_metrics():
         {'type': 'EPUB', 'count': max(1, conversions * 10 // 100), 'success_rate': 87},
     ]
 
-    return jsonify({
-        'success': True,
+    return success_response({
         'user_id': user_id,
         'metrics': {
             'total_conversions': conversions,
@@ -63,21 +63,23 @@ def get_user_metrics():
 @jwt_required()
 def get_business_metrics():
     # Admin only check could be added here
-    res = supabase.table('user_profiles').select('subscription_tier').execute()
-    profiles = res.data
-    
-    total_users = len(profiles)
-    users_by_tier = {
-        'free': sum(1 for p in profiles if p['subscription_tier'] == 'free'),
-        'pro': sum(1 for p in profiles if p['subscription_tier'] == 'pro'),
-        'studio': sum(1 for p in profiles if p['subscription_tier'] == 'studio'),
-    }
-
-    return jsonify({
-        'success': True,
-        'metrics': {
-            'total_users': total_users,
-            'subscription_distribution': users_by_tier,
-            'total_revenue': (users_by_tier['pro'] * 19.99) + (users_by_tier['studio'] * 49.99),
+    try:
+        res = supabase.table('user_profiles').select('subscription_tier').execute()
+        profiles = res.data
+        
+        total_users = len(profiles)
+        users_by_tier = {
+            'free': sum(1 for p in profiles if p['subscription_tier'] == 'free'),
+            'pro': sum(1 for p in profiles if p['subscription_tier'] == 'pro'),
+            'studio': sum(1 for p in profiles if p['subscription_tier'] == 'studio'),
         }
-    })
+
+        return success_response({
+            'metrics': {
+                'total_users': total_users,
+                'subscription_distribution': users_by_tier,
+                'total_revenue': (users_by_tier['pro'] * 19.99) + (users_by_tier['studio'] * 49.99),
+            }
+        })
+    except Exception as e:
+        return error_response(f'Failed to fetch business metrics: {str(e)}', 'DATABASE_ERROR', status_code=500)

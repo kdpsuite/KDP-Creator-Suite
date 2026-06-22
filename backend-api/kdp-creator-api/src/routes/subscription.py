@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
+from src.utils.responses import success_response, error_response
 
 subscription_bp = Blueprint('subscription', __name__)
 
@@ -42,10 +43,7 @@ SUBSCRIPTION_TIERS = {
 
 @subscription_bp.route('/tiers', methods=['GET'])
 def get_subscription_tiers():
-    return jsonify({
-        'success': True,
-        'tiers': SUBSCRIPTION_TIERS,
-    })
+    return success_response({'tiers': SUBSCRIPTION_TIERS})
 
 @subscription_bp.route('/status', methods=['GET'])
 @jwt_required()
@@ -53,7 +51,7 @@ def get_subscription_status():
     user_id = get_jwt_identity()
     profile = UserProfile.get_by_id(user_id)
     if not profile:
-        return jsonify({'error': 'User not found'}), 404
+        return error_response('User not found', 'USER_NOT_FOUND', status_code=404)
         
     tier = profile.get('subscription_tier', 'free')
     tier_limits = SUBSCRIPTION_TIERS.get(tier, SUBSCRIPTION_TIERS['free'])
@@ -72,8 +70,7 @@ def get_subscription_status():
         else max(0, tier_limits['batch_processing_limit'] - batch_ops)
     )
     
-    return jsonify({
-        'success': True,
+    return success_response({
         'user_id': user_id,
         'tier': tier,
         'tier_details': tier_limits,
@@ -95,15 +92,17 @@ def upgrade_subscription():
     new_tier = data.get('tier')
     
     if new_tier not in SUBSCRIPTION_TIERS:
-        return jsonify({'error': 'Invalid subscription tier'}), 400
+        return error_response('Invalid subscription tier', 'INVALID_TIER', status_code=400)
     
-    res = supabase.table('user_profiles').update({'subscription_tier': new_tier}).eq('id', user_id).execute()
-    if not res.data:
-        return jsonify({'error': 'User not found'}), 404
-    
-    return jsonify({
-        'success': True,
-        'user_id': user_id,
-        'new_tier': new_tier,
-        'tier_details': SUBSCRIPTION_TIERS[new_tier]
-    })
+    try:
+        res = supabase.table('user_profiles').update({'subscription_tier': new_tier}).eq('id', user_id).execute()
+        if not res.data:
+            return error_response('User not found', 'USER_NOT_FOUND', status_code=404)
+        
+        return success_response({
+            'user_id': user_id,
+            'new_tier': new_tier,
+            'tier_details': SUBSCRIPTION_TIERS[new_tier]
+        })
+    except Exception as e:
+        return error_response(f'Upgrade failed: {str(e)}', 'DATABASE_ERROR', status_code=500)
