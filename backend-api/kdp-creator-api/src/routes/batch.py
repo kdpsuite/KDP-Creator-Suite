@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from src.models.user import supabase, UserProfile, BatchJob, jwt_required, get_jwt_identity
 from src.utils.responses import success_response, error_response
+from src.utils.rate_limit import rate_limit_batch_processing
 from datetime import datetime
 import threading
 
@@ -29,6 +30,7 @@ def get_batch_job(job_id):
         return error_response(f'Failed to fetch job details: {str(e)}', 'DATABASE_ERROR', status_code=500)
 
 @batch_bp.route('/batch/submit', methods=['POST'])
+@rate_limit_batch_processing
 @jwt_required()
 def submit_batch_job():
     user_id = get_jwt_identity()

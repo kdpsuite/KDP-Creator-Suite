@@ -1,7 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models.user import User, db
+from src.models.user import User, db, jwt_required, get_jwt_identity
 from src.storage import upload_file
 from src.utils.responses import success_response, error_response
+from src.utils.rate_limit import rate_limit_file_upload, rate_limit_batch_processing
 from reportlab.lib.colors import grey
 import os
 import io
@@ -39,6 +40,8 @@ PRINT_DPI = 300
 DIGITAL_DPI = 150
 
 @pdf_bp.route('/convert-image-to-coloring', methods=['POST'])
+@rate_limit_file_upload
+@jwt_required()
 def convert_image_to_coloring():
     """Convert an image to a coloring book page"""
     try:
@@ -126,6 +129,8 @@ def convert_image_to_coloring():
         return error_response(f'Conversion failed: {str(e)}', 'CONVERSION_ERROR', status_code=500)
 
 @pdf_bp.route('/validate-kdp-compliance', methods=['POST'])
+@rate_limit_file_upload
+@jwt_required()
 def validate_kdp_compliance():
     """Validate PDF for KDP compliance"""
     try:
@@ -195,6 +200,8 @@ def validate_kdp_compliance():
         return error_response(f'Validation failed: {str(e)}', 'VALIDATION_ERROR', status_code=500)
 
 @pdf_bp.route('/convert-to-kdp-format', methods=['POST'])
+@rate_limit_file_upload
+@jwt_required()
 def convert_to_kdp_format():
     """Convert PDF to KDP-compliant format"""
     try:
@@ -268,6 +275,8 @@ def convert_to_kdp_format():
         return error_response(f'Conversion failed: {str(e)}', 'CONVERSION_ERROR', status_code=500)
 
 @pdf_bp.route('/batch-process', methods=['POST'])
+@rate_limit_batch_processing
+@jwt_required()
 def batch_process():
     """Process multiple files in batch"""
     try:
