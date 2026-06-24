@@ -1,0 +1,83 @@
+name: Deployment Protection
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-all-tests:
+    runs-on: ubuntu-latest
+    name: Verify All Tests Pass
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for CI checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo, number } = context;
+            const { data: pullRequest } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: number,
+            });
+
+            if (pullRequest.draft) {
+              console.log('Draft PR detected. Skipping deployment checks.');
+              return;
+            }
+
+            console.log('Waiting for all status checks to complete...');
+            let allChecksPassed = false;
+            let attempts = 0;
+            const maxAttempts = 60;
+
+            while (!allChecksPassed && attempts < maxAttempts) {
+              const { data: checkRuns } = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: pullRequest.head.sha,
+              });
+
+              const relevantChecks = checkRuns.check_runs.filter(
+                check => check.name.includes('CI') || check.name.includes('Lint') || check.name.includes('Test')
+              );
+
+              if (relevantChecks.length === 0) {
+                console.log('No CI checks found yet. Waiting...');
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 10000));
+                continue;
+              }
+
+              const allCompleted = relevantChecks.every(check => check.status === 'completed');
+              const allPassed = relevantChecks.every(check => check.conclusion === 'success');
+
+              if (allCompleted) {
+                if (allPassed) {
+                  console.log('✅ All CI checks passed!');
+                  allChecksPassed = true;
+                } else {
+                  const failedChecks = relevantChecks.filter(check => check.conclusion !== 'success');
+                  console.log('❌ Some checks failed:');
+                  failedChecks.forEach(check => {
+                    console.log(`  - ${check.name}: ${check.conclusion}`);
+                  });
+                  throw new Error('CI checks failed. Fix the issues before deploying.');
+                }
+              } else {
+                console.log('Checks still running. Waiting...');
+                attempts++;
+                await new Promise(resolve => setTimeout(resolve, 10000));
+              }
+            }
+
+            if (!allChecksPassed) {
+              throw new Error('Timeout waiting for CI checks to complete.');
+            }
+
+      - name: Deployment approved
+        run: echo "✅ All checks passed. Deployment approved."
