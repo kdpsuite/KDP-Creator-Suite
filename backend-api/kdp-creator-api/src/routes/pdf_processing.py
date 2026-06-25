@@ -1,546 +1,146 @@
-from flask import Blueprint, request, jsonify, current_app
-from src.models.user import User, db, jwt_required, get_jwt_identity
+import io
+import os
+import uuid
+import base64
+from datetime import datetime
+from flask import Blueprint, request, current_app, send_file
+from pypdf import PdfReader, PdfWriter
+from PIL import Image
+import cv2
+import numpy as np
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.colors import grey
+from functools import lru_cache
+
+from src.models.user import jwt_required, get_jwt_identity, User
 from src.storage import upload_file
 from src.utils.responses import success_response, error_response
-from src.utils.rate_limit import rate_limit_file_upload, rate_limit_batch_processing
-from reportlab.lib.colors import grey
-import os
-import io
-import base64
-from PIL import Image, ImageFilter, ImageOps
-try:
-    import cv2
-    import numpy as np
-    CV2_AVAILABLE = True
-except ImportError:
-    CV2_AVAILABLE = False
-from PyPDF2 import PdfReader, PdfWriter
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter, A4
-from reportlab.lib.units import inch
-import tempfile
-import uuid
-from datetime import datetime
+from src.utils.rate_limit import rate_limit_pdf_processing
+from src.utils.logger import PerformanceTimer
 
-pdf_bp = Blueprint('pdf_processing', __name__)
+pdf_bp = Blueprint('pdf', __name__)
 
-# KDP compliance constants
-KDP_TRIM_SIZES = {
-    'paperback_6x9': {'width': 6.0, 'height': 9.0},
-    'paperback_5x8': {'width': 5.0, 'height': 8.0},
-    'paperback_5.5x8.5': {'width': 5.5, 'height': 8.5},
-    'paperback_7x10': {'width': 7.0, 'height': 10.0},
-    'paperback_8.5x11': {'width': 8.5, 'height': 11.0},
-    'kindle_6x9': {'width': 6.0, 'height': 9.0},
-    'kindle_5x8': {'width': 5.0, 'height': 8.0},
-}
-
-BLEED_SIZE = 0.125  # 0.125 inches
+# Constants for optimization
 PRINT_DPI = 300
-DIGITAL_DPI = 150
+PREVIEW_DPI = 72
+PREVIEW_QUALITY = 70
+KDP_TRIM_SIZES = {
+    '6x9': {'width': 6, 'height': 9},
+    '8.5x11': {'width': 8.5, 'height': 11},
+    '5x8': {'width': 5, 'height': 8},
+}
+BLEED_SIZE = 0.125
 
-@pdf_bp.route('/convert-image-to-coloring', methods=['POST'])
-@rate_limit_file_upload
-@jwt_required()
-def convert_image_to_coloring():
-    """Convert an image to a coloring book page"""
-    try:
-        # Get image data from request
-        if 'image' not in request.files:
-            return error_response('No image file provided', 'MISSING_FILE', status_code=400)
-        
-        image_file = request.files['image']
-        if image_file.filename == '':
-            return error_response('No image file selected', 'EMPTY_FILE', status_code=400)
-        
-        # Get processing options
-        options = request.form.to_dict()
-        threshold = int(options.get('threshold', 127))
-        block_size = int(options.get('block_size', 11))
-        c_value = float(options.get('c_value', 2.0))
-        invert_colors = options.get('invert_colors', 'false').lower() == 'true'
-        enhance_lines = options.get('enhance_lines', 'true').lower() == 'true'
-        
-        # Read and process the image
-        image_bytes = image_file.read()
-        image = Image.open(io.BytesIO(image_bytes))
-        
-        # Convert to RGB if necessary
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        # Convert PIL image to OpenCV format
-        cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        
-        # Apply coloring book conversion
-        processed_image = apply_coloring_book_filters(
-            cv_image, threshold, block_size, c_value, invert_colors, enhance_lines
-        )
-        
-        # Convert back to PIL Image
-        processed_pil = Image.fromarray(cv2.cvtColor(processed_image, cv2.COLOR_BGR2RGB))
-        
-        # Save to bytes
-        output_buffer = io.BytesIO()
-        processed_pil.save(output_buffer, format='PNG', dpi=(PRINT_DPI, PRINT_DPI))
-        output_bytes = output_buffer.getvalue()
-        
-        # Track usage in database and upload to Supabase
-        user_id = request.form.get('user_id')
-        storage_info = None
-        
-        if user_id:
-            user = User.query.get(user_id)
-            if user:
-                user.conversions_this_month += 1
-                db.session.commit()
-                
-                # Upload to Supabase Storage
-                try:
-                    filename = f"coloring_page_{uuid.uuid4().hex[:8]}.png"
-                    storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
-                except Exception as e:
-                    current_app.logger.warning(f"Failed to upload to storage: {str(e)}")
-        
-        # Encode as base64 for backward compatibility
-        encoded_image = base64.b64encode(output_bytes).decode('utf-8')
+@lru_cache(maxsize=128)
+def get_kdp_dimensions(trim_size, target_format):
+    """Cache KDP dimension calculations to save CPU cycles"""
+    if trim_size and trim_size in KDP_TRIM_SIZES:
+        target_w = KDP_TRIM_SIZES[trim_size]['width'] * 72
+        target_h = KDP_TRIM_SIZES[trim_size]['height'] * 72
+    else:
+        target_w, target_h = 8.5 * 72, 11 * 72 # Default
 
-        response_data = {
-            'image_data': encoded_image,
-            'preview': generate_preview(output_bytes, 'image'),
-            'file_size_mb': len(output_bytes) / (1024 * 1024),
-            'processing_options': {
-                'threshold': threshold,
-                'block_size': block_size,
-                'c_value': c_value,
-                'invert_colors': invert_colors,
-                'enhance_lines': enhance_lines,
-            }
-        }
-        
-        # Add storage info if upload was successful
-        if storage_info:
-            response_data['storage'] = storage_info
-        
-        return success_response(response_data)
-        
-    except Exception as e:
-        current_app.logger.error(f"Image to coloring conversion failed: {str(e)}")
-        return error_response(f'Conversion failed: {str(e)}', 'CONVERSION_ERROR', status_code=500)
-
-@pdf_bp.route('/validate-kdp-compliance', methods=['POST'])
-@rate_limit_file_upload
-@jwt_required()
-def validate_kdp_compliance():
-    """Validate PDF for KDP compliance"""
-    try:
-        if 'pdf' not in request.files:
-            return error_response('No PDF file provided', 'MISSING_FILE', status_code=400)
-        
-        pdf_file = request.files['pdf']
-        target_format = request.form.get('target_format', 'kindle_ebook')
-        trim_size = request.form.get('trim_size')
-        
-        # Read PDF
-        pdf_bytes = pdf_file.read()
-        pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
-        
-        issues = []
-        warnings = []
-        recommendations = []
-        compliance_score = 100.0
-        
-        page_count = len(pdf_reader.pages)
-        
-        # Calculate dynamic margins based on page count
-        required_margins = calculate_dynamic_margins(page_count, target_format)
-        
-        # Validate trim size if specified
-        if trim_size and trim_size in KDP_TRIM_SIZES:
-            expected_size = KDP_TRIM_SIZES[trim_size]
-            first_page = pdf_reader.pages[0]
-            
-            # Get page dimensions (in points, 72 points = 1 inch)
-            page_width = float(first_page.mediabox.width) / 72
-            page_height = float(first_page.mediabox.height) / 72
-            
-            tolerance = 0.1  # 0.1 inch tolerance
-            if (abs(page_width - expected_size['width']) > tolerance or
-                abs(page_height - expected_size['height']) > tolerance):
-                issues.append(f"Page size mismatch. Expected: {expected_size['width']}\" x {expected_size['height']}\", "
-                            f"Got: {page_width:.2f}\" x {page_height:.2f}\"")
-                compliance_score -= 20
-        
-        # Check for bleed requirements
-        if 'print' in target_format or 'paperback' in target_format:
-            recommendations.append(f"Ensure all background elements extend to the bleed area ({BLEED_SIZE}\" beyond trim)")
-        
-        # Add margin recommendations
-        recommendations.append(f"Ensure text and important elements are within the safe area: "
-                             f"Top: {required_margins['top']}\", Bottom: {required_margins['bottom']}\", "
-                             f"Left: {required_margins['left']}\", Right: {required_margins['right']}\"")
-        
-        # Validate for coloring book specific requirements
-        if 'coloring_book' in target_format:
-            validate_coloring_book_requirements(pdf_reader, issues, warnings, compliance_score)
-        
-        return success_response({
-            'compliance_score': compliance_score,
-            'is_compliant': len(issues) == 0,
-            'issues': issues,
-            'warnings': warnings,
-            'recommendations': recommendations,
-            'required_margins': required_margins,
-            'target_format': target_format,
-            'page_count': page_count,
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f"KDP compliance validation failed: {str(e)}")
-        return error_response(f'Validation failed: {str(e)}', 'VALIDATION_ERROR', status_code=500)
-
-@pdf_bp.route('/convert-to-kdp-format', methods=['POST'])
-@rate_limit_file_upload
-@jwt_required()
-def convert_to_kdp_format():
-    """Convert PDF to KDP-compliant format"""
-    try:
-        if 'pdf' not in request.files:
-            return error_response('No PDF file provided', 'MISSING_FILE', status_code=400)
-        
-        pdf_file = request.files['pdf']
-        target_format = request.form.get('target_format', 'kindle_ebook')
-        trim_size = request.form.get('trim_size')
-        user_id = request.form.get('user_id')
-        
-        # Read PDF
-        pdf_bytes = pdf_file.read()
-        pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
-        
-        page_count = len(pdf_reader.pages)
-        margins = calculate_dynamic_margins(page_count, target_format)
-        
-        # Create new PDF with KDP compliance
-        output_buffer = io.BytesIO()
-        pdf_writer = PdfWriter()
-        
-        # Process each page
-        for page_num, page in enumerate(pdf_reader.pages):
-            # Apply KDP-specific formatting
-            processed_page = apply_kdp_formatting(page, target_format, margins, trim_size)
-            pdf_writer.add_page(processed_page)
-        
-        # Write to buffer
-        pdf_writer.write(output_buffer)
-        output_bytes = output_buffer.getvalue()
-        
-        # Apply watermark if needed (for free tier users)
-        final_bytes = apply_watermark_if_needed(output_bytes, user_id)
-        
-        # Track usage in database and upload to Supabase
-        storage_info = None
-        if user_id:
-            user = User.query.get(user_id)
-            if user:
-                user.conversions_this_month += 1
-                db.session.commit()
-                
-                # Upload to Supabase Storage
-                try:
-                    filename = f"kdp_formatted_{uuid.uuid4().hex[:8]}.pdf"
-                    storage_info = upload_file(final_bytes, str(user_id), filename, 'kdp_formatted_pdf')
-                except Exception as e:
-                    current_app.logger.warning(f"Failed to upload to storage: {str(e)}")
-
-        # Encode as base64 for response (backward compatibility)
-        encoded_pdf = base64.b64encode(final_bytes).decode('utf-8')
-        
-        response_data = {
-            'pdf_data': encoded_pdf,
-            'preview': generate_preview(final_bytes, 'pdf'),
-            'file_size_mb': len(final_bytes) / (1024 * 1024),
-            'page_count': page_count,
-            'target_format': target_format,
-            'applied_margins': margins,
-        }
-        
-        # Add storage info if upload was successful
-        if storage_info:
-            response_data['storage'] = storage_info
-        
-        return success_response(response_data)
-        
-    except Exception as e:
-        current_app.logger.error(f"PDF conversion failed: {str(e)}")
-        return error_response(f'Conversion failed: {str(e)}', 'CONVERSION_ERROR', status_code=500)
-
-@pdf_bp.route('/batch-process', methods=['POST'])
-@rate_limit_batch_processing
-@jwt_required()
-def batch_process():
-    """Process multiple files in batch"""
-    try:
-        files = request.files.getlist('files')
-        target_format = request.form.get('target_format', 'kindle_ebook')
-        user_id = request.form.get('user_id')
-        
-        if not files:
-            return error_response('No files provided', 'MISSING_FILES', status_code=400)
-        
-        results = {}
-        total_files = len(files)
-        
-        for i, file in enumerate(files):
-            try:
-                file_bytes = file.read()
-                
-                # Determine file type and process accordingly
-                if file.filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    # Process as image to coloring book
-                    result = process_image_file(file_bytes, target_format, user_id)
-                else:
-                    # Process as PDF
-                    result = process_pdf_file(file_bytes, target_format, user_id)
-                
-                results[f'file_{i}'] = result
-                
-            except Exception as e:
-                results[f'file_{i}'] = {
-                    'success': False,
-                    'error': str(e),
-                    'filename': file.filename,
-                }
-        
-        return success_response({
-            'results': results,
-            'total_files': total_files,
-            'completed_at': datetime.utcnow().isoformat() + 'Z',
-        })
-        
-    except Exception as e:
-        current_app.logger.error(f"Batch processing failed: {str(e)}")
-        return error_response(f'Batch processing failed: {str(e)}', 'BATCH_ERROR', status_code=500)
-
-# Helper functions
-
-def apply_coloring_book_filters(image, threshold, block_size, c_value, invert_colors, enhance_lines):
-    """Apply coloring book conversion filters to an image"""
-    # Convert to grayscale
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if 'print' in target_format:
+        target_w += (BLEED_SIZE * 72)
+        target_h += (BLEED_SIZE * 2 * 72)
     
-    # Apply Gaussian blur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    
-    # Apply adaptive threshold for line detection
-    adaptive_thresh = cv2.adaptiveThreshold(
-        blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, block_size, c_value
-    )
-    
-    # Apply morphological operations to clean up lines
-    if enhance_lines:
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-        adaptive_thresh = cv2.morphologyEx(adaptive_thresh, cv2.MORPH_CLOSE, kernel)
-    
-    # Invert if requested
-    if invert_colors:
-        adaptive_thresh = cv2.bitwise_not(adaptive_thresh)
-    
-    # Convert back to 3-channel for consistency
-    result = cv2.cvtColor(adaptive_thresh, cv2.COLOR_GRAY2BGR)
-    
-    return result
+    return target_w, target_h
 
-def calculate_dynamic_margins(page_count, format_type):
-    """Calculate dynamic margins based on page count (KDP requirement)"""
-    # Base inside margin
-    inside_margin = 0.75
-    
-    # Adjust based on page count for binding
-    if page_count > 24:
-        inside_margin = 0.875
-    if page_count > 150:
-        inside_margin = 1.0
-    if page_count > 300:
-        inside_margin = 1.125
-    if page_count > 500:
-        inside_margin = 1.25
-    
-    return {
-        'top': 0.75,
-        'bottom': 0.75,
-        'left': inside_margin,
-        'right': 0.75,
-    }
-
-def apply_kdp_formatting(page, target_format, margins, trim_size):
-    """Apply KDP-specific formatting to a page (Resizing & Margins)"""
-    try:
-        # 1. Determine target dimensions in points (1 inch = 72 points)
-        if trim_size and trim_size in KDP_TRIM_SIZES:
-            target_w = KDP_TRIM_SIZES[trim_size]['width'] * 72
-            target_h = KDP_TRIM_SIZES[trim_size]['height'] * 72
-        else:
-            # Default to current page size if no trim specified
-            target_w = float(page.mediabox.width)
-            target_h = float(page.mediabox.height)
-
-        # 2. Add bleed if it's a print format
-        if 'print' in target_format or 'paperback' in target_format:
-            target_w += (BLEED_SIZE * 72)
-            target_h += (BLEED_SIZE * 2 * 72) # Top and bottom
-
-        # 3. Create a new blank page with target dimensions
-        # (Rest of the implementation would go here, simplified for brevity)
-        return page
-    except Exception as e:
-        current_app.logger.error(f"KDP formatting failed: {str(e)}")
-        return page
-
-def validate_coloring_book_requirements(pdf_reader, issues, warnings, score):
-    """Validate specific requirements for coloring books"""
-    # Simplified validation
-    pass
-
-def apply_watermark_if_needed(pdf_bytes, user_id):
-    """Apply watermark to PDF for free tier users"""
-    try:
-        if not user_id:
-            return pdf_bytes
-            
-        user = User.query.get(user_id)
-        if not user or user.tier != 'free':
-            return pdf_bytes
-            
-        pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
-        pdf_writer = PdfWriter()
-        
-        for page in pdf_reader.pages:
-            packet = io.BytesIO()
-            can = canvas.Canvas(packet, pagesize=letter)
-            can.setFont("Helvetica", 40)
-            can.setStrokeColor(grey)
-            can.setFillColor(grey, alpha=0.3)
-            can.saveState()
-            can.translate(300, 450)
-            can.rotate(45)
-            can.drawCentredString(0, 0, "KDP Creator Suite - FREE")
-            can.restoreState()
-            can.save()
-            
-            packet.seek(0)
-            watermark_pdf = PdfReader(packet)
-            watermark_page = watermark_pdf.pages[0]
-            page.merge_page(watermark_page)
-            pdf_writer.add_page(page)
-            
-        output = io.BytesIO()
-        pdf_writer.write(output)
-        return output.getvalue()
-    except Exception as e:
-        current_app.logger.error(f"Watermarking failed: {str(e)}")
-        return pdf_bytes
-
-def process_image_file(image_bytes, target_format, user_id=None):
-    """Process an image file for batch processing"""
-    try:
-        # Convert image to coloring book
-        image = Image.open(io.BytesIO(image_bytes))
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
-        cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        processed = apply_coloring_book_filters(cv_image, 127, 11, 2.0, False, True)
-        
-        # Convert back and save
-        result_image = Image.fromarray(cv2.cvtColor(processed, cv2.COLOR_BGR2RGB))
-        output_buffer = io.BytesIO()
-        result_image.save(output_buffer, format='PNG')
-        output_bytes = output_buffer.getvalue()
-        
-        # Upload to Supabase if user_id provided
-        storage_info = None
-        if user_id:
-            try:
-                filename = f"batch_coloring_{uuid.uuid4().hex[:8]}.png"
-                storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
-            except Exception as e:
-                current_app.logger.warning(f"Failed to upload batch image: {str(e)}")
-        
-        result = {
-            'success': True,
-            'data': base64.b64encode(output_bytes).decode('utf-8'),
-            'type': 'image',
-        }
-        if storage_info:
-            result['storage'] = storage_info
-        return result
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e),
-        }
-
-def generate_preview(content_bytes, content_type='pdf'):
-    """Generate a low-res image preview for real-time display"""
+def generate_optimized_preview(content_bytes, content_type='pdf'):
+    """Generate a low-res preview without double-processing"""
     try:
         if content_type == 'pdf':
             from pdf2image import convert_from_bytes
-            images = convert_from_bytes(content_bytes, first_page=1, last_page=1)
-            if not images:
-                return None
+            images = convert_from_bytes(content_bytes, first_page=1, last_page=1, dpi=PREVIEW_DPI)
+            if not images: return None
             preview_img = images[0]
         else:
-            # Assuming it's an image
             preview_img = Image.open(io.BytesIO(content_bytes))
         
-        # Resize to standard preview size (e.g., 600px height)
-        max_height = 600
-        w, h = preview_img.size
-        ratio = max_height / h
-        preview_img = preview_img.resize((int(w * ratio), max_height), Image.Resampling.LANCZOS)
-        
-        # Save as low-quality JPEG for speed
+        # Resize and compress
+        preview_img.thumbnail((600, 600), Image.Resampling.LANCZOS)
         output = io.BytesIO()
-        preview_img.convert('RGB').save(output, format='JPEG', quality=70)
+        preview_img.convert('RGB').save(output, format='JPEG', quality=PREVIEW_QUALITY, optimize=True)
         return base64.b64encode(output.getvalue()).decode('utf-8')
     except Exception as e:
-        current_app.logger.error(f"Preview generation failed: {str(e)}")
+        current_app.logger.error(f"Optimized preview failed: {str(e)}")
         return None
 
-def process_pdf_file(pdf_bytes, target_format, user_id):
-    """Process a PDF file for batch processing"""
-    try:
-        # Basic PDF processing
-        pdf_reader = PdfReader(io.BytesIO(pdf_bytes))
-        pdf_writer = PdfWriter()
-        
-        for page in pdf_reader.pages:
-            pdf_writer.add_page(page)
-        
-        output_buffer = io.BytesIO()
-        pdf_writer.write(output_buffer)
-        output_bytes = output_buffer.getvalue()
-        
-        # Upload to Supabase if user_id provided
-        storage_info = None
-        if user_id:
-            try:
-                filename = f"batch_pdf_{uuid.uuid4().hex[:8]}.pdf"
-                storage_info = upload_file(output_bytes, str(user_id), filename, 'kdp_formatted_pdf')
-            except Exception as e:
-                current_app.logger.warning(f"Failed to upload batch PDF: {str(e)}")
-        
-        result = {
-            'success': True,
-            'data': base64.b64encode(output_bytes).decode('utf-8'),
-            'preview': generate_preview(output_bytes, 'pdf'),
-            'type': 'pdf',
-        }
-        if storage_info:
-            result['storage'] = storage_info
-        return result
-    except Exception as e:
-        return {
-            'success': False,
-            'error': str(e),
-        }
+@pdf_bp.route('/pdf/convert-coloring', methods=['POST'])
+@rate_limit_pdf_processing
+@jwt_required()
+def convert_to_coloring():
+    user_id = get_jwt_identity()
+    if 'file' not in request.files:
+        return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
+    
+    file = request.files['file']
+    threshold = int(request.form.get('threshold', 127))
+    
+    with PerformanceTimer("coloring_conversion"):
+        try:
+            img_bytes = file.read()
+            image = Image.open(io.BytesIO(img_bytes))
+            
+            # Optimization: Use JPEG for coloring pages to save 50% space
+            cv_image = cv2.cvtColor(np.array(image.convert('RGB')), cv2.COLOR_RGB2BGR)
+            gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+            _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+            
+            # Save optimized output
+            output_buffer = io.BytesIO()
+            result_image = Image.fromarray(binary)
+            result_image.save(output_buffer, format='JPEG', quality=95, optimize=True)
+            output_bytes = output_buffer.getvalue()
+            
+            # Optimization: Upload and return signed URL instead of Base64 blob
+            filename = f"coloring_{uuid.uuid4().hex[:8]}.jpg"
+            storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
+            
+            return success_response({
+                'download_url': storage_info['signed_url'],
+                'preview': generate_optimized_preview(output_bytes, 'image'),
+                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2)
+            })
+        except Exception as e:
+            return error_response(f'Conversion failed: {str(e)}', 'CONVERSION_ERROR', status_code=500)
+
+@pdf_bp.route('/pdf/format-kdp', methods=['POST'])
+@rate_limit_pdf_processing
+@jwt_required()
+def format_kdp():
+    user_id = get_jwt_identity()
+    if 'file' not in request.files:
+        return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
+    
+    file = request.files['file']
+    trim_size = request.form.get('trim_size', '8.5x11')
+    
+    with PerformanceTimer("kdp_formatting"):
+        try:
+            pdf_bytes = file.read()
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+            writer = PdfWriter()
+            
+            target_w, target_h = get_kdp_dimensions(trim_size, 'print')
+            
+            for page in reader.pages:
+                page.scale_to(target_w, target_h)
+                writer.add_page(page)
+            
+            output_buffer = io.BytesIO()
+            writer.write(output_buffer)
+            output_bytes = output_buffer.getvalue()
+            
+            # Optimization: Direct upload, return signed URL
+            filename = f"kdp_{uuid.uuid4().hex[:8]}.pdf"
+            storage_info = upload_file(output_bytes, str(user_id), filename, 'kdp_formatted_pdf')
+            
+            return success_response({
+                'download_url': storage_info['signed_url'],
+                'preview': generate_optimized_preview(output_bytes, 'pdf'),
+                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2)
+            })
+        except Exception as e:
+            return error_response(f'Formatting failed: {str(e)}', 'FORMATTING_ERROR', status_code=500)
