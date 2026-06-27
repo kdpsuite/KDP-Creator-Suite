@@ -17,6 +17,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('kdp_token'))
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     // Check Supabase session on mount
@@ -82,14 +83,15 @@ function App() {
           id: session.user.id,
         })
       }
-    } catch (error) {
-      console.error('Failed to fetch user data', error)
+    } catch (err) {
+      console.error("Failed to fetch user data", err)
+      setError(err.message || "Failed to load dashboard data. Please try again.")
       // Log timeout errors separately for monitoring
-      if (error.message.includes('timed out')) {
-        console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
+      if (err.message.includes("timed out")) {
+        console.warn("[TIMEOUT] Session check exceeded", SESSION_CHECK_TIMEOUT, "ms")
       }
       setIsAuthenticated(false)
-      localStorage.removeItem('kdp_token')
+      localStorage.removeItem("kdp_token")
     } finally {
       setLoading(false)
     }
@@ -111,9 +113,27 @@ function App() {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600 text-sm">Loading your dashboard...</p>
-          <p className="text-gray-400 text-xs mt-2">This may take a few seconds</p>
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground text-sm">Loading your dashboard...</p>
+          <p className="text-muted-foreground text-xs mt-2">This may take a few seconds</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center p-6 bg-card rounded-lg shadow-lg max-w-md">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Dashboard Load Error</h2>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={fetchUserData} className="transition-premium">
+            Retry
+          </Button>
+          <Button variant="ghost" onClick={handleLogout} className="ml-2 transition-premium">
+            Logout
+          </Button>
         </div>
       </div>
     )
