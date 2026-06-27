@@ -149,8 +149,8 @@ export default function DashboardContent({ user, handleLogout }) {
           subscriptionApi.getStatus(),
           analyticsApi.getUserMetrics()
         ])
-        setSubscription(subRes.data)
-        setMetrics(metricsRes.data.metrics)
+        setSubscription(subRes.data.data)
+        setMetrics(metricsRes.data.data.metrics)
       } catch (error) {
         console.error('Failed to load dashboard data', error)
       } finally {

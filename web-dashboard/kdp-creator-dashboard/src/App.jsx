@@ -74,7 +74,8 @@ function App() {
       ])
 
       if (session) {
-        // Use Supabase user metadata as fallback
+        // Call profile-sync endpoint to ensure user_profile exists in backend
+        await authApi.syncProfile()
         setUser({
           email: session.user.email,
           username: session.user.user_metadata?.username || session.user.email,

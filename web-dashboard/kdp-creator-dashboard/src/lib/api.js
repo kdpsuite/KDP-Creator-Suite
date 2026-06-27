@@ -90,12 +90,13 @@ export const authApi = {
       }
     }
   }),
-  getMe: () => api.get('/me'),
+  getMe: () => api.get("/me"),
   logout: () => supabase.auth.signOut(),
   requestPasswordReset: (email) => supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
   }),
   resetPassword: (newPassword) => supabase.auth.updateUser({ password: newPassword }),
+  syncProfile: () => api.post("/user/profile-sync"),
 };
 
 export const subscriptionApi = {

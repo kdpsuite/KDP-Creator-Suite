@@ -140,3 +140,37 @@ def reset_password():
     # Handled by Supabase on dashboard
     log_info('Password reset endpoint called (deprecated)')
     return error_response('Please use dashboard password reset', 'DEPRECATED_ENDPOINT', status_code=400)
+
+@user_bp.route("/user/profile-sync", methods=["POST"])
+@jwt_required()
+def sync_user_profile():
+    user_id = get_jwt_identity()
+    profile = UserProfile.get_by_id(user_id)
+
+    if not profile:
+        # Create a new profile if it doesn't exist
+        try:
+            # Fetch user email from Supabase auth.users table
+            user_data = supabase.auth.admin.get_user_by_id(user_id).data.user
+            user_email = user_data.email
+            user_username = user_data.user_metadata.get("username", user_email.split("@")[0])
+
+            new_profile_data = {
+                "id": user_id,
+                "email": user_email,
+                "username": user_username,
+                "subscription_tier": "free",
+                "conversions_this_month": 0,
+                "batch_operations_this_month": 0,
+                "last_usage_reset": datetime.utcnow().isoformat(),
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            res = supabase.table("user_profiles").insert(new_profile_data).execute()
+            if not res.data:
+                return error_response("Failed to create user profile", "PROFILE_CREATION_FAILED", status_code=500)
+            profile = res.data[0]
+        except Exception as e:
+            return error_response(f"Error creating user profile: {str(e)}", "PROFILE_CREATION_ERROR", status_code=500)
+
+    return success_response(UserProfile.to_dict(profile), "User profile synced successfully")
