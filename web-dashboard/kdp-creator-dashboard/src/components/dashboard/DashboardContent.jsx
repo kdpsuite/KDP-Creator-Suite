@@ -187,11 +187,11 @@ export default function DashboardContent({ user, handleLogout }) {
             variant="ghost" 
             size="icon" 
             onClick={() => setDarkMode(!darkMode)}
-            className="rounded-full transition-premium"
+            className="rounded-full"
           >
             {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
-          <Button onClick={handleLogout} variant="outline" className="transition-premium hover:shadow-md">
+          <Button onClick={handleLogout} variant="outline" className="hover:shadow-md">
             <LogOut className="mr-2 h-4 w-4" /> Logout
           </Button>
         </div>
@@ -199,10 +199,10 @@ export default function DashboardContent({ user, handleLogout }) {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="glass p-1 rounded-xl">
-          <TabsTrigger value="overview" className="rounded-lg transition-premium">Overview</TabsTrigger>
-          <TabsTrigger value="tools" className="rounded-lg transition-premium">Tools</TabsTrigger>
-          <TabsTrigger value="analytics" className="rounded-lg transition-premium">Analytics</TabsTrigger>
-          <TabsTrigger value="settings" className="rounded-lg transition-premium">Settings</TabsTrigger>
+          <TabsTrigger value="overview" className="rounded-lg">Overview</TabsTrigger>
+          <TabsTrigger value="tools" className="rounded-lg">Tools</TabsTrigger>
+          <TabsTrigger value="analytics" className="rounded-lg">Analytics</TabsTrigger>
+          <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -305,7 +305,7 @@ export default function DashboardContent({ user, handleLogout }) {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Trim Size</label>
-                      <select id="trim-size" className="w-full p-2 rounded-md border bg-background transition-premium focus:ring-2 focus:ring-primary/20">
+                      <select id="trim-size" className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20">
                         <option value="6x9">6 x 9 in</option>
                         <option value="8.5x11">8.5 x 11 in</option>
                         <option value="5.5x8.5">5.5 x 8.5 in</option>
@@ -313,7 +313,7 @@ export default function DashboardContent({ user, handleLogout }) {
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Format</label>
-                      <select id="target-format" className="w-full p-2 rounded-md border bg-background transition-premium focus:ring-2 focus:ring-primary/20">
+                      <select id="target-format" className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20">
                         <option value="kdp-standard">KDP Standard</option>
                         <option value="kdp-premium">KDP Premium</option>
                       </select>
@@ -326,7 +326,7 @@ export default function DashboardContent({ user, handleLogout }) {
                     shouldShow={shouldShowTooltip('pdf-upload')}
                     onDismiss={dismissTooltip}
                   >
-                    <div className="border-2 border-dashed border-muted rounded-xl p-8 text-center hover:border-primary/50 transition-premium">
+                    <div className="border-2 border-dashed border-muted rounded-xl p-8 text-center hover:border-primary/50">
                       <input 
                         type="file" 
                         accept=".pdf" 
@@ -364,7 +364,7 @@ export default function DashboardContent({ user, handleLogout }) {
                       <div className="relative aspect-[3/4] w-full max-w-[200px] mx-auto shadow-2xl rounded-lg overflow-hidden border">
                         <img src={`data:image/png;base64,${previewImage}`} alt="Preview" className="object-cover w-full h-full" />
                       </div>
-                      <Button onClick={downloadResult} className="w-full gradient-primary transition-premium">
+                      <Button onClick={downloadResult} className="w-full gradient-primary">
                         <Download className="mr-2 h-4 w-4" /> Download {resultType.toUpperCase()}
                       </Button>
                     </div>

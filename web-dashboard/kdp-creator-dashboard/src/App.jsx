@@ -128,10 +128,10 @@ function App() {
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">Dashboard Load Error</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={fetchUserData} className="transition-premium">
+          <Button onClick={fetchUserData} className="">
             Retry
           </Button>
-          <Button variant="ghost" onClick={handleLogout} className="ml-2 transition-premium">
+          <Button variant="ghost" onClick={handleLogout} className="ml-2">
             Logout
           </Button>
         </div>

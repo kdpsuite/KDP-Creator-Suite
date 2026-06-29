@@ -159,7 +159,7 @@
   .animate-shimmer { animation: shimmer 2s infinite; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); background-size: 1000px 100%; }
   .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   
-  .transition-premium { @apply transition-all duration-300; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+  /* Replaced .transition-premium with direct property application to fix Tailwind v4 build error */
   
   /* Glassmorphism Effect */
   .glass {
@@ -177,14 +177,18 @@
    ============================================================================ */
 
 /* Button refinements */
-button { @apply transition-premium; }
+button { transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1); }
 button:hover:not(:disabled) { @apply brightness-110 shadow-md; }
 button:active:not(:disabled) { @apply scale-95 brightness-95; }
 
 /* Card refinements */
-.card { @apply transition-premium hover:shadow-xl hover:-translate-y-1; }
+.card { 
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  @apply hover:shadow-xl hover:-translate-y-1; 
+}
 
 /* Input refinements */
 input, textarea, select {
-  @apply transition-premium focus:ring-2 focus:ring-primary/30 focus:border-primary;
+  transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  @apply focus:ring-2 focus:ring-primary/30 focus:border-primary;
 }
