@@ -216,7 +216,6 @@ export default function DashboardContent({ user, handleLogout }) {
                 <Crown className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-<<<<<<< HEAD
                 <div className="flex items-center justify-between">
                   <div className="text-2xl font-bold">{tier_details.name}</div>
                   <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
@@ -229,12 +228,6 @@ export default function DashboardContent({ user, handleLogout }) {
                     <span>{conversionsUsed} / {conversionsLimit === -1 ? 'Unlimited' : conversionsLimit}</span>
                   </div>
                   <Progress value={conversionsLimit === -1 ? 100 : (conversionsUsed / conversionsLimit) * 100} className="h-2" />
-=======
-                <Badge>{tier_details.name}</Badge>
-                <div className="mt-4">
-                  <p className="text-sm text-gray-500">Usage: {conversionsUsed} / {conversionsLimit === -1 ? 'Unlimited' : conversionsLimit}</p>
-                  <Progress value={conversionsLimit === -1 ? 100 : (conversionsUsed / conversionsLimit) * 100} className="mt-2" />
->>>>>>> 47c9f30 (Fix dashboard loading after login)
                 </div>
               </CardContent>
             </Card>
