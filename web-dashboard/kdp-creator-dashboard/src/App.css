@@ -159,7 +159,7 @@
   .animate-shimmer { animation: shimmer 2s infinite; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); background-size: 1000px 100%; }
   .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   
-  .transition-premium { @apply transition-all duration-300 cubic-bezier(0.4, 0, 0.2, 1); }
+  .transition-premium { @apply transition-all duration-300; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
   
   /* Glassmorphism Effect */
   .glass {
