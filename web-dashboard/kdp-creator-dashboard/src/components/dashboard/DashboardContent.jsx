@@ -176,6 +176,9 @@ export default function DashboardContent({ user, handleLogout }) {
   }
 
   const { tier, tier_details, current_usage, remaining_usage } = subscription
+  const conversionsUsed = current_usage?.conversions ?? current_usage ?? 0
+  const conversionsLimit = tier_details?.monthly_conversions ?? tier_details?.limits?.conversions_per_month ?? 0
+
   const { shouldShowTooltip, dismissTooltip } = useOnboarding()
   
   return (
@@ -213,6 +216,7 @@ export default function DashboardContent({ user, handleLogout }) {
                 <Crown className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
+<<<<<<< HEAD
                 <div className="flex items-center justify-between">
                   <div className="text-2xl font-bold">{tier_details.name}</div>
                   <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20">
@@ -222,9 +226,15 @@ export default function DashboardContent({ user, handleLogout }) {
                 <div className="mt-4 space-y-2">
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>Monthly Usage</span>
-                    <span>{current_usage} / {tier_details.limits.conversions_per_month}</span>
+                    <span>{conversionsUsed} / {conversionsLimit === -1 ? 'Unlimited' : conversionsLimit}</span>
                   </div>
-                  <Progress value={(current_usage / tier_details.limits.conversions_per_month) * 100} className="h-2" />
+                  <Progress value={conversionsLimit === -1 ? 100 : (conversionsUsed / conversionsLimit) * 100} className="h-2" />
+=======
+                <Badge>{tier_details.name}</Badge>
+                <div className="mt-4">
+                  <p className="text-sm text-gray-500">Usage: {conversionsUsed} / {conversionsLimit === -1 ? 'Unlimited' : conversionsLimit}</p>
+                  <Progress value={conversionsLimit === -1 ? 100 : (conversionsUsed / conversionsLimit) * 100} className="mt-2" />
+>>>>>>> 47c9f30 (Fix dashboard loading after login)
                 </div>
               </CardContent>
             </Card>
