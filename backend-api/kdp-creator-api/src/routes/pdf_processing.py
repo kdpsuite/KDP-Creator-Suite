@@ -83,7 +83,7 @@ def convert_to_coloring():
             img_bytes = file.read()
             image = Image.open(io.BytesIO(img_bytes))
             
-            # Optimization: Use JPEG for coloring pages to save 50% space
+            # Optimization: Use PNG for coloring pages for lossless quality, potentially smaller file size for line art
             cv_image = cv2.cvtColor(np.array(image.convert('RGB')), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
             _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
@@ -91,20 +91,22 @@ def convert_to_coloring():
             # Save optimized output
             output_buffer = io.BytesIO()
             result_image = Image.fromarray(binary)
-            result_image.save(output_buffer, format='JPEG', quality=95, optimize=True)
+            result_image.save(output_buffer, format=\'PNG\', optimize=True)
             output_bytes = output_buffer.getvalue()
             
             # Optimization: Upload and return signed URL instead of Base64 blob
-            filename = f"coloring_{uuid.uuid4().hex[:8]}.jpg"
+            filename = f"coloring_{uuid.uuid4().hex[:8]}.png"
             storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
             
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'image'),
-                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2)
+                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2),
+                'format': 'PNG'
             })
         except Exception as e:
-            return error_response(f'Conversion failed: {str(e)}', 'CONVERSION_ERROR', status_code=500)
+            current_app.logger.error(f"Coloring conversion failed: {str(e)}")
+            return error_response('Conversion failed', 'CONVERSION_ERROR', status_code=500)
 
 @pdf_bp.route('/pdf/format-kdp', methods=['POST'])
 @rate_limit_pdf_processing
@@ -140,7 +142,63 @@ def format_kdp():
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'pdf'),
-                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2)
+                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2),
+                'format': 'PDF'
             })
         except Exception as e:
-            return error_response(f'Formatting failed: {str(e)}', 'FORMATTING_ERROR', status_code=500)
+            current_app.logger.error(f"KDP formatting failed: {str(e)}")
+            return error_response('Formatting failed', 'FORMATTING_ERROR', status_code=500)
+
+@pdf_bp.route("/pdf/validate-kdp", methods=["POST"])
+@rate_limit_pdf_processing
+@jwt_required()
+def validate_kdp():
+    user_id = get_jwt_identity()
+    if "file" not in request.files:
+        return error_response("No file uploaded", "MISSING_FILE", status_code=400)
+
+    file = request.files["file"]
+    trim_size = request.form.get("trim_size", "8.5x11")
+    target_format = request.form.get("target_format", "print")
+
+    with PerformanceTimer("kdp_validation"):
+        try:
+            pdf_bytes = file.read()
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+            
+            # Basic validation: page count, dimensions
+            num_pages = len(reader.pages)
+            if num_pages == 0:
+                return error_response("PDF contains no pages", "EMPTY_PDF", status_code=400)
+
+            first_page = reader.pages[0]
+            media_box = first_page.mediabox
+            pdf_width = float(media_box.width) / 72 # Convert points to inches
+            pdf_height = float(media_box.height) / 72 # Convert points to inches
+
+            expected_width, expected_height = get_kdp_dimensions(trim_size, target_format)
+            expected_width_in = expected_width / 72
+            expected_height_in = expected_height / 72
+
+            dimension_match = (
+                abs(pdf_width - expected_width_in) < 0.05 and
+                abs(pdf_height - expected_height_in) < 0.05
+            )
+
+            warnings = []
+            if not dimension_match:
+                warnings.append(f"Dimensions mismatch. Expected {expected_width_in:.2f}x{expected_height_in:.2f} inches, got {pdf_width:.2f}x{pdf_height:.2f} inches.")
+            
+            # Add more sophisticated checks here (e.g., font embedding, image resolution)
+
+            return success_response({
+                "is_valid": dimension_match and not warnings, # Simplified for now
+                "num_pages": num_pages,
+                "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}",
+                "expected_dimensions_inches": f"{expected_width_in:.2f}x{expected_height_in:.2f}",
+                "warnings": warnings,
+                "message": "PDF validation complete"
+            })
+        except Exception as e:
+            current_app.logger.error(f"KDP validation failed: {str(e)}")
+            return error_response("Validation failed", "VALIDATION_ERROR", status_code=500)
