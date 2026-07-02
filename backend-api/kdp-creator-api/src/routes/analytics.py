@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
 from src.utils.responses import success_response, error_response
 from datetime import datetime, timedelta
-import random
+from src.utils.performance import PerformanceTimer
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -20,27 +20,37 @@ def get_user_metrics():
     max_conversions = tier_info['monthly_conversions']
     max_batch = tier_info['batch_processing_limit']
 
-    conversions = profile.get('conversions_this_month', 0)
-    batch_ops = profile.get('batch_operations_this_month', 0)
+
 
     # Generate daily activity (mock for now, or query analytics_events table if exists)
     # Using a hash of user_id for deterministic seed
-    random.seed(hash(user_id))
-    daily_activity = []
-    for i in range(30):
-        d = datetime.now() - timedelta(days=29 - i)
-        daily_activity.append({
-            'date': d.strftime('%Y-%m-%d'),
-            'conversions': random.randint(0, 4),
-            'batch_ops': random.randint(0, 2)
-        })
+    with PerformanceTimer("fetch_user_analytics"):
+        # Fetch real analytics data from the new analytics_events table
+        today = datetime.now().date()
+        thirty_days_ago = today - timedelta(days=30)
 
-    file_types = [
-        {'type': 'PDF', 'count': max(1, conversions * 60 // 100), 'success_rate': 94},
-        {'type': 'Image', 'count': max(1, conversions * 30 // 100), 'success_rate': 98},
-        {'type': 'EPUB', 'count': max(1, conversions * 10 // 100), 'success_rate': 87},
-    ]
+        # Fetch events for the last 30 days
+        res = supabase.table('analytics_events').select('event_type, created_at, event_data').eq('user_id', str(user_id)).gte('created_at', thirty_days_ago.isoformat()).order('created_at', desc=False).execute()
+        events = res.data
 
+        daily_activity_map = { (today - timedelta(days=i)).strftime('%Y-%m-%d'): {'conversions': 0, 'batch_ops': 0} for i in range(30) }
+
+        for event in events:
+            event_date = datetime.fromisoformat(event['created_at']).strftime('%Y-%m-%d')
+            if event_date in daily_activity_map:
+                if event['event_type'] == 'pdf_conversion':
+                    daily_activity_map[event_date]['conversions'] += 1
+                elif event['event_type'] == 'batch_process':
+                    daily_activity_map[event_date]['batch_ops'] += 1
+        
+        daily_activity = [{'date': date, 'conversions': data['conversions'], 'batch_ops': data['batch_ops']} for date, data in daily_activity_map.items()]
+        daily_activity.sort(key=lambda x: x['date'])
+
+        # Calculate total conversions and batch ops for the month
+        conversions = sum(d['conversions'] for d in daily_activity)
+        batch_ops = sum(d['batch_ops'] for d in daily_activity)
+
+        # Determine file types and success rates (mock for now, or aggregate from event_data)
     return success_response({
         'user_id': user_id,
         'metrics': {

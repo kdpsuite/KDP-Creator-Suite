@@ -16,6 +16,7 @@ from functools import lru_cache
 from src.models.user import jwt_required, get_jwt_identity, User
 from src.storage import upload_file
 from src.utils.responses import success_response, error_response
+from src.models.user import supabase
 from src.utils.rate_limit import rate_limit_pdf_processing
 from src.utils.logger import PerformanceTimer
 
@@ -98,6 +99,11 @@ def convert_to_coloring():
             filename = f"coloring_{uuid.uuid4().hex[:8]}.png"
             storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
             
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "pdf_coloring_conversion",
+                "event_data": {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PNG"}
+            }).execute()
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'image'),
@@ -106,7 +112,12 @@ def convert_to_coloring():
             })
         except Exception as e:
             current_app.logger.error(f"Coloring conversion failed: {str(e)}")
-            return error_response('Conversion failed', 'CONVERSION_ERROR', status_code=500)
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "pdf_coloring_conversion",
+                "event_data": {"status": "failed", "error": str(e)}
+            }).execute()
+            return error_response("Conversion failed", "CONVERSION_ERROR", status_code=500)
 
 @pdf_bp.route('/pdf/format-kdp', methods=['POST'])
 @rate_limit_pdf_processing
@@ -139,6 +150,11 @@ def format_kdp():
             filename = f"kdp_{uuid.uuid4().hex[:8]}.pdf"
             storage_info = upload_file(output_bytes, str(user_id), filename, 'kdp_formatted_pdf')
             
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_formatting",
+                "event_data": {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PDF"}
+            }).execute()
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'pdf'),
@@ -147,7 +163,12 @@ def format_kdp():
             })
         except Exception as e:
             current_app.logger.error(f"KDP formatting failed: {str(e)}")
-            return error_response('Formatting failed', 'FORMATTING_ERROR', status_code=500)
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_formatting",
+                "event_data": {"status": "failed", "error": str(e)}
+            }).execute()
+            return error_response("Formatting failed", "FORMATTING_ERROR", status_code=500)
 
 @pdf_bp.route("/pdf/validate-kdp", methods=["POST"])
 @rate_limit_pdf_processing
@@ -191,6 +212,11 @@ def validate_kdp():
             
             # Add more sophisticated checks here (e.g., font embedding, image resolution)
 
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_validation",
+                "event_data": {"status": "success", "is_valid": dimension_match and not warnings, "num_pages": num_pages, "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}"}
+            }).execute()
             return success_response({
                 "is_valid": dimension_match and not warnings, # Simplified for now
                 "num_pages": num_pages,
@@ -201,4 +227,9 @@ def validate_kdp():
             })
         except Exception as e:
             current_app.logger.error(f"KDP validation failed: {str(e)}")
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_validation",
+                "event_data": {"status": "failed", "error": str(e)}
+            }).execute()
             return error_response("Validation failed", "VALIDATION_ERROR", status_code=500)
