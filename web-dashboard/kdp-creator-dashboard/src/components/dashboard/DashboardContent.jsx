@@ -42,6 +42,11 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 import { EmptyProjectsIllustration } from '@/components/illustrations/EmptyProjectsIllustration'
 import { EmptyAnalyticsIllustration } from '@/components/illustrations/EmptyAnalyticsIllustration'
 
+import * as pdfjs from 'pdfjs-dist'
+import 'pdfjs-dist/build/pdf.worker.min.mjs'
+
+pdfjs.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs'
+
 export default function DashboardContent({ user, handleLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [subscription, setSubscription] = useState(null)
@@ -103,17 +108,62 @@ export default function DashboardContent({ user, handleLogout }) {
     }
   };
 
+  const KDP_TRIM_SIZES = {
+    '6x9': { width: 6, height: 9 },
+    '8.5x11': { width: 8.5, height: 11 },
+    '5.5x8.5': { width: 5.5, height: 8.5 },
+  };
+  const BLEED_SIZE = 0.125;
+
+  const validatePdfDimensions = async (file, trimSize, targetFormat) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+
+    const pdfWidth = viewport.width / 72; // Convert points to inches
+    const pdfHeight = viewport.height / 72; // Convert points to inches
+
+    let expectedWidth = KDP_TRIM_SIZES[trimSize].width;
+    let expectedHeight = KDP_TRIM_SIZES[trimSize].height;
+
+    if (targetFormat === 'kdp-print') { // Assuming 'kdp-print' implies bleed
+      expectedWidth += BLEED_SIZE;
+      expectedHeight += BLEED_SIZE * 2; // Top and bottom bleed
+    }
+
+    const dimensionMatch = (
+      Math.abs(pdfWidth - expectedWidth) < 0.05 &&
+      Math.abs(pdfHeight - expectedHeight) < 0.05
+    );
+
+    if (!dimensionMatch) {
+      return `Dimension mismatch. Expected ${expectedWidth.toFixed(2)}x${expectedHeight.toFixed(2)} inches, got ${pdfWidth.toFixed(2)}x${pdfHeight.toFixed(2)} inches.`;
+    }
+    return null; // No error
+  };
+
   const handlePdfProcess = async (file) => {
     if (!file) return;
     try {
       setIsProcessing(true);
       setPreviewImage(null);
       setResultType('pdf');
+
+      const trimSize = document.getElementById('trim-size').value;
+      const targetFormat = document.getElementById('target-format').value;
+
+      const validationError = await validatePdfDimensions(file, trimSize, targetFormat);
+      if (validationError) {
+        alert(`PDF Validation Error: ${validationError}`);
+        return;
+      }
+
       const formData = new FormData();
       formData.append('pdf', file);
       formData.append('user_id', user.id);
-      formData.append('trim_size', document.getElementById('trim-size').value);
-      formData.append('target_format', document.getElementById('target-format').value);
+      formData.append('trim_size', trimSize);
+      formData.append('target_format', targetFormat);
       
       const response = await pdfApi.convertToKdp(formData);
       if (response.data.success) {
@@ -124,6 +174,7 @@ export default function DashboardContent({ user, handleLogout }) {
       }
     } catch (error) {
       console.error('PDF processing failed', error);
+      alert(`PDF Processing Error: ${error.message || 'An unknown error occurred.'}`);
     } finally {
       setIsProcessing(false);
     }
