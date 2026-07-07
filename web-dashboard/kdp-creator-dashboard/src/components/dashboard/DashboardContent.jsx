@@ -55,7 +55,10 @@ export default function DashboardContent({ user, handleLogout }) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
   const [resultData, setResultData] = useState(null)
-  const [resultType, setResultType] = useState('image')
+  const [resultType, setResultType] = useState("image")
+  const [batchProgress, setBatchProgress] = useState(0)
+  const [processedCount, setProcessedCount] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('kdp_dark_mode') === 'true')
   const [templates, setTemplates] = useState([])
 
@@ -83,6 +86,45 @@ export default function DashboardContent({ user, handleLogout }) {
     const res = await templateApi.getAll()
     setTemplates(res.data.templates)
   }
+
+  const handleBatchConvert = async (files) => {
+    if (!files || files.length === 0) return;
+    try {
+      setIsProcessing(true);
+      setBatchProgress(0);
+      setProcessedCount(0);
+      setTotalFiles(files.length);
+      setPreviewImage(null);
+      setResultData(null);
+      setResultType("pdf");
+
+      const trimSize = document.getElementById("batch-coloring-trim-size").value;
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        formData.append(`file_${index}`, file);
+      });
+      formData.append("trim_size", trimSize);
+
+      const response = await pdfApi.convertColoringBatch(formData);
+      if (response.data.success) {
+        setPreviewImage(response.data.preview);
+        setResultData(response.data.download_url);
+        setResultType("pdf");
+        alert("Batch processing finished. Your PDF is ready for download.");
+      } else {
+        alert(`Batch processing failed: ${response.data.message || "An unknown error occurred."}`);
+      }
+
+      const metricsRes = await analyticsApi.getUserMetrics();
+      setMetrics(metricsRes.data.data.metrics);
+
+    } catch (error) {
+      console.error("Batch conversion failed", error);
+      alert(`Batch Conversion Error: ${error.message || "An unknown error occurred."}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleImageConvert = async (file) => {
     if (!file) return;
@@ -254,6 +296,7 @@ export default function DashboardContent({ user, handleLogout }) {
           <TabsTrigger value="overview" className="rounded-lg">Overview</TabsTrigger>
           <TabsTrigger value="tools" className="rounded-lg">Tools</TabsTrigger>
           <TabsTrigger value="analytics" className="rounded-lg">Analytics</TabsTrigger>
+          <TabsTrigger value="batch" className="rounded-lg">Batch Processing</TabsTrigger>
           <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
         </TabsList>
 
@@ -576,6 +619,52 @@ export default function DashboardContent({ user, handleLogout }) {
                 </CardContent>
               </Card>
             </div>
+          </PageTransition>
+        </TabsContent>
+
+        <TabsContent value="batch">
+          <PageTransition className="space-y-6">
+            <Card className="card glass">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Batch Image to Coloring Book
+                  <Tooltip content="Upload multiple images to convert them into a single KDP-formatted coloring book PDF.">
+                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </Tooltip>
+                </CardTitle>
+                <CardDescription>Process multiple images into one KDP-ready PDF</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Trim Size</label>
+                    <select id="batch-coloring-trim-size" className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20">
+                      <option value="6x9">6 x 9 in</option>
+                      <option value="8.5x11">8.5 x 11 in</option>
+                      <option value="5.5x8.5">5.5 x 8.5 in</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
+                  <p className="text-sm text-muted-foreground mb-2">Drag & drop multiple images here</p>
+                  <p className="text-xs text-muted-foreground mb-4">Supports JPG, PNG</p>
+                  <Input 
+                    type="file" 
+                    accept=".jpg,.jpeg,.png" 
+                    multiple
+                    onChange={(e) => handleBatchConvert(Array.from(e.target.files))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  />
+                </div>
+                {isProcessing && (
+                  <div className="space-y-2">
+                    <Progress value={batchProgress} className="h-2" />
+                    <p className="text-sm text-muted-foreground text-center">Processing {processedCount} of {totalFiles} files...</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </PageTransition>
         </TabsContent>
 
