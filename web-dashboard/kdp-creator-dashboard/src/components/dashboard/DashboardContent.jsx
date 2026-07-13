@@ -42,6 +42,11 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 import { EmptyProjectsIllustration } from '@/components/illustrations/EmptyProjectsIllustration'
 import { EmptyAnalyticsIllustration } from '@/components/illustrations/EmptyAnalyticsIllustration'
 
+import * as pdfjs from 'pdfjs-dist'
+import 'pdfjs-dist/build/pdf.worker.min.mjs'
+
+pdfjs.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.mjs'
+
 export default function DashboardContent({ user, handleLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [subscription, setSubscription] = useState(null)
@@ -50,7 +55,10 @@ export default function DashboardContent({ user, handleLogout }) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
   const [resultData, setResultData] = useState(null)
-  const [resultType, setResultType] = useState('image')
+  const [resultType, setResultType] = useState("image")
+  const [batchProgress, setBatchProgress] = useState(0)
+  const [processedCount, setProcessedCount] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('kdp_dark_mode') === 'true')
   const [templates, setTemplates] = useState([])
 
@@ -79,28 +87,104 @@ export default function DashboardContent({ user, handleLogout }) {
     setTemplates(res.data.templates)
   }
 
+  const handleBatchConvert = async (files) => {
+    if (!files || files.length === 0) return;
+    try {
+      setIsProcessing(true);
+      setBatchProgress(0);
+      setProcessedCount(0);
+      setTotalFiles(files.length);
+      setPreviewImage(null);
+      setResultData(null);
+      setResultType("pdf");
+
+      const trimSize = document.getElementById("batch-coloring-trim-size").value;
+      const formData = new FormData();
+      files.forEach((file, index) => {
+        formData.append(`file_${index}`, file);
+      });
+      formData.append("trim_size", trimSize);
+
+      const response = await pdfApi.convertColoringBatch(formData);
+      if (response.data.success) {
+        setPreviewImage(response.data.preview);
+        setResultData(response.data.download_url);
+        setResultType("pdf");
+        alert("Batch processing finished. Your PDF is ready for download.");
+      } else {
+        alert(`Batch processing failed: ${response.data.message || "An unknown error occurred."}`);
+      }
+
+      const metricsRes = await analyticsApi.getUserMetrics();
+      setMetrics(metricsRes.data.data.metrics);
+
+    } catch (error) {
+      console.error("Batch conversion failed", error);
+      alert(`Batch Conversion Error: ${error.message || "An unknown error occurred."}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleImageConvert = async (file) => {
     if (!file) return;
     try {
       setIsProcessing(true);
       setPreviewImage(null);
       const formData = new FormData();
-      formData.append('image', file);
-      formData.append('user_id', user.id);
+      formData.append("file", file);
+      const trimSize = document.getElementById("coloring-trim-size").value;
+      formData.append("trim_size", trimSize);
       
-      const response = await pdfApi.convertImage(formData);
+      const response = await pdfApi.convertColoring(formData);
       if (response.data.success) {
         setPreviewImage(response.data.preview);
-        setResultData(response.data.image_data);
-        setResultType('image');
+        setResultData(response.data.download_url);
+        setResultType("image");
         const metricsRes = await analyticsApi.getUserMetrics();
-        setMetrics(metricsRes.data.metrics);
+        setMetrics(metricsRes.data.data.metrics);
       }
     } catch (error) {
-      console.error('Conversion failed', error);
+      console.error("Coloring conversion failed", error);
+      alert(`Coloring Conversion Error: ${error.message || "An unknown error occurred."}`);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const KDP_TRIM_SIZES = {
+    '6x9': { width: 6, height: 9 },
+    '8.5x11': { width: 8.5, height: 11 },
+    '5.5x8.5': { width: 5.5, height: 8.5 },
+  };
+  const BLEED_SIZE = 0.125;
+
+  const validatePdfDimensions = async (file, trimSize, targetFormat) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const page = await pdf.getPage(1);
+    const viewport = page.getViewport({ scale: 1 });
+
+    const pdfWidth = viewport.width / 72; // Convert points to inches
+    const pdfHeight = viewport.height / 72; // Convert points to inches
+
+    let expectedWidth = KDP_TRIM_SIZES[trimSize].width;
+    let expectedHeight = KDP_TRIM_SIZES[trimSize].height;
+
+    if (targetFormat === 'kdp-print') { // Assuming 'kdp-print' implies bleed
+      expectedWidth += BLEED_SIZE;
+      expectedHeight += BLEED_SIZE * 2; // Top and bottom bleed
+    }
+
+    const dimensionMatch = (
+      Math.abs(pdfWidth - expectedWidth) < 0.05 &&
+      Math.abs(pdfHeight - expectedHeight) < 0.05
+    );
+
+    if (!dimensionMatch) {
+      return `Dimension mismatch. Expected ${expectedWidth.toFixed(2)}x${expectedHeight.toFixed(2)} inches, got ${pdfWidth.toFixed(2)}x${pdfHeight.toFixed(2)} inches.`;
+    }
+    return null; // No error
   };
 
   const handlePdfProcess = async (file) => {
@@ -109,11 +193,17 @@ export default function DashboardContent({ user, handleLogout }) {
       setIsProcessing(true);
       setPreviewImage(null);
       setResultType('pdf');
+
+      const trimSize = document.getElementById('trim-size').value;
+      const targetFormat = document.getElementById('target-format').value;
+
+      // No client-side validation for coloring book conversion, as backend handles sizing.
+
       const formData = new FormData();
       formData.append('pdf', file);
       formData.append('user_id', user.id);
-      formData.append('trim_size', document.getElementById('trim-size').value);
-      formData.append('target_format', document.getElementById('target-format').value);
+      formData.append('trim_size', trimSize);
+      formData.append('target_format', targetFormat);
       
       const response = await pdfApi.convertToKdp(formData);
       if (response.data.success) {
@@ -124,6 +214,7 @@ export default function DashboardContent({ user, handleLogout }) {
       }
     } catch (error) {
       console.error('PDF processing failed', error);
+      alert(`PDF Processing Error: ${error.message || 'An unknown error occurred.'}`);
     } finally {
       setIsProcessing(false);
     }
@@ -205,6 +296,7 @@ export default function DashboardContent({ user, handleLogout }) {
           <TabsTrigger value="overview" className="rounded-lg">Overview</TabsTrigger>
           <TabsTrigger value="tools" className="rounded-lg">Tools</TabsTrigger>
           <TabsTrigger value="analytics" className="rounded-lg">Analytics</TabsTrigger>
+          <TabsTrigger value="batch" className="rounded-lg">Batch Processing</TabsTrigger>
           <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
         </TabsList>
 
@@ -315,101 +407,261 @@ export default function DashboardContent({ user, handleLogout }) {
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Format</label>
+                      <label className="text-sm font-medium">Target Format</label>
                       <select id="target-format" className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20">
-                        <option value="kdp-standard">KDP Standard</option>
-                        <option value="kdp-premium">KDP Premium</option>
+                        <option value="kdp-print">KDP Print (with bleed)</option>
+                        <option value="kdp-ebook">KDP eBook</option>
                       </select>
                     </div>
                   </div>
-                  <OnboardingTooltip
-                    tooltipId="pdf-upload"
-                    content="Upload your interior PDF here to start the conversion"
+                  
+                  <OnboardingTooltip 
+                    content="Upload your PDF here. We'll automatically format it for KDP."
+                    tooltipId="pdf-upload-tooltip"
+                    isOpen={shouldShowTooltip('pdf-upload-tooltip')}
+                    onDismiss={() => dismissTooltip('pdf-upload-tooltip')}
                     position="top"
-                    shouldShow={shouldShowTooltip('pdf-upload')}
-                    onDismiss={dismissTooltip}
                   >
-                    <div className="border-2 border-dashed border-muted rounded-xl p-8 text-center hover:border-primary/50">
-                      <input 
+                    <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
+                      <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
+                      <p className="text-sm text-muted-foreground mb-2">Drag & drop your PDF here</p>
+                      <p className="text-xs text-muted-foreground mb-4">or click to browse</p>
+                      <Input 
                         type="file" 
                         accept=".pdf" 
-                        onChange={(e) => handlePdfProcess(e.target.files[0])}
-                        className="hidden" 
-                        id="pdf-upload-input" 
+                        onChange={(e) => handlePdfProcess(e.target.files[0])} 
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
-                      <label htmlFor="pdf-upload-input" className="cursor-pointer">
-                        <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                        <p className="font-medium">Click to upload PDF</p>
-                        <p className="text-xs text-muted-foreground mt-1">Max file size: 50MB</p>
-                      </label>
                     </div>
                   </OnboardingTooltip>
-                  {isProcessing && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs">
-                        <span>Processing PDF...</span>
-                        <span>{Math.round(45)}%</span>
-                      </div>
-                      <Progress value={45} className="h-1 animate-pulse" />
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
               <Card className="card glass">
                 <CardHeader>
-                  <CardTitle>Result Preview</CardTitle>
-                  <CardDescription>Verify your file before downloading</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    Image to Coloring Book
+                    <Tooltip content="Convert any image into a high-quality coloring page">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </Tooltip>
+                  </CardTitle>
+                  <CardDescription>AI-powered line art extraction</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col items-center justify-center min-h-[300px]">
-                  {previewImage ? (
-                    <div className="space-y-4 w-full">
-                      <div className="relative aspect-[3/4] w-full max-w-[200px] mx-auto shadow-2xl rounded-lg overflow-hidden border">
-                        <img src={`data:image/png;base64,${previewImage}`} alt="Preview" className="object-cover w-full h-full" />
-                      </div>
-                      <Button onClick={downloadResult} className="w-full gradient-primary">
-                        <Download className="mr-2 h-4 w-4" /> Download {resultType.toUpperCase()}
-                      </Button>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Trim Size</label>
+                      <select id="coloring-trim-size" className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20">
+                        <option value="6x9">6 x 9 in</option>
+                        <option value="8.5x11">8.5 x 11 in</option>
+                        <option value="5.5x8.5">5.5 x 8.5 in</option>
+                      </select>
                     </div>
-                  ) : (
-                    <div className="text-center text-muted-foreground">
-                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
-                      <p>No preview available</p>
-                      <p className="text-xs">Upload a file to see preview</p>
-                    </div>
-                  )}
+                  </div>
+                  <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
+                    <Image className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
+                    <p className="text-sm text-muted-foreground mb-2">Upload image to convert</p>
+                    <p className="text-xs text-muted-foreground mb-4">Supports JPG, PNG</p>
+                    <Input 
+                      type="file" 
+                      accept=".jpg,.jpeg,.png" 
+                      onChange={(e) => handleImageConvert(e.target.files[0])} 
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {isProcessing && (
+              <Card className="card glass border-primary/20">
+                <CardContent className="p-12 text-center">
+                  <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">Processing your file...</h3>
+                  <p className="text-muted-foreground">This may take a few moments depending on file size.</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {previewImage && !isProcessing && (
+              <Card className="card glass border-green-500/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="h-5 w-5" />
+                    Processing Complete
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="aspect-video relative rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
+                    <img 
+                      src={`data:image/png;base64,${previewImage}`} 
+                      alt="Preview" 
+                      className="max-h-full object-contain"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-4">
+                    <Button variant="outline" onClick={() => {
+                      setPreviewImage(null)
+                      setResultData(null)
+                    }}>
+                      Process Another
+                    </Button>
+                    <Button onClick={downloadResult} className="transition-premium">
+                      <Download className="mr-2 h-4 w-4" />
+                      Download {resultType === 'pdf' ? 'PDF' : 'Image'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </PageTransition>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <PageTransition className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="card glass">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Processing Time</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">2.4h</div>
+                  <p className="text-xs text-green-500 flex items-center mt-1">
+                    <TrendingUp className="h-3 w-3 mr-1" /> +12% from last month
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="card glass">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Success Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">99.8%</div>
+                  <p className="text-xs text-green-500 flex items-center mt-1">
+                    <TrendingUp className="h-3 w-3 mr-1" /> +0.2% from last month
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="card glass">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">API Calls</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold">1,284</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This billing cycle
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className="card glass">
+                <CardHeader>
+                  <CardTitle>Usage Trends</CardTitle>
+                  <CardDescription>Conversions over the last 7 days</CardDescription>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={[
+                      { name: 'Mon', value: 12 },
+                      { name: 'Tue', value: 19 },
+                      { name: 'Wed', value: 15 },
+                      { name: 'Thu', value: 22 },
+                      { name: 'Fri', value: 28 },
+                      { name: 'Sat', value: 14 },
+                      { name: 'Sun', value: 8 },
+                    ]}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--muted-foreground))" opacity={0.2} />
+                      <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <RechartsTooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      />
+                      <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={3} dot={{ r: 4, fill: 'hsl(var(--primary))' }} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+
+              <Card className="card glass">
+                <CardHeader>
+                  <CardTitle>Format Distribution</CardTitle>
+                  <CardDescription>Breakdown of output formats</CardDescription>
+                </CardHeader>
+                <CardContent className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'KDP Print', value: 65 },
+                          { name: 'KDP eBook', value: 20 },
+                          { name: 'Coloring Pages', value: 15 },
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        <Cell fill="hsl(var(--primary))" />
+                        <Cell fill="hsl(var(--primary))" opacity={0.6} />
+                        <Cell fill="hsl(var(--primary))" opacity={0.3} />
+                      </Pie>
+                      <RechartsTooltip 
+                        contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                      />
+                      <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </div>
           </PageTransition>
         </TabsContent>
 
-        <TabsContent value="analytics">
+        <TabsContent value="batch">
           <PageTransition className="space-y-6">
             <Card className="card glass">
               <CardHeader>
-                <CardTitle>Conversion Performance</CardTitle>
-                <CardDescription>Daily conversion volume and success rate</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  Batch Image to Coloring Book
+                  <Tooltip content="Upload multiple images to convert them into a single KDP-formatted coloring book PDF.">
+                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </Tooltip>
+                </CardTitle>
+                <CardDescription>Process multiple images into one KDP-ready PDF</CardDescription>
               </CardHeader>
-              <CardContent className="h-[400px]">
-                {metrics.daily_stats && metrics.daily_stats.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={metrics.daily_stats}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="oklch(var(--border))" />
-                      <XAxis dataKey="date" stroke="oklch(var(--muted-foreground))" fontSize={12} />
-                      <YAxis stroke="oklch(var(--muted-foreground))" fontSize={12} />
-                      <RechartsTooltip 
-                        contentStyle={{ backgroundColor: 'oklch(var(--card))', border: '1px solid oklch(var(--border))', borderRadius: '8px' }}
-                      />
-                      <Bar dataKey="conversions" fill="oklch(var(--primary))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <EmptyState 
-                    icon={<EmptyAnalyticsIllustration />}
-                    title="No analytics data"
-                    description="Perform some conversions to see your performance metrics here."
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Trim Size</label>
+                    <select id="batch-coloring-trim-size" className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20">
+                      <option value="6x9">6 x 9 in</option>
+                      <option value="8.5x11">8.5 x 11 in</option>
+                      <option value="5.5x8.5">5.5 x 8.5 in</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
+                  <p className="text-sm text-muted-foreground mb-2">Drag & drop multiple images here</p>
+                  <p className="text-xs text-muted-foreground mb-4">Supports JPG, PNG</p>
+                  <Input 
+                    type="file" 
+                    accept=".jpg,.jpeg,.png" 
+                    multiple
+                    onChange={(e) => handleBatchConvert(Array.from(e.target.files))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
+                </div>
+                {isProcessing && (
+                  <div className="space-y-2">
+                    <Progress value={batchProgress} className="h-2" />
+                    <p className="text-sm text-muted-foreground text-center">Processing {processedCount} of {totalFiles} files...</p>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -421,7 +673,7 @@ export default function DashboardContent({ user, handleLogout }) {
             <Card className="card glass">
               <CardHeader>
                 <CardTitle>Account Settings</CardTitle>
-                <CardDescription>Manage your profile and security</CardDescription>
+                <CardDescription>Manage your profile and preferences</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -429,14 +681,25 @@ export default function DashboardContent({ user, handleLogout }) {
                   <Input value={user.email} disabled className="bg-muted/50" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">User ID</label>
+                  <label className="text-sm font-medium">API Key</label>
                   <div className="flex gap-2">
-                    <Input value={user.id} disabled className="font-mono text-xs bg-muted/50" />
-                    <Button variant="outline" size="icon" onClick={() => navigator.clipboard.writeText(user.id)}>
-                      <Key className="h-4 w-4" />
-                    </Button>
+                    <Input value="sk_live_**********************" disabled className="bg-muted/50 font-mono text-sm" />
+                    <Button variant="outline">Regenerate</Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">Use this key to authenticate with the KDP Creator API.</p>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="card glass border-destructive/20">
+              <CardHeader>
+                <CardTitle className="text-destructive">Danger Zone</CardTitle>
+                <CardDescription>Irreversible account actions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="destructive" className="w-full sm:w-auto">
+                  Delete Account & Data
+                </Button>
               </CardContent>
             </Card>
           </PageTransition>

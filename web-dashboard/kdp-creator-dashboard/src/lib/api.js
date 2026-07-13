@@ -150,9 +150,10 @@ export const pdfApi = {
   convertToKdp: (formData) => api.post('/convert-to-kdp-format', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  validateCompliance: (formData) => api.post('/validate-kdp-compliance', formData, {
+  validateCompliance: (formData) => api.post("/validate-kdp-compliance", formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  convertColoringBatch: (data) => api.post("/pdf/batch-coloring", data, { headers: { "Content-Type": "multipart/form-data" } }),
 };
 
 export default api;

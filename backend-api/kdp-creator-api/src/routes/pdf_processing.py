@@ -16,6 +16,7 @@ from functools import lru_cache
 from src.models.user import jwt_required, get_jwt_identity, User
 from src.storage import upload_file
 from src.utils.responses import success_response, error_response
+from src.models.user import supabase
 from src.utils.rate_limit import rate_limit_pdf_processing
 from src.utils.logger import PerformanceTimer
 
@@ -75,36 +76,74 @@ def convert_to_coloring():
     if 'file' not in request.files:
         return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
     
-    file = request.files['file']
-    threshold = int(request.form.get('threshold', 127))
+    file = request.files["file"]
+    threshold = int(request.form.get("threshold", 127))
+    trim_size = request.form.get("trim_size", "8.5x11")
     
     with PerformanceTimer("coloring_conversion"):
         try:
             img_bytes = file.read()
-            image = Image.open(io.BytesIO(img_bytes))
+            image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+            # Calculate target dimensions in pixels
+            target_width_pt, target_height_pt = get_kdp_dimensions(trim_size, 'print')
+            target_width_px = int(target_width_pt / 72 * PRINT_DPI)
+            target_height_px = int(target_height_pt / 72 * PRINT_DPI)
+
+            # Resize image to fit within target dimensions, maintaining aspect ratio
+            img_width, img_height = image.size
+            aspect_ratio = img_width / img_height
+
+            if img_width > target_width_px or img_height > target_height_px:
+                if aspect_ratio > (target_width_px / target_height_px):
+                    new_width = target_width_px
+                    new_height = int(new_width / aspect_ratio)
+                else:
+                    new_height = target_height_px
+                    new_width = int(new_height * aspect_ratio)
+                image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
             
-            # Optimization: Use JPEG for coloring pages to save 50% space
-            cv_image = cv2.cvtColor(np.array(image.convert('RGB')), cv2.COLOR_RGB2BGR)
+            # Create a new blank image with target dimensions and paste the resized image
+            # This adds padding if the image is smaller than the target or has a different aspect ratio
+            padded_image = Image.new('RGB', (target_width_px, target_height_px), (255, 255, 255))
+            paste_x = (target_width_px - image.width) // 2
+            paste_y = (target_height_px - image.height) // 2
+            padded_image.paste(image, (paste_x, paste_y))
+
+            # Convert to OpenCV format for coloring effect
+                        cv_image = cv2.cvtColor(np.array(padded_image), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
             _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
             
             # Save optimized output
             output_buffer = io.BytesIO()
             result_image = Image.fromarray(binary)
-            result_image.save(output_buffer, format='JPEG', quality=95, optimize=True)
+            result_image.save(output_buffer, format=\'PNG\')
             output_bytes = output_buffer.getvalue()
             
             # Optimization: Upload and return signed URL instead of Base64 blob
-            filename = f"coloring_{uuid.uuid4().hex[:8]}.jpg"
+            filename = f"coloring_{uuid.uuid4().hex[:8]}.png"
             storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
             
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "pdf_coloring_conversion",
+                "event_data": {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PNG", "trim_size": trim_size}
+            }).execute()
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'image'),
-                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2)
+                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2),
+                'format': 'PNG'
             })
         except Exception as e:
-            return error_response(f'Conversion failed: {str(e)}', 'CONVERSION_ERROR', status_code=500)
+            current_app.logger.error(f"Coloring conversion failed: {str(e)}")
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "pdf_coloring_conversion",
+                "event_data": {"status": "failed", "error": str(e), "trim_size": trim_size}
+            }).execute()
+            return error_response("Conversion failed", "CONVERSION_ERROR", status_code=500)
 
 @pdf_bp.route('/pdf/format-kdp', methods=['POST'])
 @rate_limit_pdf_processing
@@ -137,10 +176,183 @@ def format_kdp():
             filename = f"kdp_{uuid.uuid4().hex[:8]}.pdf"
             storage_info = upload_file(output_bytes, str(user_id), filename, 'kdp_formatted_pdf')
             
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_formatting",
+                "event_data": {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PDF"}
+            }).execute()
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'pdf'),
-                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2)
+                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2),
+                'format': 'PDF'
             })
         except Exception as e:
-            return error_response(f'Formatting failed: {str(e)}', 'FORMATTING_ERROR', status_code=500)
+            current_app.logger.error(f"KDP formatting failed: {str(e)}")
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_formatting",
+                "event_data": {"status": "failed", "error": str(e)}
+            }).execute()
+            return error_response("Formatting failed", "FORMATTING_ERROR", status_code=500)
+
+@pdf_bp.route("/pdf/batch-coloring", methods=["POST"])
+@rate_limit_pdf_processing
+@jwt_required()
+def batch_convert_coloring():
+    user_id = get_jwt_identity()
+    if not request.files:
+        return error_response("No files uploaded", "MISSING_FILES", status_code=400)
+
+    trim_size = request.form.get("trim_size", "8.5x11")
+    threshold = int(request.form.get("threshold", 127))
+    
+    output_pdfs = []
+    total_processed_bytes = 0
+
+    with PerformanceTimer("batch_coloring_conversion"):
+        try:
+            for key in request.files:
+                file = request.files[key]
+                img_bytes = file.read()
+                image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+                # Apply KDP dimension formatting (reusing logic from convert_to_coloring)
+                target_width_pt, target_height_pt = get_kdp_dimensions(trim_size, 'print')
+                target_width_px = int(target_width_pt / 72 * PRINT_DPI)
+                target_height_px = int(target_height_pt / 72 * PRINT_DPI)
+
+                img_width, img_height = image.size
+                aspect_ratio = img_width / img_height
+
+                if img_width > target_width_px or img_height > target_height_px:
+                    if aspect_ratio > (target_width_px / target_height_px):
+                        new_width = target_width_px
+                        new_height = int(new_width / aspect_ratio)
+                    else:
+                        new_height = target_height_px
+                        new_width = int(new_height * aspect_ratio)
+                    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                
+                padded_image = Image.new('RGB', (target_width_px, target_height_px), (255, 255, 255))
+                paste_x = (target_width_px - image.width) // 2
+                paste_y = (target_height_px - image.height) // 2
+                padded_image.paste(image, (paste_x, paste_y))
+
+                cv_image = cv2.cvtColor(np.array(padded_image), cv2.COLOR_RGB2BGR)
+                gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
+                _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
+                
+                output_buffer = io.BytesIO()
+                result_image = Image.fromarray(binary)
+                result_image.save(output_buffer, format='PNG')
+                output_pdfs.append(output_buffer.getvalue()) # Store PNG bytes
+                total_processed_bytes += len(output_buffer.getvalue())
+
+            # Combine all processed PNGs into a single PDF
+            pdf_writer = PdfWriter()
+            for png_bytes in output_pdfs:
+                # Convert PNG bytes to a temporary PDF page
+                img = Image.open(io.BytesIO(png_bytes))
+                img_width_pt = img.width * 72 / PRINT_DPI
+                img_height_pt = img.height * 72 / PRINT_DPI
+
+                temp_pdf_buffer = io.BytesIO()
+                c = canvas.Canvas(temp_pdf_buffer, pagesize=(img_width_pt, img_height_pt))
+                c.drawImage(Image.open(io.BytesIO(png_bytes)), 0, 0, width=img_width_pt, height=img_height_pt)
+                c.showPage()
+                c.save()
+                temp_pdf_buffer.seek(0)
+                temp_pdf_reader = PdfReader(temp_pdf_buffer)
+                pdf_writer.add_page(temp_pdf_reader.pages[0])
+
+            final_pdf_buffer = io.BytesIO()
+            pdf_writer.write(final_pdf_buffer)
+            final_pdf_bytes = final_pdf_buffer.getvalue()
+
+            filename = f"batch_coloring_{uuid.uuid4().hex[:8]}.pdf"
+            storage_info = upload_file(final_pdf_bytes, str(user_id), filename, 'batch_coloring_pdf')
+            
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "batch_coloring_conversion",
+                "event_data": {"status": "success", "file_count": len(request.files), "file_size_mb": round(len(final_pdf_bytes) / (1024 * 1024), 2), "format": "PDF", "trim_size": trim_size}
+            }).execute()
+            return success_response({
+                'download_url': storage_info['signed_url'],
+                'preview': generate_optimized_preview(final_pdf_bytes, 'pdf'),
+                'file_size_mb': round(len(final_pdf_bytes) / (1024 * 1024), 2),
+                'format': 'PDF'
+            })
+        except Exception as e:
+            current_app.logger.error(f"Batch coloring conversion failed: {str(e)}")
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "batch_coloring_conversion",
+                "event_data": {"status": "failed", "error": str(e), "file_count": len(request.files), "trim_size": trim_size}
+            }).execute()
+            return error_response("Batch conversion failed", "BATCH_CONVERSION_ERROR", status_code=500)
+
+@pdf_bp.route("/pdf/validate-kdp", methods=["POST"])
+@rate_limit_pdf_processing
+@jwt_required()
+def validate_kdp():
+    user_id = get_jwt_identity()
+    if "file" not in request.files:
+        return error_response("No file uploaded", "MISSING_FILE", status_code=400)
+
+    file = request.files["file"]
+    trim_size = request.form.get("trim_size", "8.5x11")
+    target_format = request.form.get("target_format", "print")
+
+    with PerformanceTimer("kdp_validation"):
+        try:
+            pdf_bytes = file.read()
+            reader = PdfReader(io.BytesIO(pdf_bytes))
+            
+            # Basic validation: page count, dimensions
+            num_pages = len(reader.pages)
+            if num_pages == 0:
+                return error_response("PDF contains no pages", "EMPTY_PDF", status_code=400)
+
+            first_page = reader.pages[0]
+            media_box = first_page.mediabox
+            pdf_width = float(media_box.width) / 72 # Convert points to inches
+            pdf_height = float(media_box.height) / 72 # Convert points to inches
+
+            expected_width, expected_height = get_kdp_dimensions(trim_size, target_format)
+            expected_width_in = expected_width / 72
+            expected_height_in = expected_height / 72
+
+            dimension_match = (
+                abs(pdf_width - expected_width_in) < 0.05 and
+                abs(pdf_height - expected_height_in) < 0.05
+            )
+
+            warnings = []
+            if not dimension_match:
+                warnings.append(f"Dimensions mismatch. Expected {expected_width_in:.2f}x{expected_height_in:.2f} inches, got {pdf_width:.2f}x{pdf_height:.2f} inches.")
+            
+            # Add more sophisticated checks here (e.g., font embedding, image resolution)
+
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_validation",
+                "event_data": {"status": "success", "is_valid": dimension_match and not warnings, "num_pages": num_pages, "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}"}
+            }).execute()
+            return success_response({
+                "is_valid": dimension_match and not warnings, # Simplified for now
+                "num_pages": num_pages,
+                "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}",
+                "expected_dimensions_inches": f"{expected_width_in:.2f}x{expected_height_in:.2f}",
+                "warnings": warnings,
+                "message": "PDF validation complete"
+            })
+        except Exception as e:
+            current_app.logger.error(f"KDP validation failed: {str(e)}")
+            supabase.table("analytics_events").insert({
+                "user_id": user_id,
+                "event_type": "kdp_validation",
+                "event_data": {"status": "failed", "error": str(e)}
+            }).execute()
+            return error_response("Validation failed", "VALIDATION_ERROR", status_code=500)
