@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Loader2, AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button.jsx'
 import { authApi, supabase } from '@/lib/api'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import DashboardContent from '@/components/dashboard/DashboardContent.jsx'
@@ -8,9 +9,6 @@ import LoginContent from '@/components/dashboard/LoginContent.jsx'
 import ErrorBoundary from '@/components/ErrorBoundary.jsx'
 import './App.css'
 
-// ============================================================================
-// Session Check Timeout (10 seconds)
-// ============================================================================
 const SESSION_CHECK_TIMEOUT = 10000
 
 function App() {
@@ -20,7 +18,6 @@ function App() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    // Check Supabase session on mount
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (session) {
@@ -33,7 +30,6 @@ function App() {
     }
     checkSession()
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
         localStorage.setItem('kdp_token', session.access_token)
@@ -59,15 +55,14 @@ function App() {
   const fetchUserData = async () => {
     try {
       setLoading(true)
+      setError(null)
 
-      // Create a timeout promise that rejects after SESSION_CHECK_TIMEOUT ms
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error('Session check timed out. Please refresh the page.'))
         }, SESSION_CHECK_TIMEOUT)
       })
 
-      // Race between session check and timeout
       const sessionPromise = supabase.auth.getSession()
       const { data: { session } } = await Promise.race([
         sessionPromise,
@@ -75,7 +70,6 @@ function App() {
       ])
 
       if (session) {
-        // Call profile-sync endpoint to ensure user_profile exists in backend
         await authApi.syncProfile()
         setUser({
           email: session.user.email,
@@ -84,14 +78,13 @@ function App() {
         })
       }
     } catch (err) {
-      console.error("Failed to fetch user data", err)
-      setError(err.message || "Failed to load dashboard data. Please try again.")
-      // Log timeout errors separately for monitoring
-      if (err.message.includes("timed out")) {
-        console.warn("[TIMEOUT] Session check exceeded", SESSION_CHECK_TIMEOUT, "ms")
+      console.error('Failed to fetch user data', err)
+      setError(err.message || 'Failed to load dashboard data. Please try again.')
+      if (err.message?.includes('timed out')) {
+        console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
       }
       setIsAuthenticated(false)
-      localStorage.removeItem("kdp_token")
+      localStorage.removeItem('kdp_token')
     } finally {
       setLoading(false)
     }
@@ -100,8 +93,8 @@ function App() {
   const handleLogout = async () => {
     try {
       await authApi.logout()
-    } catch (error) {
-      console.error('Logout failed on server', error)
+    } catch (logoutError) {
+      console.error('Logout failed on server', logoutError)
     } finally {
       localStorage.removeItem('kdp_token')
       setIsAuthenticated(false)
@@ -128,7 +121,7 @@ function App() {
           <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-xl font-bold mb-2">Dashboard Load Error</h2>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={fetchUserData} className="">
+          <Button onClick={fetchUserData}>
             Retry
           </Button>
           <Button variant="ghost" onClick={handleLogout} className="ml-2">

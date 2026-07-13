@@ -1,5 +1,9 @@
 # KDP Creator Suite Dashboard UI/UX Enhancements - Complete Summary
 
+> **STATUS (2026-07-13): OVERSTATED.**
+> Component files for Phases 1–3 exist, but integration is incomplete (FormField unused, EmptyJobs unused, checklist below still unchecked).
+> "Known Issues: None" is false — see dashboard code review. Treat this as a component inventory, not a ship certificate.
+
 ## Overview
 This document summarizes all UI/UX enhancements completed across three phases to transform the dashboard from functional to premium.
 

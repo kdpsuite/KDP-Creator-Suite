@@ -1,5 +1,10 @@
 # Password Reset Fix - KDP Creator Suite Dashboard
 
+> **STATUS (2026-07-13): SUPERSEDED / FALSE CLAIM.**
+> Flask `/request-password-reset` and `/reset-password` return `DEPRECATED_ENDPOINT` (400).
+> The live flow is Supabase Auth (`resetPasswordForEmail` + `/auth/callback` + `updateUser`).
+> Do not treat the SQLAlchemy token-email design below as operational.
+
 ## Problem Summary
 
 The password reset functionality in the KDP Creator Suite web dashboard was **not implemented** in the backend. While the frontend UI had all the necessary components to request a password reset (including a "Forgot password?" link and a dedicated reset form), the corresponding backend endpoints were missing.

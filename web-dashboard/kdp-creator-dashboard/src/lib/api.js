@@ -9,19 +9,18 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add a request interceptor to include the Supabase token
 api.interceptors.request.use(
   async (config) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       config.headers.Authorization = `Bearer ${session.access_token}`;
     } else {
-      // Fallback to localStorage for compatibility during transition
       const token = localStorage.getItem('kdp_token');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
@@ -32,10 +31,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// ============================================================================
-// Retry Logic for Failed Requests
-// ============================================================================
-// Retry on server errors (5xx) with exponential backoff
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000;
 
@@ -48,20 +43,38 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    if (error.response && error.response.status === 401) {
+      console.warn('[AUTH] Unauthorized request, session may be expired');
+      localStorage.removeItem('kdp_token');
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // ignore sign-out failures during 401 handling
+      }
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+        window.location.assign('/login');
+      }
+      return Promise.reject(error);
+    }
+
     config.retryCount = config.retryCount || 0;
 
     if (config.retryCount >= MAX_RETRIES) {
       return Promise.reject(error);
     }
 
+    const method = (config.method || 'get').toLowerCase();
+    const isIdempotent = method === 'get' || method === 'head' || method === 'options';
     const shouldRetry =
-      !error.response || (error.response && error.response.status >= 500);
+      isIdempotent &&
+      (!error.response || (error.response && error.response.status >= 500));
 
     if (!shouldRetry) {
-      if (error.response && error.response.status === 401) {
-        console.warn('[AUTH] Unauthorized request, session may be expired');
-      } else if (error.response && error.response.status >= 400) {
-        console.warn(`[CLIENT_ERROR] HTTP ${error.response.status}:`, error.response.data?.error || error.message);
+      if (error.response && error.response.status >= 400) {
+        console.warn(
+          `[CLIENT_ERROR] HTTP ${error.response.status}:`,
+          error.response.data?.error || error.message
+        );
       }
       return Promise.reject(error);
     }
@@ -80,23 +93,23 @@ api.interceptors.response.use(
 
 export const authApi = {
   login: (email, password) => supabase.auth.signInWithPassword({ email, password }),
-  register: (email, password, username) => supabase.auth.signUp({ 
-    email, 
+  register: (email, password, username) => supabase.auth.signUp({
+    email,
     password,
     options: {
       data: {
         username: username,
-        full_name: username // Fallback
-      }
-    }
+        full_name: username,
+      },
+    },
   }),
-  getMe: () => api.get("/me"),
+  getMe: () => api.get('/me'),
   logout: () => supabase.auth.signOut(),
   requestPasswordReset: (email) => supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
   }),
   resetPassword: (newPassword) => supabase.auth.updateUser({ password: newPassword }),
-  syncProfile: () => api.post("/user/profile-sync"),
+  syncProfile: () => api.post('/user/profile-sync'),
 };
 
 export const subscriptionApi = {
@@ -117,43 +130,46 @@ export const totpApi = {
 
 export const batchApi = {
   getJobs: () => api.get('/batch/jobs'),
-  getJob: (id) => api.get(`/batch/jobs/${id}`),
   submit: (jobType, totalFiles) => api.post('/batch/submit', { job_type: jobType, total_files: totalFiles }),
-  cancel: (id) => api.post(`/batch/jobs/${id}/cancel`),
 };
 
 export const templateApi = {
   getAll: () => {
-    const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]')
-    return Promise.resolve({ data: { templates } })
+    const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]');
+    return Promise.resolve({ data: { templates } });
   },
   save: (template) => {
-    const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]')
-    template.id = Date.now()
-    template.created_at = new Date().toISOString()
-    templates.push(template)
-    localStorage.setItem('kdp_templates', JSON.stringify(templates))
-    return Promise.resolve({ data: { template } })
+    const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]');
+    template.id = Date.now();
+    template.created_at = new Date().toISOString();
+    templates.push(template);
+    localStorage.setItem('kdp_templates', JSON.stringify(templates));
+    return Promise.resolve({ data: { template } });
   },
   delete: (id) => {
-    let templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]')
-    templates = templates.filter(t => t.id !== id)
-    localStorage.setItem('kdp_templates', JSON.stringify(templates))
-    return Promise.resolve({ data: { success: true } })
+    let templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]');
+    templates = templates.filter((t) => t.id !== id);
+    localStorage.setItem('kdp_templates', JSON.stringify(templates));
+    return Promise.resolve({ data: { success: true } });
   },
-}
+};
 
 export const pdfApi = {
-  convertImage: (formData) => api.post('/convert-image-to-coloring', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  convertColoring: (formData) => api.post('/pdf/convert-coloring', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   }),
-  convertToKdp: (formData) => api.post('/convert-to-kdp-format', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  convertImage: (formData) => api.post('/pdf/convert-coloring', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   }),
-  validateCompliance: (formData) => api.post("/validate-kdp-compliance", formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  convertToKdp: (formData) => api.post('/pdf/format-kdp', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
   }),
-  convertColoringBatch: (data) => api.post("/pdf/batch-coloring", data, { headers: { "Content-Type": "multipart/form-data" } }),
+  validateCompliance: (formData) => api.post('/pdf/validate-kdp', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  convertColoringBatch: (data) => api.post('/pdf/batch-coloring', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 export default api;

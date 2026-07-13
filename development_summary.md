@@ -1,5 +1,9 @@
 # KDP Creator Suite - Development & Integration Summary
 
+> **STATUS (2026-07-13): OVERSTATED / MISLEADING.**
+> Phase 3 is not fully complete. There is no Amazon KDP API integration in this repo.
+> Dashboard tools previously had PDF path mismatches and mock analytics/settings; treat "COMPLETED" checkmarks below as historical marketing, not audit truth.
+
 ## Phase 3: Development & Integration - COMPLETED ✅
 
 ### Overview

@@ -1,5 +1,10 @@
 # Cross-Domain Session Persistence Guide
 
+> **STATUS (2026-07-13): NOT IMPLEMENTED / FALSE CLAIM.**
+> `sessionBridge.js` does not exist. App.jsx uses Supabase `getSession` / `onAuthStateChange` only.
+> Documented `/sync-session` and `/validate-session` routes and `tests/e2e/session-persistence.spec.js` were never shipped.
+> Treat this file as an aspirational design note, not a completion record.
+
 **Problem:** Users get logged out when navigating between `kdpsuite.com` and `dashboard.kdpsuite.com`.
 
 **Root Cause:** Supabase session tokens are stored in localStorage, which is domain-specific. When the user moves to a different subdomain, the session is lost.

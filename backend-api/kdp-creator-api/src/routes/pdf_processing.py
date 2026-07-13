@@ -111,14 +111,14 @@ def convert_to_coloring():
             padded_image.paste(image, (paste_x, paste_y))
 
             # Convert to OpenCV format for coloring effect
-                        cv_image = cv2.cvtColor(np.array(padded_image), cv2.COLOR_RGB2BGR)
+            cv_image = cv2.cvtColor(np.array(padded_image), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
             _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
-            
+
             # Save optimized output
             output_buffer = io.BytesIO()
             result_image = Image.fromarray(binary)
-            result_image.save(output_buffer, format=\'PNG\')
+            result_image.save(output_buffer, format='PNG')
             output_bytes = output_buffer.getvalue()
             
             # Optimization: Upload and return signed URL instead of Base64 blob
