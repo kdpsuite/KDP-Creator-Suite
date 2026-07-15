@@ -1,7 +1,21 @@
 import axios from 'axios';
 import { createClient } from '@supabase/supabase-js';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+function normalizeApiBaseUrl(rawUrl) {
+  const value = (rawUrl || '/api').trim();
+  if (!value) return '/api';
+
+  if (value.startsWith('/')) {
+    return value.replace(/\/+$/, '') || '/api';
+  }
+
+  const withoutTrailingSlash = value.replace(/\/+$/, '');
+  return withoutTrailingSlash.endsWith('/api')
+    ? withoutTrailingSlash
+    : `${withoutTrailingSlash}/api`;
+}
+
+const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
