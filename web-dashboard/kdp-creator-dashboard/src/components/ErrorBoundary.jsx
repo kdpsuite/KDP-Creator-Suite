@@ -71,12 +71,11 @@ export class ErrorBoundary extends React.Component {
               We encountered an unexpected error. Please try refreshing the page or contact support if the problem persists.
             </p>
 
-            {/* Error Message (Development Only) */}
-            {isDevelopment && (
-              <div className="mb-6 rounded-lg bg-red-50 p-4">
-                <p className="mb-2 text-sm font-semibold text-red-900">Error Details:</p>
-                <p className="mb-4 font-mono text-xs text-red-800">{errorMessage}</p>
-                {errorStack && (
+            {/* Error Message */}
+            <div className="mb-6 rounded-lg bg-red-50 p-4">
+              <p className="mb-2 text-sm font-semibold text-red-900">Error Details:</p>
+              <p className="font-mono text-xs text-red-800 break-words">{errorMessage}</p>
+              {isDevelopment && errorStack && (
                   <details className="cursor-pointer">
                     <summary className="text-xs font-semibold text-red-900 hover:underline">
                       Stack Trace
@@ -86,8 +85,7 @@ export class ErrorBoundary extends React.Component {
                     </pre>
                   </details>
                 )}
-              </div>
-            )}
+            </div>
 
             {/* Error Count Warning */}
             {this.state.errorCount > 2 && (

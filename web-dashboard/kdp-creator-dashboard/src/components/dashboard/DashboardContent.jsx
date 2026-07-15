@@ -325,7 +325,7 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const dailyActivity = asArray(metrics.daily_activity)
   const dailyChartData = dailyActivity.slice(-7).map((day) => ({
-    name: day?.date?.slice(5) || day?.date || '',
+    name: typeof day?.date === 'string' ? (day.date.slice(5) || day.date) : String(day?.date ?? ''),
     value: Number(day?.conversions || 0) + Number(day?.batch_ops || 0),
   }))
 
@@ -336,7 +336,7 @@ export default function DashboardContent({ user, handleLogout }) {
   )
   const pieData =
     fileTypeEntries.length > 0
-      ? fileTypeEntries.map(([name, value]) => ({ name, value }))
+      ? fileTypeEntries.map(([name, value]) => ({ name, value: Number(value) || 0 }))
       : [{ name: 'No data yet', value: 1 }]
 
   const successEvents = dailyActivity.reduce(

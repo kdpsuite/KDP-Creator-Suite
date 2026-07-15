@@ -25,7 +25,26 @@ def get_user_metrics():
     user_id = get_jwt_identity()
     profile = UserProfile.get_by_id(user_id)
     if not profile:
-        return error_response('User not found', 'USER_NOT_FOUND', status_code=404)
+        from src.routes.subscription import SUBSCRIPTION_TIERS
+        tier_info = SUBSCRIPTION_TIERS['free']
+        return success_response({
+            'user_id': user_id,
+            'metrics': {
+                'total_conversions': 0,
+                'total_batch_operations': 0,
+                'subscription_tier': 'free',
+                'storage_used_mb': 0,
+                'last_active': datetime.now().isoformat(),
+                'daily_activity': [],
+                'file_types': {},
+                'usage_quota': {
+                    'conversions_used': 0,
+                    'conversions_limit': tier_info['monthly_conversions'],
+                    'batch_used': 0,
+                    'batch_limit': tier_info['batch_processing_limit'],
+                },
+            },
+        })
 
     from src.routes.subscription import SUBSCRIPTION_TIERS
     tier = profile.get('subscription_tier', 'free')
@@ -37,12 +56,17 @@ def get_user_metrics():
         today = datetime.now().date()
         thirty_days_ago = today - timedelta(days=30)
 
-        res = supabase.table('analytics_events').select(
-            'event_type, created_at, event_data'
-        ).eq('user_id', str(user_id)).gte(
-            'created_at', thirty_days_ago.isoformat()
-        ).order('created_at', desc=False).execute()
-        events = res.data or []
+        events = []
+        try:
+            res = supabase.table('analytics_events').select(
+                'event_type, created_at, event_data'
+            ).eq('user_id', str(user_id)).gte(
+                'created_at', thirty_days_ago.isoformat()
+            ).order('created_at', desc=False).execute()
+            events = res.data or []
+        except Exception as analytics_error:
+            print(f"Failed to fetch analytics events for {user_id}: {analytics_error}")
+            events = []
 
         daily_activity_map = {
             (today - timedelta(days=i)).strftime('%Y-%m-%d'): {

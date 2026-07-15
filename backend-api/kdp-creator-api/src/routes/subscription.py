@@ -51,7 +51,20 @@ def get_subscription_status():
     user_id = get_jwt_identity()
     profile = UserProfile.get_by_id(user_id)
     if not profile:
-        return error_response('User not found', 'USER_NOT_FOUND', status_code=404)
+        tier_limits = SUBSCRIPTION_TIERS['free']
+        return success_response({
+            'user_id': user_id,
+            'tier': 'free',
+            'tier_details': tier_limits,
+            'current_usage': {
+                'conversions': 0,
+                'batch_operations': 0,
+            },
+            'remaining_usage': {
+                'conversions': tier_limits['monthly_conversions'],
+                'batch_operations': tier_limits['batch_processing_limit'],
+            },
+        })
         
     tier = profile.get('subscription_tier', 'free')
     tier_limits = SUBSCRIPTION_TIERS.get(tier, SUBSCRIPTION_TIERS['free'])

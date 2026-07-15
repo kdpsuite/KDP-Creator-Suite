@@ -161,6 +161,17 @@ function App() {
     )
   }
 
+  if (isAuthenticated && !user) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground text-sm">Preparing your session...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (error && isAuthenticated) {
     return (
       <div className="flex h-screen items-center justify-center">
