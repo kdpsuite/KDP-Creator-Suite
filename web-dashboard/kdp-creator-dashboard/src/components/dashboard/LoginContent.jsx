@@ -3,7 +3,7 @@ import { Key, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
-import { authApi, supabase } from '@/lib/api'
+import { authApi } from '@/lib/api'
 
 export default function LoginContent({ setIsAuthenticated }) {
   const [email, setEmail] = useState('')
@@ -20,19 +20,15 @@ export default function LoginContent({ setIsAuthenticated }) {
     setError('')
     setIsSubmitting(true)
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({ 
-        email, 
-        password 
-      })
-      
+      const { data, error: authError } = await authApi.login(email, password)
+
       if (authError) {
         setError(authError.message)
         setIsSubmitting(false)
         return
       }
-      
+
       if (data.session) {
-        localStorage.setItem('kdp_token', data.session.access_token)
         setIsAuthenticated(true)
       } else {
         setError('Login succeeded but no session was returned')
@@ -49,26 +45,16 @@ export default function LoginContent({ setIsAuthenticated }) {
     setError('')
     setIsSubmitting(true)
     try {
-      const { data, error: authError } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: {
-          data: {
-            username: username,
-            full_name: username
-          }
-        }
-      })
-      
+      const { data, error: authError } = await authApi.register(email, password, username)
+
       if (authError) {
         setError(authError.message)
         setIsSubmitting(false)
         return
       }
-      
+
       // If email confirmation is disabled, user is logged in immediately
       if (data.session) {
-        localStorage.setItem('kdp_token', data.session.access_token)
         setIsAuthenticated(true)
       } else {
         setIsRegistering(false)
@@ -87,10 +73,8 @@ export default function LoginContent({ setIsAuthenticated }) {
     setSuccess('')
     setIsSubmitting(true)
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
-      })
-      
+      const { error: resetError } = await authApi.requestPasswordReset(email)
+
       if (resetError) {
         setError(resetError.message)
       } else {

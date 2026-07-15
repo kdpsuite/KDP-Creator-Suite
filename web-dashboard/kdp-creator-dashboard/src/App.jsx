@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'sonner'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { authApi, supabase } from '@/lib/api'
@@ -12,19 +13,31 @@ import './App.css'
 const SESSION_CHECK_TIMEOUT = 10000
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('kdp_token'))
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let active = true
+
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        localStorage.setItem('kdp_token', session.access_token)
-        setIsAuthenticated(true)
-      } else if (!localStorage.getItem('kdp_token')) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!active) return
+
+        if (session) {
+          setIsAuthenticated(true)
+        } else {
+          setIsAuthenticated(false)
+          setUser(null)
+          setLoading(false)
+        }
+      } catch (sessionError) {
+        if (!active) return
+        console.error('Failed to restore session', sessionError)
         setIsAuthenticated(false)
+        setUser(null)
         setLoading(false)
       }
     }
@@ -32,23 +45,24 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        localStorage.setItem('kdp_token', session.access_token)
         setIsAuthenticated(true)
+        setError(null)
       } else if (event === 'SIGNED_OUT') {
-        localStorage.removeItem('kdp_token')
         setIsAuthenticated(false)
         setUser(null)
+        setLoading(false)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchUserData()
-    } else {
-      setLoading(false)
     }
   }, [isAuthenticated])
 
@@ -69,14 +83,18 @@ function App() {
         timeoutPromise,
       ])
 
-      if (session) {
-        await authApi.syncProfile()
-        setUser({
-          email: session.user.email,
-          username: session.user.user_metadata?.username || session.user.email,
-          id: session.user.id,
-        })
+      if (!session) {
+        setIsAuthenticated(false)
+        setUser(null)
+        return
       }
+
+      await authApi.syncProfile()
+      setUser({
+        email: session.user.email,
+        username: session.user.user_metadata?.username || session.user.email,
+        id: session.user.id,
+      })
     } catch (err) {
       console.error('Failed to fetch user data', err)
       setError(err.message || 'Failed to load dashboard data. Please try again.')
@@ -84,7 +102,6 @@ function App() {
         console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
       }
       setIsAuthenticated(false)
-      localStorage.removeItem('kdp_token')
     } finally {
       setLoading(false)
     }
@@ -96,7 +113,6 @@ function App() {
     } catch (logoutError) {
       console.error('Logout failed on server', logoutError)
     } finally {
-      localStorage.removeItem('kdp_token')
       setIsAuthenticated(false)
       setUser(null)
     }
@@ -134,6 +150,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <Toaster richColors position="top-right" />
       <Router>
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
           <Routes>

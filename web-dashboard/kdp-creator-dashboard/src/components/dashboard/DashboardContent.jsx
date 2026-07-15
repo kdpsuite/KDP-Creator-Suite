@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.j
 import { Badge } from '@/components/ui/badge.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
 import { Input } from '@/components/ui/input.jsx'
+import { toast } from 'sonner'
 import { subscriptionApi, analyticsApi, pdfApi, templateApi } from '@/lib/api'
 import {
   LineChart,
@@ -130,9 +131,10 @@ export default function DashboardContent({ user, handleLogout }) {
       setBatchProgress(100)
       setProcessedCount(files.length)
       await refreshMetrics()
+      toast.success('Batch conversion complete')
     } catch (error) {
       console.error('Batch conversion failed', error)
-      alert(`Batch Conversion Error: ${error.message || 'An unknown error occurred.'}`)
+      toast.error(error.message || 'Batch conversion failed')
     } finally {
       setIsProcessing(false)
     }
@@ -153,9 +155,10 @@ export default function DashboardContent({ user, handleLogout }) {
       setResultData(data.download_url)
       setResultType('image')
       await refreshMetrics()
+      toast.success('Coloring conversion complete')
     } catch (error) {
       console.error('Coloring conversion failed', error)
-      alert(`Coloring Conversion Error: ${error.message || 'An unknown error occurred.'}`)
+      toast.error(error.message || 'Coloring conversion failed')
     } finally {
       setIsProcessing(false)
     }
@@ -178,9 +181,10 @@ export default function DashboardContent({ user, handleLogout }) {
       setPreviewImage(data.preview)
       setResultData(data.download_url)
       await refreshMetrics()
+      toast.success('PDF processing complete')
     } catch (error) {
       console.error('PDF processing failed', error)
-      alert(`PDF Processing Error: ${error.message || 'An unknown error occurred.'}`)
+      toast.error(error.message || 'PDF processing failed')
     } finally {
       setIsProcessing(false)
     }

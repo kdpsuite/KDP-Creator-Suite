@@ -15,6 +15,7 @@ CONVERSION_EVENT_TYPES = {
 BATCH_EVENT_TYPES = {
     'batch_process',
     'batch_coloring_conversion',
+    'batch_coloring',
 }
 
 

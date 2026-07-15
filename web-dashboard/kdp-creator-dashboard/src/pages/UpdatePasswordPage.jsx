@@ -1,15 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { createClient } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button.jsx'
+import { authApi, supabase } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { AlertCircle, CheckCircle, Loader2, Eye, EyeOff } from 'lucide-react'
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
 
 export default function UpdatePasswordPage() {
   const [searchParams] = useSearchParams()
@@ -96,9 +91,7 @@ export default function UpdatePasswordPage() {
 
     try {
       setIsSubmitting(true)
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: password,
-      })
+      const { error: updateError } = await authApi.resetPassword(password)
 
       if (updateError) throw updateError
 

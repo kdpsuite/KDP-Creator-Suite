@@ -18,13 +18,10 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    if (session?.access_token) {
       config.headers.Authorization = `Bearer ${session.access_token}`;
-    } else {
-      const token = localStorage.getItem('kdp_token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    } else if (config.headers?.Authorization) {
+      delete config.headers.Authorization;
     }
     return config;
   },
@@ -45,7 +42,6 @@ api.interceptors.response.use(
 
     if (error.response && error.response.status === 401) {
       console.warn('[AUTH] Unauthorized request, session may be expired');
-      localStorage.removeItem('kdp_token');
       try {
         await supabase.auth.signOut();
       } catch {
