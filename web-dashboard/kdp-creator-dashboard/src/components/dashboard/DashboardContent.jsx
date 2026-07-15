@@ -434,10 +434,11 @@ export default function DashboardContent({ user, handleLogout }) {
             <h2 className="text-2xl font-bold mb-4">Recent Projects</h2>
             {templates.length === 0 ? (
               <EmptyState
-                icon={<EmptyProjectsIllustration />}
+                icon={EmptyProjectsIllustration}
                 title="No projects yet"
                 description="Create your first KDP project to start optimizing your publishing workflow."
-                action={{ label: 'Create Project', onClick: () => setActiveTab('tools') }}
+                action={() => setActiveTab('tools')}
+                actionLabel="Create Project"
               />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -676,7 +677,7 @@ export default function DashboardContent({ user, handleLogout }) {
                 <CardContent className="h-[300px]">
                   {dailyChartData.length === 0 || dailyChartData.every((d) => d.value === 0) ? (
                     <EmptyState
-                      icon={<EmptyAnalyticsIllustration />}
+                      icon={EmptyAnalyticsIllustration}
                       title="No activity yet"
                       description="Run a conversion to populate usage trends."
                     />
