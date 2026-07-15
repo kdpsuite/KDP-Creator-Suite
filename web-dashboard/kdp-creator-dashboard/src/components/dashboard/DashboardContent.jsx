@@ -61,6 +61,39 @@ const unwrapOk = (response) => {
   return body.data ?? body
 }
 
+const asArray = (value) => (Array.isArray(value) ? value : [])
+
+const normalizeMetrics = (payload) => {
+  const raw = payload?.metrics ?? payload
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null
+  }
+
+  const fileTypes =
+    raw.file_types && typeof raw.file_types === 'object' && !Array.isArray(raw.file_types)
+      ? raw.file_types
+      : {}
+
+  return {
+    ...raw,
+    daily_activity: asArray(raw.daily_activity),
+    file_types: fileTypes,
+    storage_used_mb: Number(raw.storage_used_mb) || 0,
+    total_conversions: Number(raw.total_conversions) || 0,
+    total_batch_operations: Number(raw.total_batch_operations) || 0,
+  }
+}
+
+const normalizeSubscription = (payload) => {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null
+  }
+  if (!payload.tier_details) {
+    return null
+  }
+  return payload
+}
+
 export default function DashboardContent({ user, handleLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [subscription, setSubscription] = useState(null)
@@ -103,7 +136,11 @@ export default function DashboardContent({ user, handleLogout }) {
   const refreshMetrics = async () => {
     const metricsRes = await analyticsApi.getUserMetrics()
     const payload = unwrapOk(metricsRes)
-    setMetrics(payload.metrics)
+    const normalizedMetrics = normalizeMetrics(payload)
+    if (!normalizedMetrics) {
+      throw new Error('Invalid metrics response')
+    }
+    setMetrics(normalizedMetrics)
   }
 
   const handleBatchConvert = async (files) => {
@@ -214,10 +251,13 @@ export default function DashboardContent({ user, handleLogout }) {
         subscriptionApi.getStatus(),
         analyticsApi.getUserMetrics(),
       ])
-      const subPayload = unwrapOk(subRes)
-      const metricsPayload = unwrapOk(metricsRes)
+      const subPayload = normalizeSubscription(unwrapOk(subRes))
+      const metricsPayload = normalizeMetrics(unwrapOk(metricsRes))
+      if (!subPayload || !metricsPayload) {
+        throw new Error('Dashboard data response was incomplete')
+      }
       setSubscription(subPayload)
-      setMetrics(metricsPayload.metrics)
+      setMetrics(metricsPayload)
     } catch (error) {
       console.error('Failed to load dashboard data', error)
       setLoadError(error.message || 'Failed to load dashboard data')
@@ -283,19 +323,24 @@ export default function DashboardContent({ user, handleLogout }) {
       ? 'Unlimited'
       : `${remainingConversions} left`
 
-  const dailyChartData = (metrics.daily_activity || []).slice(-7).map((day) => ({
-    name: day.date?.slice(5) || day.date,
-    value: (day.conversions || 0) + (day.batch_ops || 0),
+  const dailyActivity = asArray(metrics.daily_activity)
+  const dailyChartData = dailyActivity.slice(-7).map((day) => ({
+    name: day?.date?.slice(5) || day?.date || '',
+    value: Number(day?.conversions || 0) + Number(day?.batch_ops || 0),
   }))
 
-  const fileTypeEntries = Object.entries(metrics.file_types || {})
+  const fileTypeEntries = Object.entries(
+    metrics.file_types && typeof metrics.file_types === 'object' && !Array.isArray(metrics.file_types)
+      ? metrics.file_types
+      : {}
+  )
   const pieData =
     fileTypeEntries.length > 0
       ? fileTypeEntries.map(([name, value]) => ({ name, value }))
       : [{ name: 'No data yet', value: 1 }]
 
-  const successEvents = (metrics.daily_activity || []).reduce(
-    (sum, day) => sum + (day.conversions || 0) + (day.batch_ops || 0),
+  const successEvents = dailyActivity.reduce(
+    (sum, day) => sum + Number(day?.conversions || 0) + Number(day?.batch_ops || 0),
     0
   )
 
@@ -378,7 +423,7 @@ export default function DashboardContent({ user, handleLogout }) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {(metrics.storage_used_mb || 0).toFixed(1)} MB
+                  {Number(metrics.storage_used_mb || 0).toFixed(1)} MB
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Cloud asset storage</p>
               </CardContent>
@@ -467,7 +512,7 @@ export default function DashboardContent({ user, handleLogout }) {
                   <OnboardingTooltip
                     content="Upload your PDF here. We'll automatically format it for KDP."
                     tooltipId="pdf-upload-tooltip"
-                    isOpen={shouldShowTooltip('pdf-upload-tooltip')}
+                    shouldShow={shouldShowTooltip('pdf-upload-tooltip')}
                     onDismiss={() => dismissTooltip('pdf-upload-tooltip')}
                     position="top"
                   >
