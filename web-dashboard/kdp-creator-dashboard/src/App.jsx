@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { Loader2, AlertCircle } from 'lucide-react'
@@ -12,11 +12,22 @@ import './App.css'
 
 const SESSION_CHECK_TIMEOUT = 10000
 
+function isBootstrapFailure(err) {
+  const status = err.response?.status
+  return (
+    !err.response ||
+    status === 401 ||
+    status === 403 ||
+    err.message?.includes('timed out')
+  )
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const fetchUserDataIdRef = useRef(0)
 
   useEffect(() => {
     let active = true
@@ -48,9 +59,11 @@ function App() {
         setIsAuthenticated(true)
         setError(null)
       } else if (event === 'SIGNED_OUT') {
+        fetchUserDataIdRef.current += 1
         setIsAuthenticated(false)
         setUser(null)
         setLoading(false)
+        setError(null)
       }
     })
 
@@ -67,6 +80,8 @@ function App() {
   }, [isAuthenticated])
 
   const fetchUserData = async () => {
+    const fetchId = ++fetchUserDataIdRef.current
+
     try {
       setLoading(true)
       setError(null)
@@ -83,6 +98,8 @@ function App() {
         timeoutPromise,
       ])
 
+      if (fetchId !== fetchUserDataIdRef.current) return
+
       if (!session) {
         setIsAuthenticated(false)
         setUser(null)
@@ -90,24 +107,43 @@ function App() {
       }
 
       await authApi.syncProfile()
+
+      if (fetchId !== fetchUserDataIdRef.current) return
+
       setUser({
         email: session.user.email,
         username: session.user.user_metadata?.username || session.user.email,
         id: session.user.id,
       })
     } catch (err) {
+      if (fetchId !== fetchUserDataIdRef.current) return
+
       console.error('Failed to fetch user data', err)
-      setError(err.message || 'Failed to load dashboard data. Please try again.')
-      if (err.message?.includes('timed out')) {
-        console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
+
+      if (isBootstrapFailure(err)) {
+        if (err.message?.includes('timed out')) {
+          console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
+        }
+        try {
+          await supabase.auth.signOut()
+        } catch {
+          // ignore sign-out failures during bootstrap recovery
+        }
+        setIsAuthenticated(false)
+        setUser(null)
+        setError(null)
+      } else {
+        setError(err.message || 'Failed to load dashboard data. Please try again.')
       }
-      setIsAuthenticated(false)
     } finally {
-      setLoading(false)
+      if (fetchId === fetchUserDataIdRef.current) {
+        setLoading(false)
+      }
     }
   }
 
   const handleLogout = async () => {
+    fetchUserDataIdRef.current += 1
     try {
       await authApi.logout()
     } catch (logoutError) {
@@ -115,6 +151,7 @@ function App() {
     } finally {
       setIsAuthenticated(false)
       setUser(null)
+      setError(null)
     }
   }
 
@@ -130,7 +167,7 @@ function App() {
     )
   }
 
-  if (error) {
+  if (error && isAuthenticated) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center p-6 bg-card rounded-lg shadow-lg max-w-md">
