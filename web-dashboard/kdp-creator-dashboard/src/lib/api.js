@@ -41,15 +41,22 @@ api.interceptors.response.use(
     }
 
     if (error.response && error.response.status === 401) {
-      console.warn('[AUTH] Unauthorized request, session may be expired');
-      try {
-        await supabase.auth.signOut();
-      } catch {
-        // ignore sign-out failures during 401 handling
+      const requestUrl = config.url || '';
+      const isProfileSync = requestUrl.includes('/user/profile-sync');
+
+      console.warn('[AUTH] Unauthorized request, session may be expired', requestUrl);
+
+      if (!isProfileSync) {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // ignore sign-out failures during 401 handling
+        }
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+          window.location.assign('/login');
+        }
       }
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-        window.location.assign('/login');
-      }
+
       return Promise.reject(error);
     }
 

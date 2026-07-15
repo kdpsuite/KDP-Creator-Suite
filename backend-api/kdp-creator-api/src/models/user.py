@@ -13,7 +13,11 @@ supabase = None
 try:
     from supabase import create_client, Client
     url = os.environ.get("SUPABASE_URL")
-    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+    key = (
+        os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SUPABASE_SERVICE_KEY")
+        or os.environ.get("SUPABASE_ANON_KEY")
+    )
     if url and key:
         supabase = create_client(url, key)
     else:
@@ -63,8 +67,12 @@ class UserProfile:
     def get_by_id(user_id):
         if not supabase:
             return None
-        res = supabase.table('user_profiles').select('*').eq('id', user_id).single().execute()
-        return res.data if res.data else None
+        try:
+            res = supabase.table('user_profiles').select('*').eq('id', user_id).maybe_single().execute()
+            return res.data if res.data else None
+        except Exception as profile_error:
+            print(f"Failed to fetch user profile {user_id}: {profile_error}")
+            return None
 
     @staticmethod
     def to_dict(profile):

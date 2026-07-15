@@ -13,7 +13,6 @@ load_dotenv()
 # Check for required environment variables at startup
 REQUIRED_ENV_VARS = [
     'SUPABASE_URL',
-    'SUPABASE_KEY',
     'JWT_SECRET_KEY',
 ]
 
@@ -32,7 +31,6 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from src.models.user import db, bcrypt
 from src.routes.user import user_bp
-from src.routes.pdf_processing import pdf_bp
 from src.routes.subscription import subscription_bp
 from src.routes.analytics import analytics_bp
 from src.routes.totp import totp_bp
@@ -57,7 +55,11 @@ def after_request(response):
 
 # Register blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
-app.register_blueprint(pdf_bp, url_prefix='/api')
+try:
+    from src.routes.pdf_processing import pdf_bp
+    app.register_blueprint(pdf_bp, url_prefix='/api')
+except ImportError as pdf_import_error:
+    print(f"[WARNING] PDF processing routes disabled: {pdf_import_error}")
 app.register_blueprint(subscription_bp, url_prefix='/api')
 app.register_blueprint(analytics_bp, url_prefix='/api')
 app.register_blueprint(totp_bp, url_prefix='/api')
@@ -69,14 +71,22 @@ database_url = os.environ.get('DATABASE_URL')
 if database_url and database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url or f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
+if not database_url:
+    sqlite_dir = os.environ.get('VERCEL') and '/tmp' or os.path.join(os.path.dirname(__file__), 'database')
+    os.makedirs(sqlite_dir, exist_ok=True)
+    database_url = f"sqlite:///{os.path.join(sqlite_dir, 'app.db')}"
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 bcrypt.init_app(app)
 jwt = JWTManager(app)
 
 with app.app_context():
-    db.create_all()
+    try:
+        db.create_all()
+    except Exception as db_error:
+        print(f"[WARNING] Database initialization skipped: {db_error}")
 
 
 @app.route('/api/health')

@@ -12,16 +12,6 @@ import './App.css'
 
 const SESSION_CHECK_TIMEOUT = 10000
 
-function isBootstrapFailure(err) {
-  const status = err.response?.status
-  return (
-    !err.response ||
-    status === 401 ||
-    status === 403 ||
-    err.message?.includes('timed out')
-  )
-}
-
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
@@ -106,24 +96,28 @@ function App() {
         return
       }
 
-      await authApi.syncProfile()
-
-      if (fetchId !== fetchUserDataIdRef.current) return
-
-      setUser({
+      const sessionUser = {
         email: session.user.email,
         username: session.user.user_metadata?.username || session.user.email,
         id: session.user.id,
-      })
+      }
+
+      try {
+        await authApi.syncProfile()
+      } catch (syncErr) {
+        console.warn('Profile sync failed; continuing with Supabase session', syncErr)
+      }
+
+      if (fetchId !== fetchUserDataIdRef.current) return
+
+      setUser(sessionUser)
     } catch (err) {
       if (fetchId !== fetchUserDataIdRef.current) return
 
       console.error('Failed to fetch user data', err)
 
-      if (isBootstrapFailure(err)) {
-        if (err.message?.includes('timed out')) {
-          console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
-        }
+      if (err.message?.includes('timed out')) {
+        console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
         try {
           await supabase.auth.signOut()
         } catch {
