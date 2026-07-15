@@ -241,6 +241,11 @@ def rate_limit_file_upload(f):
     return decorated_function
 
 
+def rate_limit_pdf_processing(f):
+    """Rate limit PDF processing endpoints"""
+    return rate_limit_file_upload(f)
+
+
 def rate_limit_batch_processing(f):
     """Rate limit batch processing"""
     @wraps(f)
