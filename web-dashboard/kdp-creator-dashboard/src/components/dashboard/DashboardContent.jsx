@@ -424,16 +424,15 @@ export default function DashboardContent({ user, handleLogout }) {
   )
   const pieData = fileTypeEntries.map(([name, value]) => ({ name, value: Number(value) || 0 }))
   const hasFileTypeData = pieData.length > 0
-  const hasAnalyticsActivity = successEvents > 0 || resolvedMetrics.total_conversions > 0
-
   const successEvents = dailyActivity.reduce(
     (sum, day) => sum + Number(day?.conversions || 0) + Number(day?.batch_ops || 0),
     0
   )
+  const hasAnalyticsActivity = successEvents > 0 || resolvedMetrics.total_conversions > 0
 
   return (
     <div className="container mx-auto p-6 animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
+      <div className="glass flex items-center justify-between mb-8 rounded-xl p-4 sticky top-0 z-10">
         <h1 className="text-4xl font-extrabold tracking-tight">KDP Creator Suite</h1>
         <div className="flex items-center gap-4">
           <Button
@@ -740,7 +739,8 @@ export default function DashboardContent({ user, handleLogout }) {
             {!hasAnalyticsActivity && (
               <p className="text-xs text-muted-foreground border border-dashed rounded-lg px-3 py-2 bg-muted/30">
                 No events recorded yet. Conversions populate automatically, or seed historical data via{' '}
-                <code className="text-xs">urgent/supabase_seed_script.sql</code> in the Supabase SQL Editor.
+                <code className="text-xs">urgent/supabase_seed_script.sql</code> in the Supabase SQL Editor
+                (see <code className="text-xs">urgent/supabase_seed_instructions.md</code>).
               </p>
             )}
             <OnboardingTooltip
@@ -990,6 +990,7 @@ export default function DashboardContent({ user, handleLogout }) {
               <h2 className="text-2xl font-bold mb-2">Template Library</h2>
               <p className="text-muted-foreground text-sm">
                 Starter KDP templates from niche research — more coming in the 10-week rollout.
+                Full plan: <code className="text-xs">web-dashboard/template_library/template_library/template_library_action_plan.md</code>
               </p>
             </div>
             {libraryTemplates.length === 0 ? (
