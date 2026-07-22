@@ -207,7 +207,7 @@ class _FormatSelectionState extends State<FormatSelection> {
       return;
     }
 
-    // Generate the file data (this would be your actual conversion logic)
+    // Generate converted file via PdfProcessingService
     final fileBytes = await _generateFileBytes();
     final fileName = _generateFileName();
 

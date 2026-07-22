@@ -16,7 +16,9 @@ export async function trackEvent(eventType, eventData = {}) {
 }
 
 export const AnalyticsEvents = {
+  USER_REGISTERED: 'user_registered',
   PDF_CONVERSION_STARTED: 'pdf_conversion_started',
   PDF_CONVERSION_COMPLETED: 'pdf_conversion_completed',
   BATCH_PROCESSING_INITIATED: 'batch_processing_initiated',
+  SUBSCRIPTION_UPGRADED: 'subscription_upgraded',
 };

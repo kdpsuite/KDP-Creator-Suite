@@ -288,6 +288,8 @@ jobs:
 
 ### 10. Launch Checklist
 
+> **Tracked checklist:** See [docs/LAUNCH_CHECKLIST.md](docs/LAUNCH_CHECKLIST.md) for coded vs manual status per item, health probe locations, and post-launch analytics foundation (`src/lib/analytics.js`, `POST /api/analytics/events`). Months 1–12 roadmap: [post_launch_strategy.md](post_launch_strategy.md).
+
 #### Pre-Launch (Week -2):
 - [ ] Complete security audit
 - [ ] Performance testing

@@ -97,3 +97,39 @@ def test_subscription_tiers_response_format(client):
     assert response.status_code == 200
     assert_success_envelope(payload)
     assert 'tiers' in payload['data']
+
+
+def test_templates_list_response_format(client):
+    response = client.get('/api/templates')
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert_success_envelope(payload)
+    templates = payload['data']['templates']
+    assert payload['data']['total'] == len(templates)
+    assert len(templates) >= 5
+    niches = {t['niche'] for t in templates}
+    assert 'adult_coloring' in niches
+    assert 'kids_workbook' in niches
+    assert 'log_book' in niches
+
+
+def test_templates_niche_filter(client):
+    response = client.get('/api/templates?niche=kids_workbook')
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert_success_envelope(payload)
+    assert all(t['niche'] == 'kids_workbook' for t in payload['data']['templates'])
+
+
+def test_analytics_events_missing_auth(client):
+    response = client.post('/api/analytics/events', json={
+        'event_type': 'pdf_conversion_started',
+        'event_data': {},
+    })
+    payload = response.get_json()
+
+    assert response.status_code == 401
+    assert_error_envelope(payload, 401)
+    assert payload['error']['code'] == 'AUTH_MISSING'

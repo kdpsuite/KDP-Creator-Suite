@@ -16,7 +16,7 @@ import time
 from functools import wraps
 from flask import request
 from collections import defaultdict
-from src.utils.validation import error_response
+from src.utils.responses import error_response
 from src.utils.logger import log_warning
 
 # ============================================================================
@@ -142,11 +142,12 @@ def rate_limit(max_requests, window_seconds, key_func=None):
                 
                 return error_response(
                     f'Rate limit exceeded. Try again in {reset_seconds} seconds.',
-                    code=429,
+                    error_code='RATE_LIMIT_EXCEEDED',
                     details={
                         'retry_after': reset_seconds,
                         'reset_time': reset_time,
-                    }
+                    },
+                    status_code=429,
                 )
             
             # Add rate limit headers to response
@@ -223,8 +224,9 @@ def rate_limit_password_reset(f):
             reset_seconds = int(reset_time - time.time())
             return error_response(
                 f'Too many password reset requests. Try again in {reset_seconds} seconds.',
-                code=429,
-                details={'retry_after': reset_seconds}
+                error_code='RATE_LIMIT_EXCEEDED',
+                details={'retry_after': reset_seconds},
+                status_code=429,
             )
         
         return f(*args, **kwargs)

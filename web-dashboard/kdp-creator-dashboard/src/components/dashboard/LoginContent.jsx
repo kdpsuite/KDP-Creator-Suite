@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { FormField } from '@/components/FormField'
 import { authApi } from '@/lib/api'
+import { trackEvent, AnalyticsEvents } from '@/lib/analytics'
 
 export default function LoginContent({ setIsAuthenticated }) {
   const [email, setEmail] = useState('')
@@ -54,6 +55,7 @@ export default function LoginContent({ setIsAuthenticated }) {
       }
 
       if (data.session) {
+        await trackEvent(AnalyticsEvents.USER_REGISTERED, { source: 'dashboard' })
         setIsAuthenticated(true)
       } else {
         setIsRegistering(false)
