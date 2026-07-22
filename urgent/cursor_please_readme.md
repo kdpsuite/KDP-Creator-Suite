@@ -2,6 +2,8 @@
 
 This document provides a comprehensive overview of the recent developments, improvements, and outstanding tasks for the KDP Creator Suite dashboard and its associated backend services.
 
+**Out of scope:** APF, Shadowcast, and Mission Control are separate products and must not be integrated into this dashboard or the Android app.
+
 ## I. Completed Improvements
 
 ### A. Dashboard UI/UX Polish (Phases 1-3)
@@ -50,11 +52,7 @@ Critical backend and frontend issues have been resolved, and the system has been
 *   **Status**: Planned.
 *   **Objective**: Add a live preview overlay in the dashboard that shows the KDP "Safe Zone" on uploaded files to help users avoid common margin-related rejections.
 
-### C. Shadowcast Integration
-*   **Status**: Planned.
-*   **Objective**: Build an API bridge to allow users to pull assets directly from Shadowcast into the KDP Creator Suite dashboard, eliminating the need for manual download/upload.
-
-### D. Advanced Batch Features
+### C. Advanced Batch Features
 *   **Status**: Planned.
 *   **Objective**: Enhance the Batch Creator with features like custom page ordering, automatic cover generation, and multi-user collaboration.
 
