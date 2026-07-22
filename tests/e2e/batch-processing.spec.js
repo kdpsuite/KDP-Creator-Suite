@@ -31,6 +31,10 @@ test.describe('KDP Creator Suite - Batch Processing', () => {
       ]);
       await fileChooser.setFiles(paths);
 
+      await expect(page.getByText(/2 file\(s\) — drag to reorder/i)).toBeVisible({ timeout: 5000 });
+
+      await page.getByRole('button', { name: /Process \d+ file\(s\)/i }).click();
+
       await expect(page.getByText(/Processing \d+ of \d+ files/i)).toBeVisible({ timeout: 15000 });
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });

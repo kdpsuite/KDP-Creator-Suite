@@ -49,7 +49,6 @@ import { KdpSafeZoneOverlay } from '@/components/KdpSafeZoneOverlay'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { EmptyProjectsIllustration } from '@/components/illustrations/EmptyProjectsIllustration'
 import { EmptyAnalyticsIllustration } from '@/components/illustrations/EmptyAnalyticsIllustration'
-import { EmptyJobsIllustration } from '@/components/illustrations/EmptyJobsIllustration'
 
 import * as pdfjs from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
