@@ -1,7 +1,8 @@
 import os
 import jwt
 from functools import wraps
-from flask import request, jsonify
+from flask import request
+from src.utils.responses import error_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 
@@ -45,11 +46,11 @@ def jwt_required():
         def decorated_function(*args, **kwargs):
             auth_header = request.headers.get('Authorization')
             if not auth_header or not auth_header.startswith('Bearer '):
-                return jsonify({'error': 'Missing or invalid token'}), 401
+                return error_response('Missing or invalid token', 'AUTH_MISSING', status_code=401)
             token = auth_header.split(" ")[1]
             user = get_supabase_user(token)
             if not user:
-                return jsonify({'error': 'Invalid or expired token'}), 401
+                return error_response('Invalid or expired token', 'AUTH_INVALID', status_code=401)
             # Attach user to request context
             request.user = user
             return f(*args, **kwargs)

@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 import { Loader2, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { authApi, supabase } from '@/lib/api'
+import { sessionBridge } from '@/lib/sessionBridge'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import DashboardContent from '@/components/dashboard/DashboardContent.jsx'
 import LoginContent from '@/components/dashboard/LoginContent.jsx'
@@ -21,9 +22,13 @@ function App() {
 
   useEffect(() => {
     let active = true
+    let bridgeSubscription = null
 
     const checkSession = async () => {
       try {
+        bridgeSubscription = await sessionBridge.init()
+        if (!active) return
+
         const { data: { session } } = await supabase.auth.getSession()
         if (!active) return
 
@@ -50,6 +55,7 @@ function App() {
         setError(null)
       } else if (event === 'SIGNED_OUT') {
         fetchUserDataIdRef.current += 1
+        sessionBridge.clearSession()
         setIsAuthenticated(false)
         setUser(null)
         setLoading(false)
@@ -60,6 +66,9 @@ function App() {
     return () => {
       active = false
       subscription.unsubscribe()
+      if (bridgeSubscription) {
+        bridgeSubscription.unsubscribe()
+      }
     }
   }, [])
 
@@ -138,6 +147,7 @@ function App() {
 
   const handleLogout = async () => {
     fetchUserDataIdRef.current += 1
+    sessionBridge.clearSession()
     try {
       await authApi.logout()
     } catch (logoutError) {

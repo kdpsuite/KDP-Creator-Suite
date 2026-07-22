@@ -293,47 +293,73 @@ export function useApi(url, method = 'GET') {
 
 ## Migration Checklist
 
-- [ ] Update all endpoints to use `success_response()` and `error_response()`
-- [ ] Ensure all error responses include error codes
-- [ ] Add validation error details for form fields
-- [ ] Test error handling in frontend
-- [ ] Update API documentation
-- [ ] Add tests for response format
+- [x] Update all endpoints to use `success_response()` and `error_response()` from `src/utils/responses.py`
+- [x] Ensure all error responses include machine-readable error codes (auth, validation, TOTP, auth_sync)
+- [ ] Add validation error details for all form fields (partial — user update and TOTP routes covered)
+- [ ] Test error handling in frontend (frontend still uses axios raw responses in places)
+- [x] Update API documentation (this file)
+- [x] Add tests for response format (`backend-api/kdp-creator-api/tests/test_api_responses.py`)
 - [ ] Monitor logs for non-standard responses
-- [ ] Update frontend error handling
+- [ ] Update frontend error handling to rely on standard envelope everywhere
+
+**Notes:** `src/utils/validation.py` retains legacy helpers used by rate-limit middleware; route handlers use `src/utils/responses.py`.
 
 ---
 
 ## Endpoints to Standardize
 
 ### User Routes (`/api/users`)
-- [x] GET `/users/me` - Get current user
+- [x] GET `/me` - Get current user
 - [x] PUT `/users/<id>` - Update user
 - [x] DELETE `/users/<id>` - Delete user
-- [x] POST `/request-password-reset` - Request password reset
-- [ ] GET `/users` - List users (admin)
+- [x] POST `/request-password-reset` - Deprecated (Supabase auth)
+- [x] GET `/users` - List users (admin)
+- [x] POST `/user/profile-sync` - Sync Supabase profile
 
-### Auth Routes (`/api/auth`)
-- [ ] POST `/auth/register` - Register user
-- [ ] POST `/auth/login` - Login user
-- [ ] POST `/auth/logout` - Logout user
-- [ ] POST `/auth/refresh` - Refresh token
+### Auth Sync Routes (`/api`)
+- [x] POST `/sync-session` - Cross-domain session sync
+- [x] GET `/validate-session` - Validate current session
+- [x] POST `/sync-supabase-user` - Legacy user sync
+- [x] POST `/validate-supabase-token` - Legacy token validation
+
+### Auth Routes (`/api/auth`) — N/A (Supabase-managed)
+- [x] POST `/register` - Deprecated redirect message
+- [x] POST `/login` - Deprecated redirect message
+- [x] POST `/logout` - Standardized success response
+- [ ] POST `/auth/refresh` - Not implemented (Supabase client handles refresh)
 
 ### PDF Routes (`/api/pdf`)
-- [ ] POST `/pdf/convert` - Convert image to PDF
-- [ ] GET `/pdf/<id>` - Get PDF status
-- [ ] DELETE `/pdf/<id>` - Delete PDF
+- [x] POST `/pdf/convert-coloring` - Convert image to PDF
+- [x] POST `/pdf/format-kdp` - Format for KDP
+- [x] POST `/pdf/batch-coloring` - Batch conversion
+- [x] POST `/pdf/validate-kdp` - Validate compliance
 
 ### Batch Routes (`/api/batch`)
-- [ ] POST `/batch/submit` - Submit batch job
-- [ ] GET `/batch/<id>` - Get batch status
-- [ ] GET `/batch` - List batch jobs
-- [ ] DELETE `/batch/<id>` - Cancel batch job
+- [x] GET `/batch/jobs` - List batch jobs
+- [x] POST `/batch/submit` - Submit batch job
+
+### Subscription Routes (`/api`)
+- [x] GET `/tiers` - List subscription tiers
+- [x] GET `/status` - Subscription status
+- [x] POST `/upgrade` - Upgrade tier
+
+### Analytics Routes (`/api`)
+- [x] GET `/user-metrics` - User analytics
+- [x] GET `/business-metrics` - Business analytics
+
+### TOTP Routes (`/api`)
+- [x] POST `/2fa/setup` - Setup 2FA
+- [x] POST `/2fa/verify` - Verify 2FA setup
+- [x] POST `/2fa/disable` - Disable 2FA
+- [x] POST `/2fa/validate` - Validate 2FA at login
 
 ### Health Routes (`/api/health`)
-- [ ] GET `/health` - Health check
-- [ ] GET `/health/ready` - Readiness check
-- [ ] GET `/health/live` - Liveness check
+- [x] GET `/health` - Health check
+- [x] GET `/health/ready` - Readiness check
+- [x] GET `/health/live` - Liveness check
+
+### Template Routes (`/api`)
+- [x] GET `/templates` - List starter templates
 
 ---
 

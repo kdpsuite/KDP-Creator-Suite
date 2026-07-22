@@ -13,15 +13,23 @@ export function FormField({
   helperText,
   required = false,
   disabled = false,
+  rightAdornment,
+  inputClassName = '',
+  labelAdornment,
   ...props
 }) {
+  const hasRightSlot = Boolean(rightAdornment || error || success)
+
   return (
     <div className="space-y-2">
       {label && (
-        <label htmlFor={name} className="text-sm font-medium">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
+        <div className="flex items-center justify-between">
+          <label htmlFor={name} className="text-sm font-medium">
+            {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          {labelAdornment}
+        </div>
       )}
       <div className="relative">
         <Input
@@ -34,16 +42,19 @@ export function FormField({
           disabled={disabled}
           className={`
             transition-all duration-200
+            ${hasRightSlot ? 'pr-10' : ''}
             ${error ? 'border-red-500 focus:ring-red-500' : ''}
             ${success ? 'border-green-500 focus:ring-green-500' : ''}
             ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
+            ${inputClassName}
           `}
           {...props}
         />
-        {error && (
+        {rightAdornment}
+        {error && !rightAdornment && (
           <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
         )}
-        {success && !error && (
+        {success && !error && !rightAdornment && (
           <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
         )}
       </div>

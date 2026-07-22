@@ -2,6 +2,7 @@ import io
 import os
 import uuid
 import base64
+import json
 from datetime import datetime
 from flask import Blueprint, request, current_app, send_file
 from pypdf import PdfReader, PdfWriter
@@ -47,6 +48,35 @@ def get_kdp_dimensions(trim_size, target_format):
         target_h += (BLEED_SIZE * 2 * 72)
     
     return target_w, target_h
+
+def generate_title_page_pdf(title, trim_size):
+    """Create a simple title/cover page PDF prepended to batch output."""
+    target_w, target_h = get_kdp_dimensions(trim_size, 'print')
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=(target_w, target_h))
+    c.setFillColor(grey)
+    c.setFont('Helvetica-Bold', min(36, target_w / 12))
+    c.drawCentredString(target_w / 2, target_h / 2 + 20, title[:80])
+    c.setFont('Helvetica', 14)
+    c.drawCentredString(target_w / 2, target_h / 2 - 30, 'KDP Creator Suite')
+    c.showPage()
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def _png_bytes_to_pdf_page(png_bytes):
+    img = Image.open(io.BytesIO(png_bytes))
+    img_width_pt = img.width * 72 / PRINT_DPI
+    img_height_pt = img.height * 72 / PRINT_DPI
+    temp_pdf_buffer = io.BytesIO()
+    c = canvas.Canvas(temp_pdf_buffer, pagesize=(img_width_pt, img_height_pt))
+    c.drawImage(Image.open(io.BytesIO(png_bytes)), 0, 0, width=img_width_pt, height=img_height_pt)
+    c.showPage()
+    c.save()
+    temp_pdf_buffer.seek(0)
+    return PdfReader(temp_pdf_buffer).pages[0]
+
 
 def generate_optimized_preview(content_bytes, content_type='pdf'):
     """Generate a low-res preview without double-processing"""
@@ -206,18 +236,29 @@ def batch_convert_coloring():
 
     trim_size = request.form.get("trim_size", "8.5x11")
     threshold = int(request.form.get("threshold", 127))
-    
+    cover_title = request.form.get("cover_title", "").strip()
+    generate_cover = request.form.get("generate_cover", "false").lower() in ("1", "true", "yes")
+
+    file_order_raw = request.form.get("file_order")
+    if file_order_raw:
+        try:
+            file_keys = json.loads(file_order_raw)
+        except json.JSONDecodeError:
+            return error_response("Invalid file_order JSON", "INVALID_INPUT", status_code=400)
+    else:
+        file_keys = sorted(request.files.keys())
+
     output_pdfs = []
-    total_processed_bytes = 0
 
     with PerformanceTimer("batch_coloring_conversion"):
         try:
-            for key in request.files:
+            for key in file_keys:
+                if key not in request.files:
+                    continue
                 file = request.files[key]
                 img_bytes = file.read()
                 image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
 
-                # Apply KDP dimension formatting (reusing logic from convert_to_coloring)
                 target_width_pt, target_height_pt = get_kdp_dimensions(trim_size, 'print')
                 target_width_px = int(target_width_pt / 72 * PRINT_DPI)
                 target_height_px = int(target_height_pt / 72 * PRINT_DPI)
@@ -233,7 +274,7 @@ def batch_convert_coloring():
                         new_height = target_height_px
                         new_width = int(new_height * aspect_ratio)
                     image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                
+
                 padded_image = Image.new('RGB', (target_width_px, target_height_px), (255, 255, 255))
                 paste_x = (target_width_px - image.width) // 2
                 paste_y = (target_height_px - image.height) // 2
@@ -242,29 +283,21 @@ def batch_convert_coloring():
                 cv_image = cv2.cvtColor(np.array(padded_image), cv2.COLOR_RGB2BGR)
                 gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
                 _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
-                
+
                 output_buffer = io.BytesIO()
                 result_image = Image.fromarray(binary)
                 result_image.save(output_buffer, format='PNG')
-                output_pdfs.append(output_buffer.getvalue()) # Store PNG bytes
-                total_processed_bytes += len(output_buffer.getvalue())
+                output_pdfs.append(output_buffer.getvalue())
 
-            # Combine all processed PNGs into a single PDF
             pdf_writer = PdfWriter()
-            for png_bytes in output_pdfs:
-                # Convert PNG bytes to a temporary PDF page
-                img = Image.open(io.BytesIO(png_bytes))
-                img_width_pt = img.width * 72 / PRINT_DPI
-                img_height_pt = img.height * 72 / PRINT_DPI
 
-                temp_pdf_buffer = io.BytesIO()
-                c = canvas.Canvas(temp_pdf_buffer, pagesize=(img_width_pt, img_height_pt))
-                c.drawImage(Image.open(io.BytesIO(png_bytes)), 0, 0, width=img_width_pt, height=img_height_pt)
-                c.showPage()
-                c.save()
-                temp_pdf_buffer.seek(0)
-                temp_pdf_reader = PdfReader(temp_pdf_buffer)
-                pdf_writer.add_page(temp_pdf_reader.pages[0])
+            if generate_cover and cover_title:
+                cover_bytes = generate_title_page_pdf(cover_title, trim_size)
+                cover_reader = PdfReader(io.BytesIO(cover_bytes))
+                pdf_writer.add_page(cover_reader.pages[0])
+
+            for png_bytes in output_pdfs:
+                pdf_writer.add_page(_png_bytes_to_pdf_page(png_bytes))
 
             final_pdf_buffer = io.BytesIO()
             pdf_writer.write(final_pdf_buffer)
@@ -272,24 +305,32 @@ def batch_convert_coloring():
 
             filename = f"batch_coloring_{uuid.uuid4().hex[:8]}.pdf"
             storage_info = upload_file(final_pdf_bytes, str(user_id), filename, 'batch_coloring_pdf')
-            
+
             supabase.table("analytics_events").insert({
                 "user_id": user_id,
                 "event_type": "batch_coloring_conversion",
-                "event_data": {"status": "success", "file_count": len(request.files), "file_size_mb": round(len(final_pdf_bytes) / (1024 * 1024), 2), "format": "PDF", "trim_size": trim_size}
+                "event_data": {
+                    "status": "success",
+                    "file_count": len(output_pdfs),
+                    "has_cover": bool(generate_cover and cover_title),
+                    "file_size_mb": round(len(final_pdf_bytes) / (1024 * 1024), 2),
+                    "format": "PDF",
+                    "trim_size": trim_size,
+                },
             }).execute()
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(final_pdf_bytes, 'pdf'),
                 'file_size_mb': round(len(final_pdf_bytes) / (1024 * 1024), 2),
-                'format': 'PDF'
+                'format': 'PDF',
+                'page_count': len(output_pdfs) + (1 if generate_cover and cover_title else 0),
             })
         except Exception as e:
             current_app.logger.error(f"Batch coloring conversion failed: {str(e)}")
             supabase.table("analytics_events").insert({
                 "user_id": user_id,
                 "event_type": "batch_coloring_conversion",
-                "event_data": {"status": "failed", "error": str(e), "file_count": len(request.files), "trim_size": trim_size}
+                "event_data": {"status": "failed", "error": str(e), "file_count": len(file_keys), "trim_size": trim_size},
             }).execute()
             return error_response("Batch conversion failed", "BATCH_CONVERSION_ERROR", status_code=500)
 

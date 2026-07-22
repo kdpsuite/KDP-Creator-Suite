@@ -1,9 +1,8 @@
 # Cross-Domain Session Persistence Guide
 
-> **STATUS (2026-07-13): NOT IMPLEMENTED / FALSE CLAIM.**
-> `sessionBridge.js` does not exist. App.jsx uses Supabase `getSession` / `onAuthStateChange` only.
-> Documented `/sync-session` and `/validate-session` routes and `tests/e2e/session-persistence.spec.js` were never shipped.
-> Treat this file as an aspirational design note, not a completion record.
+> **STATUS (2026-07-22): PARTIALLY IMPLEMENTED.**
+> `sessionBridge.js`, `/sync-session`, `/validate-session`, and `tests/e2e/session-persistence.spec.js` are shipped.
+> Cross-subdomain localStorage still does not share tokens automatically — configure Supabase CORS for both domains and/or use cookie-domain (`.kdpsuite.com`) handoff for full cross-domain SSO.
 
 **Problem:** Users get logged out when navigating between `kdpsuite.com` and `dashboard.kdpsuite.com`.
 

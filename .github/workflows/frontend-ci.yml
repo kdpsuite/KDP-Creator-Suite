@@ -5,11 +5,19 @@ on:
     branches: [ main, develop ]
     paths:
       - 'web-dashboard/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
       - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
       - 'web-dashboard/**'
+      - 'tests/**'
+      - 'playwright.config.js'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
 
 jobs:
   lint:

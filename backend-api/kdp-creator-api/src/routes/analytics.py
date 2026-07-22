@@ -1,4 +1,4 @@
-from flask import Blueprint
+from flask import Blueprint, request
 from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
 from src.utils.responses import success_response, error_response
 from datetime import datetime, timedelta
@@ -6,17 +6,64 @@ from src.utils.logger import PerformanceTimer
 
 analytics_bp = Blueprint('analytics', __name__)
 
+ALLOWED_EVENT_TYPES = {
+    'pdf_conversion_started',
+    'pdf_conversion_completed',
+    'pdf_conversion',
+    'pdf_coloring_conversion',
+    'kdp_formatting',
+    'kdp_validation',
+    'batch_processing_initiated',
+    'batch_process',
+    'batch_coloring_conversion',
+    'batch_coloring',
+    'user_registered',
+    'subscription_upgraded',
+}
+
 CONVERSION_EVENT_TYPES = {
+    'pdf_conversion_completed',
     'pdf_conversion',
     'pdf_coloring_conversion',
     'kdp_formatting',
     'kdp_validation',
 }
 BATCH_EVENT_TYPES = {
+    'batch_processing_initiated',
     'batch_process',
     'batch_coloring_conversion',
     'batch_coloring',
 }
+
+
+@analytics_bp.route('/analytics/events', methods=['POST'])
+@jwt_required()
+def record_event():
+    user_id = get_jwt_identity()
+    payload = request.get_json(silent=True) or {}
+    event_type = payload.get('event_type')
+    event_data = payload.get('event_data') or {}
+
+    if not event_type or event_type not in ALLOWED_EVENT_TYPES:
+        return error_response(
+            'Invalid or missing event_type',
+            'INVALID_EVENT_TYPE',
+            status_code=400,
+        )
+
+    try:
+        supabase.table('analytics_events').insert({
+            'user_id': user_id,
+            'event_type': event_type,
+            'event_data': event_data,
+        }).execute()
+        return success_response({'recorded': True}, status_code=201)
+    except Exception as e:
+        return error_response(
+            f'Failed to record event: {str(e)}',
+            'DATABASE_ERROR',
+            status_code=500,
+        )
 
 
 @analytics_bp.route('/user-metrics', methods=['GET'])

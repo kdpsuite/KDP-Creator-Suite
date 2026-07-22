@@ -24,3 +24,4 @@ pyotp
 psycopg2-binary
 python-dotenv
 supabase
+pytest==8.3.4

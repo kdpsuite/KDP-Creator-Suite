@@ -26,17 +26,19 @@ print(f"[STARTUP] Environment: {os.environ.get('ENVIRONMENT', 'development')}")
 print(f"[STARTUP] Debug mode: {os.environ.get('DEBUG', 'False')}")
 print(f"[STARTUP] Supabase URL: {os.environ.get('SUPABASE_URL', 'NOT SET')}")
 
-from flask import Flask, jsonify
+from flask import Flask
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from src.models.user import db, bcrypt
+from sqlalchemy import text
+from src.models.user import db, bcrypt, supabase
 from src.routes.user import user_bp
 from src.routes.subscription import subscription_bp
 from src.routes.analytics import analytics_bp
 from src.routes.totp import totp_bp
 from src.routes.batch import batch_bp
 from src.routes.auth_sync import auth_sync_bp
-from src.utils.responses import success_response
+from src.routes.templates import templates_bp
+from src.utils.responses import success_response, error_response
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'kdp-creator-suite-secret-key-2024')
@@ -65,6 +67,7 @@ app.register_blueprint(analytics_bp, url_prefix='/api')
 app.register_blueprint(totp_bp, url_prefix='/api')
 app.register_blueprint(batch_bp, url_prefix='/api')
 app.register_blueprint(auth_sync_bp, url_prefix='/api')
+app.register_blueprint(templates_bp, url_prefix='/api')
 
 # Database configuration
 database_url = os.environ.get('DATABASE_URL')
@@ -95,6 +98,44 @@ def health():
         data={'status': 'ok'},
         message='KDP Creator Suite API is running',
         status_code=200
+    )
+
+
+@app.route('/api/health/live')
+def health_live():
+    return success_response(
+        data={'alive': True},
+        message='Service is alive',
+        status_code=200,
+    )
+
+
+@app.route('/api/health/ready')
+def health_ready():
+    checks = {
+        'database': False,
+        'supabase': supabase is not None,
+    }
+
+    try:
+        db.session.execute(text('SELECT 1'))
+        checks['database'] = True
+    except Exception as db_error:
+        print(f'[HEALTH] Database check failed: {db_error}')
+
+    ready = checks['database'] and checks['supabase']
+    if ready:
+        return success_response(
+            data={'ready': True, 'checks': checks},
+            message='Service is ready',
+            status_code=200,
+        )
+
+    return error_response(
+        'Service not ready',
+        'SERVICE_UNAVAILABLE',
+        details=checks,
+        status_code=503,
     )
 
 

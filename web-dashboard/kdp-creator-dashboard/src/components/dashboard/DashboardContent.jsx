@@ -24,6 +24,8 @@ import { Progress } from '@/components/ui/progress.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { toast } from 'sonner'
 import { subscriptionApi, analyticsApi, pdfApi, templateApi } from '@/lib/api'
+import { trackEvent, AnalyticsEvents } from '@/lib/analytics'
+import { BatchFileQueue } from '@/components/batch/BatchFileQueue'
 import {
   LineChart,
   Line,
@@ -39,12 +41,15 @@ import {
 } from 'recharts'
 import { SkeletonLoader } from '@/components/SkeletonLoader'
 import { EmptyState } from '@/components/EmptyState'
+import { FormField } from '@/components/FormField'
 import { Tooltip } from '@/components/Tooltip'
 import { PageTransition } from '@/components/animations/PageTransition'
 import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip'
+import { KdpSafeZoneOverlay } from '@/components/KdpSafeZoneOverlay'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { EmptyProjectsIllustration } from '@/components/illustrations/EmptyProjectsIllustration'
 import { EmptyAnalyticsIllustration } from '@/components/illustrations/EmptyAnalyticsIllustration'
+import { EmptyJobsIllustration } from '@/components/illustrations/EmptyJobsIllustration'
 
 import * as pdfjs from 'pdfjs-dist'
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
@@ -63,10 +68,18 @@ const unwrapOk = (response) => {
 
 const asArray = (value) => (Array.isArray(value) ? value : [])
 
+const EMPTY_METRICS = {
+  daily_activity: [],
+  file_types: {},
+  storage_used_mb: 0,
+  total_conversions: 0,
+  total_batch_operations: 0,
+}
+
 const normalizeMetrics = (payload) => {
   const raw = payload?.metrics ?? payload
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-    return null
+    return { ...EMPTY_METRICS }
   }
 
   const fileTypes =
@@ -75,6 +88,7 @@ const normalizeMetrics = (payload) => {
       : {}
 
   return {
+    ...EMPTY_METRICS,
     ...raw,
     daily_activity: asArray(raw.daily_activity),
     file_types: fileTypes,
@@ -102,6 +116,7 @@ export default function DashboardContent({ user, handleLogout }) {
   const [loadError, setLoadError] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
+  const [previewMeta, setPreviewMeta] = useState({ trimSize: '6x9', withBleed: true })
   const [resultData, setResultData] = useState(null)
   const [resultType, setResultType] = useState('image')
   const [batchProgress, setBatchProgress] = useState(0)
@@ -113,6 +128,10 @@ export default function DashboardContent({ user, handleLogout }) {
   const [targetFormat, setTargetFormat] = useState('kdp-print')
   const [coloringTrimSize, setColoringTrimSize] = useState('6x9')
   const [batchTrimSize, setBatchTrimSize] = useState('6x9')
+  const [batchFiles, setBatchFiles] = useState([])
+  const [coverTitle, setCoverTitle] = useState('')
+  const [generateCover, setGenerateCover] = useState(false)
+  const [libraryTemplates, setLibraryTemplates] = useState([])
 
   useEffect(() => {
     if (darkMode) {
@@ -125,6 +144,10 @@ export default function DashboardContent({ user, handleLogout }) {
 
   useEffect(() => {
     templateApi.getAll().then((res) => setTemplates(res.data.templates))
+    templateApi.getLibrary().then((res) => {
+      const payload = res.data?.data?.templates ?? res.data?.templates ?? []
+      setLibraryTemplates(payload)
+    }).catch(() => setLibraryTemplates([]))
   }, [])
 
   const deleteTemplate = async (id) => {
@@ -136,37 +159,62 @@ export default function DashboardContent({ user, handleLogout }) {
   const refreshMetrics = async () => {
     const metricsRes = await analyticsApi.getUserMetrics()
     const payload = unwrapOk(metricsRes)
-    const normalizedMetrics = normalizeMetrics(payload)
-    if (!normalizedMetrics) {
-      throw new Error('Invalid metrics response')
-    }
-    setMetrics(normalizedMetrics)
+    setMetrics(normalizeMetrics(payload))
   }
 
-  const handleBatchConvert = async (files) => {
-    if (!files || files.length === 0) return
+  const reorderBatchFiles = (fromIndex, toIndex) => {
+    setBatchFiles((prev) => {
+      const next = [...prev]
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
+  }
+
+  const handleBatchFileSelect = (files) => {
+    if (!files?.length) return
+    setBatchFiles((prev) => [...prev, ...files])
+  }
+
+  const handleBatchConvert = async () => {
+    if (!batchFiles.length) return
     try {
       setIsProcessing(true)
       setBatchProgress(0)
       setProcessedCount(0)
-      setTotalFiles(files.length)
+      setTotalFiles(batchFiles.length)
       setPreviewImage(null)
       setResultData(null)
       setResultType('pdf')
 
-      const formData = new FormData()
-      files.forEach((file, index) => {
-        formData.append(`file_${index}`, file)
+      await trackEvent(AnalyticsEvents.BATCH_PROCESSING_INITIATED, {
+        file_count: batchFiles.length,
+        trim_size: batchTrimSize,
+        generate_cover: generateCover,
       })
+
+      const formData = new FormData()
+      const fileOrder = []
+      batchFiles.forEach((file, index) => {
+        const key = `file_${index}`
+        formData.append(key, file)
+        fileOrder.push(key)
+      })
+      formData.append('file_order', JSON.stringify(fileOrder))
       formData.append('trim_size', batchTrimSize)
+      if (generateCover && coverTitle.trim()) {
+        formData.append('generate_cover', 'true')
+        formData.append('cover_title', coverTitle.trim())
+      }
 
       const response = await pdfApi.convertColoringBatch(formData)
       const data = unwrapOk(response)
       setPreviewImage(data.preview)
+      setPreviewMeta({ trimSize: batchTrimSize, withBleed: true })
       setResultData(data.download_url)
       setResultType('pdf')
       setBatchProgress(100)
-      setProcessedCount(files.length)
+      setProcessedCount(batchFiles.length)
       await refreshMetrics()
       toast.success('Batch conversion complete')
     } catch (error) {
@@ -179,9 +227,15 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handleImageConvert = async (file) => {
     if (!file) return
+    const startedAt = Date.now()
     try {
       setIsProcessing(true)
       setPreviewImage(null)
+      await trackEvent(AnalyticsEvents.PDF_CONVERSION_STARTED, {
+        format: 'coloring',
+        file_size: file.size,
+        trim_size: coloringTrimSize,
+      })
       const formData = new FormData()
       formData.append('file', file)
       formData.append('trim_size', coloringTrimSize)
@@ -189,11 +243,22 @@ export default function DashboardContent({ user, handleLogout }) {
       const response = await pdfApi.convertColoring(formData)
       const data = unwrapOk(response)
       setPreviewImage(data.preview)
+      setPreviewMeta({ trimSize: coloringTrimSize, withBleed: true })
       setResultData(data.download_url)
       setResultType('image')
+      await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
+        format: 'coloring',
+        success: true,
+        processing_time_ms: Date.now() - startedAt,
+      })
       await refreshMetrics()
       toast.success('Coloring conversion complete')
     } catch (error) {
+      await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
+        format: 'coloring',
+        success: false,
+        processing_time_ms: Date.now() - startedAt,
+      })
       console.error('Coloring conversion failed', error)
       toast.error(error.message || 'Coloring conversion failed')
     } finally {
@@ -203,10 +268,17 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handlePdfProcess = async (file) => {
     if (!file) return
+    const startedAt = Date.now()
     try {
       setIsProcessing(true)
       setPreviewImage(null)
       setResultType('pdf')
+
+      await trackEvent(AnalyticsEvents.PDF_CONVERSION_STARTED, {
+        format: targetFormat,
+        file_size: file.size,
+        trim_size: trimSize,
+      })
 
       const formData = new FormData()
       formData.append('file', file)
@@ -216,10 +288,24 @@ export default function DashboardContent({ user, handleLogout }) {
       const response = await pdfApi.convertToKdp(formData)
       const data = unwrapOk(response)
       setPreviewImage(data.preview)
+      setPreviewMeta({
+        trimSize,
+        withBleed: targetFormat === 'kdp-print',
+      })
       setResultData(data.download_url)
+      await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
+        format: targetFormat,
+        success: true,
+        processing_time_ms: Date.now() - startedAt,
+      })
       await refreshMetrics()
       toast.success('PDF processing complete')
     } catch (error) {
+      await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
+        format: targetFormat,
+        success: false,
+        processing_time_ms: Date.now() - startedAt,
+      })
       console.error('PDF processing failed', error)
       toast.error(error.message || 'PDF processing failed')
     } finally {
@@ -253,8 +339,8 @@ export default function DashboardContent({ user, handleLogout }) {
       ])
       const subPayload = normalizeSubscription(unwrapOk(subRes))
       const metricsPayload = normalizeMetrics(unwrapOk(metricsRes))
-      if (!subPayload || !metricsPayload) {
-        throw new Error('Dashboard data response was incomplete')
+      if (!subPayload) {
+        throw new Error('Subscription data could not be loaded')
       }
       setSubscription(subPayload)
       setMetrics(metricsPayload)
@@ -289,7 +375,7 @@ export default function DashboardContent({ user, handleLogout }) {
     )
   }
 
-  if (loadError || !subscription || !metrics) {
+  if (loadError || !subscription) {
     return (
       <div className="container mx-auto p-6 flex items-center justify-center min-h-[50vh]">
         <Card className="max-w-md w-full">
@@ -299,7 +385,7 @@ export default function DashboardContent({ user, handleLogout }) {
               Dashboard unavailable
             </CardTitle>
             <CardDescription>
-              {loadError || 'Subscription or metrics data could not be loaded.'}
+              {loadError || 'Subscription data could not be loaded.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex gap-2">
@@ -323,21 +409,22 @@ export default function DashboardContent({ user, handleLogout }) {
       ? 'Unlimited'
       : `${remainingConversions} left`
 
-  const dailyActivity = asArray(metrics.daily_activity)
+  const resolvedMetrics = metrics ?? EMPTY_METRICS
+
+  const dailyActivity = asArray(resolvedMetrics.daily_activity)
   const dailyChartData = dailyActivity.slice(-7).map((day) => ({
     name: typeof day?.date === 'string' ? (day.date.slice(5) || day.date) : String(day?.date ?? ''),
     value: Number(day?.conversions || 0) + Number(day?.batch_ops || 0),
   }))
 
   const fileTypeEntries = Object.entries(
-    metrics.file_types && typeof metrics.file_types === 'object' && !Array.isArray(metrics.file_types)
-      ? metrics.file_types
+    resolvedMetrics.file_types && typeof resolvedMetrics.file_types === 'object' && !Array.isArray(resolvedMetrics.file_types)
+      ? resolvedMetrics.file_types
       : {}
   )
-  const pieData =
-    fileTypeEntries.length > 0
-      ? fileTypeEntries.map(([name, value]) => ({ name, value: Number(value) || 0 }))
-      : [{ name: 'No data yet', value: 1 }]
+  const pieData = fileTypeEntries.map(([name, value]) => ({ name, value: Number(value) || 0 }))
+  const hasFileTypeData = pieData.length > 0
+  const hasAnalyticsActivity = successEvents > 0 || resolvedMetrics.total_conversions > 0
 
   const successEvents = dailyActivity.reduce(
     (sum, day) => sum + Number(day?.conversions || 0) + Number(day?.batch_ops || 0),
@@ -369,6 +456,7 @@ export default function DashboardContent({ user, handleLogout }) {
           <TabsTrigger value="tools" className="rounded-lg">Tools</TabsTrigger>
           <TabsTrigger value="analytics" className="rounded-lg">Analytics</TabsTrigger>
           <TabsTrigger value="batch" className="rounded-lg">Batch Processing</TabsTrigger>
+          <TabsTrigger value="templates" className="rounded-lg">Templates</TabsTrigger>
           <TabsTrigger value="settings" className="rounded-lg">Settings</TabsTrigger>
         </TabsList>
 
@@ -411,7 +499,7 @@ export default function DashboardContent({ user, handleLogout }) {
                 <Zap className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{metrics.total_conversions || 0}</div>
+                <div className="text-2xl font-bold">{resolvedMetrics.total_conversions || 0}</div>
                 <p className="text-xs text-muted-foreground mt-1">Across all formats</p>
               </CardContent>
             </Card>
@@ -423,7 +511,7 @@ export default function DashboardContent({ user, handleLogout }) {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {Number(metrics.storage_used_mb || 0).toFixed(1)} MB
+                  {Number(resolvedMetrics.storage_used_mb || 0).toFixed(1)} MB
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Cloud asset storage</p>
               </CardContent>
@@ -557,17 +645,25 @@ export default function DashboardContent({ user, handleLogout }) {
                       </select>
                     </div>
                   </div>
-                  <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
-                    <Image className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
-                    <p className="text-sm text-muted-foreground mb-2">Upload image to convert</p>
-                    <p className="text-xs text-muted-foreground mb-4">Supports JPG, PNG</p>
-                    <Input
-                      type="file"
-                      accept=".jpg,.jpeg,.png"
-                      onChange={(e) => handleImageConvert(e.target.files[0])}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                  </div>
+                  <OnboardingTooltip
+                    content="Upload JPG or PNG images to convert into KDP-ready coloring pages."
+                    tooltipId="image-upload-tooltip"
+                    shouldShow={shouldShowTooltip('image-upload-tooltip')}
+                    onDismiss={() => dismissTooltip('image-upload-tooltip')}
+                    position="top"
+                  >
+                    <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
+                      <Image className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
+                      <p className="text-sm text-muted-foreground mb-2">Upload image to convert</p>
+                      <p className="text-xs text-muted-foreground mb-4">Supports JPG, PNG</p>
+                      <Input
+                        type="file"
+                        accept=".jpg,.jpeg,.png"
+                        onChange={(e) => handleImageConvert(e.target.files[0])}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                    </div>
+                  </OnboardingTooltip>
                 </CardContent>
               </Card>
             </div>
@@ -593,7 +689,7 @@ export default function DashboardContent({ user, handleLogout }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="aspect-video relative rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
+                  <div className="relative aspect-video rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
                     <img
                       src={
                         previewImage.startsWith('http') || previewImage.startsWith('data:')
@@ -601,9 +697,16 @@ export default function DashboardContent({ user, handleLogout }) {
                           : `data:image/jpeg;base64,${previewImage}`
                       }
                       alt="Preview"
-                      className="max-h-full object-contain"
+                      className="max-h-full max-w-full object-contain relative z-0"
+                    />
+                    <KdpSafeZoneOverlay
+                      trimSize={previewMeta.trimSize}
+                      withBleed={previewMeta.withBleed}
                     />
                   </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Blue = trim line · Dashed amber = bleed · Green = safe margin (keep text/art inside)
+                  </p>
                   <div className="flex justify-end gap-4">
                     <Button
                       variant="outline"
@@ -627,10 +730,27 @@ export default function DashboardContent({ user, handleLogout }) {
 
         <TabsContent value="analytics">
           <PageTransition className="space-y-6">
+            {/*
+              Manual seed (optional): run urgent/supabase_seed_script.sql in Supabase SQL Editor.
+              See urgent/supabase_seed_instructions.md — replace user_id with your auth.users id.
+            */}
             <p className="text-sm text-muted-foreground">
               Live metrics from your last 30 days of processing activity.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {!hasAnalyticsActivity && (
+              <p className="text-xs text-muted-foreground border border-dashed rounded-lg px-3 py-2 bg-muted/30">
+                No events recorded yet. Conversions populate automatically, or seed historical data via{' '}
+                <code className="text-xs">urgent/supabase_seed_script.sql</code> in the Supabase SQL Editor.
+              </p>
+            )}
+            <OnboardingTooltip
+              content="Track conversions, batch ops, and format breakdown from live analytics events."
+              tooltipId="analytics-overview-tooltip"
+              shouldShow={shouldShowTooltip('analytics-overview-tooltip')}
+              onDismiss={() => dismissTooltip('analytics-overview-tooltip')}
+              position="bottom"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card className="card glass">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -651,7 +771,7 @@ export default function DashboardContent({ user, handleLogout }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">{metrics.total_conversions || 0}</div>
+                  <div className="text-3xl font-bold">{resolvedMetrics.total_conversions || 0}</div>
                   <p className="text-xs text-muted-foreground mt-1">Counted from analytics events</p>
                 </CardContent>
               </Card>
@@ -662,11 +782,12 @@ export default function DashboardContent({ user, handleLogout }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-bold">{metrics.total_batch_operations || 0}</div>
+                  <div className="text-3xl font-bold">{resolvedMetrics.total_batch_operations || 0}</div>
                   <p className="text-xs text-muted-foreground mt-1">This billing window</p>
                 </CardContent>
               </Card>
             </div>
+            </OnboardingTooltip>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card className="card glass">
@@ -719,6 +840,13 @@ export default function DashboardContent({ user, handleLogout }) {
                   <CardDescription>Breakdown of output formats</CardDescription>
                 </CardHeader>
                 <CardContent className="h-[300px]">
+                  {!hasFileTypeData ? (
+                    <EmptyState
+                      icon={EmptyAnalyticsIllustration}
+                      title="No format data yet"
+                      description="Output format breakdown appears after your first conversion."
+                    />
+                  ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -748,6 +876,7 @@ export default function DashboardContent({ user, handleLogout }) {
                       <Legend verticalAlign="bottom" height={36} iconType="circle" />
                     </PieChart>
                   </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -760,14 +889,14 @@ export default function DashboardContent({ user, handleLogout }) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   Batch Image to Coloring Book
-                  <Tooltip content="Upload multiple images to convert them into a single KDP-formatted coloring book PDF.">
+                  <Tooltip content="Upload multiple images, reorder pages, optionally add a title cover, then process into one KDP-ready PDF.">
                     <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
                   </Tooltip>
                 </CardTitle>
                 <CardDescription>Process multiple images into one KDP-ready PDF</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Trim Size</label>
                     <select
@@ -780,7 +909,32 @@ export default function DashboardContent({ user, handleLogout }) {
                       <option value="5.5x8.5">5.5 x 8.5 in</option>
                     </select>
                   </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={generateCover}
+                        onChange={(e) => setGenerateCover(e.target.checked)}
+                        className="rounded"
+                      />
+                      Add title cover page
+                    </label>
+                    {generateCover && (
+                      <Input
+                        placeholder="Book title for cover page"
+                        value={coverTitle}
+                        onChange={(e) => setCoverTitle(e.target.value)}
+                      />
+                    )}
+                  </div>
                 </div>
+                <OnboardingTooltip
+                  content="Add multiple images, reorder them, then process into one PDF."
+                  tooltipId="batch-queue-tooltip"
+                  shouldShow={shouldShowTooltip('batch-queue-tooltip')}
+                  onDismiss={() => dismissTooltip('batch-queue-tooltip')}
+                  position="bottom"
+                >
                 <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
                   <p className="text-sm text-muted-foreground mb-2">Drag & drop multiple images here</p>
@@ -789,10 +943,34 @@ export default function DashboardContent({ user, handleLogout }) {
                     type="file"
                     accept=".jpg,.jpeg,.png"
                     multiple
-                    onChange={(e) => handleBatchConvert(Array.from(e.target.files || []))}
+                    onChange={(e) => {
+                      handleBatchFileSelect(Array.from(e.target.files || []))
+                      e.target.value = ''
+                    }}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
                 </div>
+                </OnboardingTooltip>
+                <BatchFileQueue
+                  files={batchFiles}
+                  onReorder={reorderBatchFiles}
+                  onRemove={(index) => setBatchFiles((prev) => prev.filter((_, i) => i !== index))}
+                  onClear={() => setBatchFiles([])}
+                />
+                <Button
+                  onClick={handleBatchConvert}
+                  disabled={isProcessing || batchFiles.length === 0}
+                  className="w-full"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    `Process ${batchFiles.length || 0} file(s)`
+                  )}
+                </Button>
                 {isProcessing && (
                   <div className="space-y-2">
                     <Progress value={batchProgress} className="h-2" />
@@ -806,18 +984,74 @@ export default function DashboardContent({ user, handleLogout }) {
           </PageTransition>
         </TabsContent>
 
+        <TabsContent value="templates">
+          <PageTransition className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Template Library</h2>
+              <p className="text-muted-foreground text-sm">
+                Starter KDP templates from niche research — more coming in the 10-week rollout.
+              </p>
+            </div>
+            {libraryTemplates.length === 0 ? (
+              <EmptyState
+                icon={EmptyProjectsIllustration}
+                title="No templates available"
+                description="Template library is loading or unavailable. Check API connectivity."
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {libraryTemplates.map((tpl) => (
+                  <Card key={tpl.id} className="card glass">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-lg">{tpl.name}</CardTitle>
+                        <Badge variant="secondary">{tpl.tier_required}</Badge>
+                      </div>
+                      <CardDescription>{tpl.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(tpl.tags || []).map((tag) => (
+                          <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {tpl.trim_size} • {tpl.page_count} pages • {tpl.bleed ? 'Bleed' : 'No bleed'}
+                      </p>
+                      <Button size="sm" className="w-full" onClick={() => setActiveTab('tools')}>
+                        Use in Tools
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </PageTransition>
+        </TabsContent>
+
         <TabsContent value="settings">
           <PageTransition className="max-w-2xl mx-auto space-y-6">
+            <OnboardingTooltip
+              content="Your account email and API preferences live here."
+              tooltipId="settings-overview-tooltip"
+              shouldShow={shouldShowTooltip('settings-overview-tooltip')}
+              onDismiss={() => dismissTooltip('settings-overview-tooltip')}
+              position="bottom"
+            >
             <Card className="card glass">
               <CardHeader>
                 <CardTitle>Account Settings</CardTitle>
                 <CardDescription>Manage your profile and preferences</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Email Address</label>
-                  <Input value={user?.email || ''} disabled className="bg-muted/50" />
-                </div>
+                <FormField
+                  label="Email Address"
+                  name="settings-email"
+                  type="email"
+                  value={user?.email || ''}
+                  disabled
+                  helperText="Managed by Supabase Auth"
+                />
                 <div className="space-y-2">
                   <label className="text-sm font-medium">API access</label>
                   <p className="text-sm text-muted-foreground">
@@ -830,6 +1064,7 @@ export default function DashboardContent({ user, handleLogout }) {
                 </div>
               </CardContent>
             </Card>
+            </OnboardingTooltip>
 
             <Card className="card glass border-destructive/20">
               <CardHeader>

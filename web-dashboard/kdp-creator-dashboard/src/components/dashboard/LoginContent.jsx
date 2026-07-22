@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Key, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
-import { Input } from '@/components/ui/input.jsx'
+import { FormField } from '@/components/FormField'
 import { authApi } from '@/lib/api'
 
 export default function LoginContent({ setIsAuthenticated }) {
@@ -53,7 +53,6 @@ export default function LoginContent({ setIsAuthenticated }) {
         return
       }
 
-      // If email confirmation is disabled, user is logged in immediately
       if (data.session) {
         setIsAuthenticated(true)
       } else {
@@ -109,10 +108,15 @@ export default function LoginContent({ setIsAuthenticated }) {
         <CardContent>
           {isResetting ? (
             <form onSubmit={handlePasswordReset} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email Address</label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required />
-              </div>
+              <FormField
+                label="Email Address"
+                name="reset-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+              />
               {error && <p className="text-sm text-red-500">{error}</p>}
               {success && <p className="text-sm text-green-600">{success}</p>}
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
@@ -125,40 +129,53 @@ export default function LoginContent({ setIsAuthenticated }) {
             </form>
           ) : (
             <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Email</label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" required />
-              </div>
+              <FormField
+                label="Email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                required
+              />
               {isRegistering && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Username</label>
-                  <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Choose a username" required />
-                </div>
+                <FormField
+                  label="Username"
+                  name="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Choose a username"
+                  required
+                />
               )}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium">Password</label>
-                  {!isRegistering && (
-                    <button 
-                      type="button" 
+              <FormField
+                label="Password"
+                name="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                labelAdornment={
+                  !isRegistering ? (
+                    <button
+                      type="button"
                       onClick={() => setIsResetting(true)}
                       className="text-xs text-blue-600 hover:underline"
                     >
                       Forgot password?
                     </button>
-                  )}
-                </div>
-                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-              </div>
+                  ) : null
+                }
+              />
               {error && <p className="text-sm text-red-500">{error}</p>}
               {success && <p className="text-sm text-green-600">{success}</p>}
               <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (isRegistering ? 'Register' : 'Login')}
               </Button>
               <Button type="button" variant="link" className="w-full" onClick={() => {
-                setIsRegistering(!isRegistering);
-                setError('');
-                setSuccess('');
+                setIsRegistering(!isRegistering)
+                setError('')
+                setSuccess('')
               }}>
                 {isRegistering ? 'Already have an account? Login' : "Don't have an account? Register"}
               </Button>

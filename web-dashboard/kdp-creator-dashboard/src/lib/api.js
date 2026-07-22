@@ -19,7 +19,19 @@ const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'kdp-creator-suite',
+    },
+  },
+});
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -129,6 +141,11 @@ export const authApi = {
   syncProfile: () => api.post('/user/profile-sync'),
 };
 
+export const sessionApi = {
+  syncSession: (supabaseToken) => api.post('/sync-session', { supabase_token: supabaseToken }),
+  validateSession: () => api.get('/validate-session'),
+};
+
 export const subscriptionApi = {
   getStatus: () => api.get('/status'),
   getTiers: () => api.get('/tiers'),
@@ -137,6 +154,8 @@ export const subscriptionApi = {
 
 export const analyticsApi = {
   getUserMetrics: () => api.get('/user-metrics'),
+  trackEvent: (eventType, eventData = {}) =>
+    api.post('/analytics/events', { event_type: eventType, event_data: eventData }),
 };
 
 export const totpApi = {
@@ -151,6 +170,7 @@ export const batchApi = {
 };
 
 export const templateApi = {
+  getLibrary: (niche) => api.get('/templates', { params: niche ? { niche } : {} }),
   getAll: () => {
     const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]');
     return Promise.resolve({ data: { templates } });
