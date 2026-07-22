@@ -383,8 +383,12 @@ class _PdfImportState extends State<PdfImport> with TickerProviderStateMixin {
       // Wait for animation to complete then navigate
       await Future.delayed(const Duration(milliseconds: 2000));
 
-      if (mounted) {
-        Navigator.pushNamed(context, '/format-selection');
+      if (mounted && selectedFile != null) {
+        Navigator.pushNamed(
+          context,
+          '/format-selection',
+          arguments: Map<String, dynamic>.from(selectedFile!),
+        );
       }
     } catch (error) {
       setState(() {

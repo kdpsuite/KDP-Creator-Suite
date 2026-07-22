@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sizer/sizer.dart';
-import 'dart:convert';
 
 import 'package:kdp_creator_suite/theme/app_theme.dart';
 import '../../core/app_export.dart';
+import '../../services/pdf_processing_service.dart';
 import './widgets/advanced_settings_widget.dart';
 import './widgets/bottom_action_widget.dart';
 import './widgets/coloring_book_options_widget.dart';
@@ -20,7 +20,11 @@ class FormatSelection extends StatefulWidget {
 }
 
 class _FormatSelectionState extends State<FormatSelection> {
-  // Mock PDF data
+  final PdfProcessingService _pdfService = PdfProcessingService();
+  Uint8List? _sourcePdfBytes;
+  Map<String, dynamic>? _lastConversionResult;
+  bool _initializedFromArgs = false;
+
   final Map<String, dynamic> pdfData = {
     "fileName": "My Novel Draft - Chapter 1-5.pdf",
     "pageCount": 127,
@@ -84,6 +88,31 @@ class _FormatSelectionState extends State<FormatSelection> {
     super.initState();
     // Set Kindle eBook as expanded by default
     selectedFormats['kindle'] = true;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initializedFromArgs) return;
+    _initializedFromArgs = true;
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is! Map<String, dynamic>) return;
+
+    final bytes = args['bytes'];
+    if (bytes is Uint8List && bytes.isNotEmpty) {
+      _sourcePdfBytes = bytes;
+    }
+
+    if (args['name'] != null) {
+      pdfData['fileName'] = args['name'];
+    }
+    if (args['pages'] != null) {
+      pdfData['pageCount'] = args['pages'];
+    }
+    if (args['size'] != null) {
+      pdfData['fileSize'] = args['size'];
+    }
   }
 
   void _toggleFormat(String formatKey) {
@@ -197,21 +226,74 @@ class _FormatSelectionState extends State<FormatSelection> {
     }
   }
 
-  Future<Uint8List?> _generateFileBytes() async {
-    // This would contain your actual file generation logic
-    // For now, simulate file generation
-    await Future.delayed(const Duration(milliseconds: 500));
+  String _resolvePrimaryFormatKey() {
+    if (selectedFormats['bundle'] == true) {
+      return 'paperback';
+    }
 
-    // Return mock data - in real implementation, this would be your converted file
-    final mockContent = 'Generated content';
-    return Uint8List.fromList(utf8.encode(mockContent));
+    const formatOrder = ['kindle', 'coloring', 'paperback', 'hardcover'];
+    for (final formatKey in formatOrder) {
+      if (selectedFormats[formatKey] == true) {
+        return formatKey;
+      }
+    }
+
+    return 'paperback';
+  }
+
+  String _mapFormatKeyToServiceFormat(String formatKey) {
+    switch (formatKey) {
+      case 'kindle':
+        return 'kindle';
+      case 'coloring':
+        return 'coloring_book';
+      case 'paperback':
+        return 'paperback';
+      case 'hardcover':
+        return 'hardcover';
+      default:
+        return 'paperback';
+    }
+  }
+
+  Map<String, dynamic> _buildConversionSettings() {
+    return {
+      if (selectedFormats['kindle'] == true)
+        'kindle_quality': selectedKindleOption,
+      if (selectedFormats['coloring'] == true)
+        'include_printable': includePrintableVersion,
+    };
+  }
+
+  Future<Uint8List?> _generateFileBytes() async {
+    if (_sourcePdfBytes == null || _sourcePdfBytes!.isEmpty) {
+      return null;
+    }
+
+    final formatKey = _resolvePrimaryFormatKey();
+    final targetFormat = _mapFormatKeyToServiceFormat(formatKey);
+
+    final result = await _pdfService.convertToFormat(
+      _sourcePdfBytes!,
+      targetFormat,
+      customSettings: _buildConversionSettings(),
+    );
+
+    if (result['success'] != true) {
+      return null;
+    }
+
+    _lastConversionResult = result;
+    return result['bytes'] as Uint8List?;
   }
 
   String? _generateFileName() {
     if (_selectedFormatsCount == 0) return null;
 
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final extension = 'pdf';
+    final formatKey = _resolvePrimaryFormatKey();
+    final extension = _lastConversionResult?['file_extension'] as String? ??
+        _getFileExtension(formatKey);
 
     return 'KindleForge_export_$timestamp.$extension';
   }
@@ -219,8 +301,12 @@ class _FormatSelectionState extends State<FormatSelection> {
   String _getFileExtension(String formatId) {
     switch (formatId) {
       case 'kindle':
-        return 'epub';
+        return 'azw3';
+      case 'coloring':
       case 'coloring_book':
+        return 'pdf';
+      case 'paperback':
+      case 'hardcover':
         return 'pdf';
       case 'audiobook':
         return 'mp3';

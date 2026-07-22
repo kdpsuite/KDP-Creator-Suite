@@ -13,6 +13,15 @@ import './App.css'
 
 const SESSION_CHECK_TIMEOUT = 10000
 
+const isBootstrapFailure = (err) => {
+  const status = err?.response?.status
+  return (
+    !err?.response ||
+    status === 401 ||
+    err.message?.includes('timed out')
+  )
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [user, setUser] = useState(null)
@@ -114,6 +123,9 @@ function App() {
       try {
         await authApi.syncProfile()
       } catch (syncErr) {
+        if (isBootstrapFailure(syncErr)) {
+          throw syncErr
+        }
         console.warn('Profile sync failed; continuing with Supabase session', syncErr)
       }
 
@@ -125,8 +137,10 @@ function App() {
 
       console.error('Failed to fetch user data', err)
 
-      if (err.message?.includes('timed out')) {
-        console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
+      if (isBootstrapFailure(err)) {
+        if (err.message?.includes('timed out')) {
+          console.warn('[TIMEOUT] Session check exceeded', SESSION_CHECK_TIMEOUT, 'ms')
+        }
         try {
           await supabase.auth.signOut()
         } catch {
