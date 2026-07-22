@@ -43,6 +43,8 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Track technical metrics | Partial | Health endpoints; full APM deferred |
 | Plan first update | Manual | Product planning |
 
+**Months 1–12 roadmap (manual):** see `post_launch_strategy.md` at repo root for KPI targets, monitoring stack options (Mixpanel, Sentry, etc.), and feature evolution phases. Coded foundation: `web-dashboard/kdp-creator-dashboard/src/lib/analytics.js` + `POST /api/analytics/events`.
+
 ## Deferred (not in this launch)
 
 - Multi-user batch collaboration
