@@ -49,6 +49,22 @@ api.interceptors.request.use(
     } else if (config.headers?.Authorization) {
       delete config.headers.Authorization;
     }
+    // #region agent log
+    if (config.url?.includes('/pdf/')) {
+      fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
+        body: JSON.stringify({
+          sessionId: 'ca3f5d',
+          location: 'api.js:requestInterceptor',
+          message: 'pdf API request',
+          data: { url: config.url, hasToken: Boolean(session?.access_token), method: config.method },
+          timestamp: Date.now(),
+          hypothesisId: 'H2',
+        }),
+      }).catch(() => {});
+    }
+    // #endregion
     return config;
   },
   (error) => Promise.reject(error)
@@ -71,6 +87,21 @@ api.interceptors.response.use(
       const isProfileSync = requestUrl.includes('/user/profile-sync');
 
       console.warn('[AUTH] Unauthorized request, session may be expired', requestUrl);
+
+      // #region agent log
+      fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
+        body: JSON.stringify({
+          sessionId: 'ca3f5d',
+          location: 'api.js:responseInterceptor',
+          message: '401 unauthorized',
+          data: { url: requestUrl, isProfileSync },
+          timestamp: Date.now(),
+          hypothesisId: 'H2',
+        }),
+      }).catch(() => {});
+      // #endregion
 
       if (!isProfileSync) {
         try {
@@ -104,6 +135,27 @@ api.interceptors.response.use(
           `[CLIENT_ERROR] HTTP ${error.response.status}:`,
           error.response.data?.error || error.message
         );
+        // #region agent log
+        if (config.url?.includes('/pdf/')) {
+          fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
+            body: JSON.stringify({
+              sessionId: 'ca3f5d',
+              location: 'api.js:responseInterceptor',
+              message: 'pdf API error',
+              data: {
+                url: config.url,
+                status: error.response.status,
+                error: error.response.data?.error?.message ?? error.response.data?.message ?? error.message,
+                code: error.code,
+              },
+              timestamp: Date.now(),
+              hypothesisId: 'H3',
+            }),
+          }).catch(() => {});
+        }
+        // #endregion
       }
       return Promise.reject(error);
     }
@@ -192,21 +244,11 @@ export const templateApi = {
 };
 
 export const pdfApi = {
-  convertColoring: (formData) => api.post('/pdf/convert-coloring', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
-  convertImage: (formData) => api.post('/pdf/convert-coloring', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
-  convertToKdp: (formData) => api.post('/pdf/format-kdp', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
-  validateCompliance: (formData) => api.post('/pdf/validate-kdp', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
-  convertColoringBatch: (data) => api.post('/pdf/batch-coloring', data, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }),
+  convertColoring: (formData) => api.post('/pdf/convert-coloring', formData),
+  convertImage: (formData) => api.post('/pdf/convert-coloring', formData),
+  convertToKdp: (formData) => api.post('/pdf/format-kdp', formData),
+  validateCompliance: (formData) => api.post('/pdf/validate-kdp', formData),
+  convertColoringBatch: (data) => api.post('/pdf/batch-coloring', data, { timeout: 300000 }),
 };
 
 export default api;

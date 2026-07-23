@@ -10,6 +10,7 @@ from PIL import Image
 import cv2
 import numpy as np
 from reportlab.pdfgen import canvas
+from reportlab.lib.utils import ImageReader
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.colors import grey
 from functools import lru_cache
@@ -71,7 +72,7 @@ def _png_bytes_to_pdf_page(png_bytes):
     img_height_pt = img.height * 72 / PRINT_DPI
     temp_pdf_buffer = io.BytesIO()
     c = canvas.Canvas(temp_pdf_buffer, pagesize=(img_width_pt, img_height_pt))
-    c.drawImage(Image.open(io.BytesIO(png_bytes)), 0, 0, width=img_width_pt, height=img_height_pt)
+    c.drawImage(ImageReader(io.BytesIO(png_bytes)), 0, 0, width=img_width_pt, height=img_height_pt)
     c.showPage()
     c.save()
     temp_pdf_buffer.seek(0)

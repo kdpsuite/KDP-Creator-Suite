@@ -44,14 +44,14 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
         unique_id = str(uuid.uuid4())[:8]
         file_path = f"{user_id}/{file_type}/{timestamp}_{unique_id}_{filename}"
         
-        # Upload to Supabase Storage
-        response = supabase.storage.from_(BUCKET_NAME).upload(
+        # Upload to Supabase Storage (must use "content-type" — wrong key defaults to text/plain)
+        supabase.storage.from_(BUCKET_NAME).upload(
             file_path,
             file_bytes,
             {
-                "contentType": get_content_type(filename),
-                "upsert": False
-            }
+                "content-type": get_content_type(filename),
+                "upsert": "false",
+            },
         )
         
         # Generate signed URL (valid for 1 hour)
@@ -63,7 +63,7 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
         return {
             'path': file_path,
             'url': f"{SUPABASE_URL}/storage/v1/object/public/{BUCKET_NAME}/{file_path}",
-            'signed_url': signed_url.get('signedURL') if signed_url else None,
+            'signed_url': (signed_url.get('signedURL') or signed_url.get('signedUrl')) if signed_url else None,
             'file_size_bytes': len(file_bytes)
         }
     except Exception as e:

@@ -55,6 +55,18 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker
 
+// #region agent log
+const debugLog = (location, message, data, hypothesisId) => {
+  const payload = { sessionId: 'ca3f5d', location, message, data, timestamp: Date.now(), hypothesisId }
+  fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+  analyticsApi.trackEvent('debug_session', payload).catch(() => {})
+}
+// #endregion
+
 const unwrapOk = (response) => {
   const body = response?.data
   if (!body) return null
@@ -175,8 +187,26 @@ export default function DashboardContent({ user, handleLogout }) {
     setBatchFiles((prev) => [...prev, ...files])
   }
 
+  const applyTemplate = (tpl) => {
+    const trim = tpl.trim_size || '6x9'
+    setTrimSize(trim)
+    setColoringTrimSize(trim)
+    setBatchTrimSize(trim)
+    const isColoring = (tpl.tags || []).includes('coloring')
+    setActiveTab(isColoring ? 'batch' : 'tools')
+    toast.success(`Applied "${tpl.name}" — trim size set to ${trim.replace('x', ' × ')} in`)
+  }
+
   const handleBatchConvert = async () => {
     if (!batchFiles.length) return
+    // #region agent log
+    debugLog('DashboardContent.jsx:handleBatchConvert', 'batch convert started', {
+      fileCount: batchFiles.length,
+      totalBytes: batchFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+      trimSize: batchTrimSize,
+      activeTab,
+    }, 'H1')
+    // #endregion
     try {
       setIsProcessing(true)
       setBatchProgress(0)
@@ -206,7 +236,20 @@ export default function DashboardContent({ user, handleLogout }) {
         formData.append('cover_title', coverTitle.trim())
       }
 
+      // #region agent log
+      debugLog('DashboardContent.jsx:handleBatchConvert', 'calling batch-coloring API', {
+        fileCount: batchFiles.length,
+        apiBase: import.meta.env.VITE_API_URL || '/api',
+      }, 'H1')
+      // #endregion
       const response = await pdfApi.convertColoringBatch(formData)
+      // #region agent log
+      debugLog('DashboardContent.jsx:handleBatchConvert', 'batch-coloring API success', {
+        status: response?.status,
+        hasPreview: Boolean(response?.data?.data?.preview ?? response?.data?.preview),
+        hasDownloadUrl: Boolean(response?.data?.data?.download_url ?? response?.data?.download_url),
+      }, 'H1')
+      // #endregion
       const data = unwrapOk(response)
       setPreviewImage(data.preview)
       setPreviewMeta({ trimSize: batchTrimSize, withBleed: true })
@@ -215,8 +258,17 @@ export default function DashboardContent({ user, handleLogout }) {
       setBatchProgress(100)
       setProcessedCount(batchFiles.length)
       await refreshMetrics()
+      setActiveTab('tools')
       toast.success('Batch conversion complete')
     } catch (error) {
+      // #region agent log
+      debugLog('DashboardContent.jsx:handleBatchConvert', 'batch-coloring API failed', {
+        message: error?.message,
+        status: error?.response?.status,
+        code: error?.code,
+        responseError: error?.response?.data?.error?.message ?? error?.response?.data?.message,
+      }, 'H3')
+      // #endregion
       console.error('Batch conversion failed', error)
       toast.error(error.message || 'Batch conversion failed')
     } finally {
@@ -226,6 +278,13 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handleImageConvert = async (file) => {
     if (!file) return
+    // #region agent log
+    debugLog('DashboardContent.jsx:handleImageConvert', 'single image convert started', {
+      fileName: file.name,
+      fileSize: file.size,
+      trimSize: coloringTrimSize,
+    }, 'H4')
+    // #endregion
     const startedAt = Date.now()
     try {
       setIsProcessing(true)
@@ -253,6 +312,12 @@ export default function DashboardContent({ user, handleLogout }) {
       await refreshMetrics()
       toast.success('Coloring conversion complete')
     } catch (error) {
+      // #region agent log
+      debugLog('DashboardContent.jsx:handleImageConvert', 'single image convert failed', {
+        message: error?.message,
+        status: error?.response?.status,
+      }, 'H4')
+      // #endregion
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
         format: 'coloring',
         success: false,
@@ -267,6 +332,14 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handlePdfProcess = async (file) => {
     if (!file) return
+    // #region agent log
+    debugLog('DashboardContent.jsx:handlePdfProcess', 'pdf convert started', {
+      fileName: file.name,
+      fileSize: file.size,
+      trimSize,
+      targetFormat,
+    }, 'H4')
+    // #endregion
     const startedAt = Date.now()
     try {
       setIsProcessing(true)
@@ -300,6 +373,12 @@ export default function DashboardContent({ user, handleLogout }) {
       await refreshMetrics()
       toast.success('PDF processing complete')
     } catch (error) {
+      // #region agent log
+      debugLog('DashboardContent.jsx:handlePdfProcess', 'pdf convert failed', {
+        message: error?.message,
+        status: error?.response?.status,
+      }, 'H4')
+      // #endregion
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
         format: targetFormat,
         success: false,
@@ -343,7 +422,19 @@ export default function DashboardContent({ user, handleLogout }) {
       }
       setSubscription(subPayload)
       setMetrics(metricsPayload)
+      // #region agent log
+      debugLog('DashboardContent.jsx:loadDashboardData', 'dashboard loaded', {
+        tier: subPayload?.tier_details?.name,
+        hasMetrics: Boolean(metricsPayload),
+      }, 'H2')
+      // #endregion
     } catch (error) {
+      // #region agent log
+      debugLog('DashboardContent.jsx:loadDashboardData', 'dashboard load failed', {
+        message: error?.message,
+        status: error?.response?.status,
+      }, 'H2')
+      // #endregion
       console.error('Failed to load dashboard data', error)
       setLoadError(error.message || 'Failed to load dashboard data')
       setSubscription(null)
@@ -974,7 +1065,9 @@ export default function DashboardContent({ user, handleLogout }) {
                   <div className="space-y-2">
                     <Progress value={batchProgress} className="h-2" />
                     <p className="text-sm text-muted-foreground text-center">
-                      Processing {processedCount} of {totalFiles} files...
+                      {processedCount > 0
+                        ? `Processing ${processedCount} of ${totalFiles} files...`
+                        : `Uploading and processing ${totalFiles} file(s) on the server...`}
                     </p>
                   </div>
                 )}
@@ -1018,7 +1111,21 @@ export default function DashboardContent({ user, handleLogout }) {
                       <p className="text-xs text-muted-foreground">
                         {tpl.trim_size} • {tpl.page_count} pages • {tpl.bleed ? 'Bleed' : 'No bleed'}
                       </p>
-                      <Button size="sm" className="w-full" onClick={() => setActiveTab('tools')}>
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          // #region agent log
+                          debugLog('DashboardContent.jsx:templateUseInTools', 'template use clicked', {
+                            templateId: tpl.id,
+                            templateName: tpl.name,
+                            trimSize: tpl.trim_size,
+                            activeTabBefore: activeTab,
+                          }, 'H5')
+                          // #endregion
+                          applyTemplate(tpl)
+                        }}
+                      >
                         Use in Tools
                       </Button>
                     </CardContent>
