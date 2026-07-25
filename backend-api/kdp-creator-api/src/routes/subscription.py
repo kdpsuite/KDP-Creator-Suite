@@ -39,6 +39,18 @@ SUBSCRIPTION_TIERS = {
         'kdp_integration': True,
         'price': 49.99,
     },
+    # Owner/admin accounts may be stored as "unlimited" in user_profiles
+    'unlimited': {
+        'name': 'Admin',
+        'monthly_conversions': -1,
+        'batch_processing_limit': -1,
+        'watermark_free': True,
+        'priority_support': True,
+        'advanced_features': True,
+        'cloud_storage': True,
+        'kdp_integration': True,
+        'price': 0,
+    },
 }
 
 @subscription_bp.route('/tiers', methods=['GET'])
