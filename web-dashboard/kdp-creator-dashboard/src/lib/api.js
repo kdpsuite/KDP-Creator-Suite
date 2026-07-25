@@ -36,10 +36,43 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
+
+function clearContentType(headers) {
+  if (!headers) return;
+  if (typeof headers.delete === 'function') {
+    headers.delete('Content-Type');
+    headers.delete('content-type');
+    return;
+  }
+  delete headers['Content-Type'];
+  delete headers['content-type'];
+}
+
+function setJsonContentType(headers) {
+  if (!headers) return;
+  if (typeof headers.set === 'function') {
+    headers.set('Content-Type', 'application/json');
+    return;
+  }
+  headers['Content-Type'] = 'application/json';
+}
+
+/** User-facing message for Axios/network failures on uploads */
+export function getUploadErrorMessage(error, fallback = 'Request failed') {
+  if (error?.code === 'ECONNABORTED' || /timeout/i.test(error?.message || '')) {
+    return 'Upload timed out. Try fewer or smaller files.';
+  }
+  if (error?.code === 'ERR_NETWORK' || error?.message === 'Network Error') {
+    return 'Upload blocked or too large for the proxy. Try 2–3 smaller images (under ~4 MB total).';
+  }
+  return (
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.message ||
+    error?.message ||
+    fallback
+  );
+}
 
 api.interceptors.request.use(
   async (config) => {
@@ -49,17 +82,20 @@ api.interceptors.request.use(
     } else if (config.headers?.Authorization) {
       delete config.headers.Authorization;
     }
-    // FormData must not keep the instance default application/json Content-Type —
-    // otherwise the browser never adds a multipart boundary and Flask sees no files (400).
+
     const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
     if (isFormData) {
-      if (typeof config.headers?.set === 'function') {
-        config.headers.set('Content-Type', false);
-      } else if (config.headers) {
-        delete config.headers['Content-Type'];
-        delete config.headers['content-type'];
-      }
+      // Let the browser set multipart/form-data with boundary (Axios docs)
+      clearContentType(config.headers);
+    } else if (
+      config.data &&
+      typeof config.data === 'object' &&
+      !(config.data instanceof ArrayBuffer) &&
+      !(typeof Blob !== 'undefined' && config.data instanceof Blob)
+    ) {
+      setJsonContentType(config.headers);
     }
+
     // #region agent log
     if (config.url?.includes('/pdf/')) {
       fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
@@ -74,7 +110,7 @@ api.interceptors.request.use(
             hasToken: Boolean(session?.access_token),
             method: config.method,
             isFormData,
-            contentType: config.headers?.['Content-Type'] ?? config.headers?.get?.('Content-Type'),
+            contentType: config.headers?.['Content-Type'] ?? config.headers?.get?.('Content-Type') ?? null,
           },
           timestamp: Date.now(),
           hypothesisId: 'H2',
@@ -260,19 +296,12 @@ export const templateApi = {
   },
 };
 
-const formDataConfig = (extra = {}) => ({
-  ...extra,
-  // Let the browser set multipart/form-data; boundary (Axios docs)
-  headers: { ...(extra.headers || {}), 'Content-Type': false },
-});
-
 export const pdfApi = {
-  convertColoring: (formData) => api.post('/pdf/convert-coloring', formData, formDataConfig()),
-  convertImage: (formData) => api.post('/pdf/convert-coloring', formData, formDataConfig()),
-  convertToKdp: (formData) => api.post('/pdf/format-kdp', formData, formDataConfig()),
-  validateCompliance: (formData) => api.post('/pdf/validate-kdp', formData, formDataConfig()),
-  convertColoringBatch: (data) =>
-    api.post('/pdf/batch-coloring', data, formDataConfig({ timeout: 300000 })),
+  convertColoring: (formData) => api.post('/pdf/convert-coloring', formData),
+  convertImage: (formData) => api.post('/pdf/convert-coloring', formData),
+  convertToKdp: (formData) => api.post('/pdf/format-kdp', formData),
+  validateCompliance: (formData) => api.post('/pdf/validate-kdp', formData),
+  convertColoringBatch: (data) => api.post('/pdf/batch-coloring', data, { timeout: 300000 }),
 };
 
 export default api;

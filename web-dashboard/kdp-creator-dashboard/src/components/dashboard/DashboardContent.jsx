@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { toast } from 'sonner'
-import { subscriptionApi, analyticsApi, pdfApi, templateApi } from '@/lib/api'
+import { subscriptionApi, analyticsApi, pdfApi, templateApi, getUploadErrorMessage } from '@/lib/api'
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics'
 import { BatchFileQueue } from '@/components/batch/BatchFileQueue'
 import {
@@ -79,11 +79,9 @@ const unwrapOk = (response) => {
 
 const asArray = (value) => (Array.isArray(value) ? value : [])
 
-const apiErrorMessage = (error, fallback) =>
-  error?.response?.data?.error?.message ||
-  error?.response?.data?.message ||
-  error?.message ||
-  fallback
+const BATCH_MAX_UPLOAD_BYTES = 4 * 1024 * 1024
+
+const apiErrorMessage = (error, fallback) => getUploadErrorMessage(error, fallback)
 
 const EMPTY_METRICS = {
   daily_activity: [],
@@ -149,8 +147,8 @@ export default function DashboardContent({ user, handleLogout }) {
   const [coverTitle, setCoverTitle] = useState('')
   const [generateCover, setGenerateCover] = useState(false)
   const [libraryTemplates, setLibraryTemplates] = useState([])
-  const [selectedPdfName, setSelectedPdfName] = useState('')
-  const [selectedImageName, setSelectedImageName] = useState('')
+  const [pendingPdfFile, setPendingPdfFile] = useState(null)
+  const [pendingImageFile, setPendingImageFile] = useState(null)
 
   useEffect(() => {
     if (darkMode) {
@@ -207,14 +205,21 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handleBatchConvert = async () => {
     if (!batchFiles.length) return
+    const totalBytes = batchFiles.reduce((sum, f) => sum + (f.size || 0), 0)
     // #region agent log
     debugLog('DashboardContent.jsx:handleBatchConvert', 'batch convert started', {
       fileCount: batchFiles.length,
-      totalBytes: batchFiles.reduce((sum, f) => sum + (f.size || 0), 0),
+      totalBytes,
       trimSize: batchTrimSize,
       activeTab,
     }, 'H1')
     // #endregion
+    if (totalBytes > BATCH_MAX_UPLOAD_BYTES) {
+      toast.error(
+        `Batch is ${(totalBytes / (1024 * 1024)).toFixed(1)} MB. Keep total under 4 MB (fewer/smaller images) or split into multiple runs.`
+      )
+      return
+    }
     try {
       setIsProcessing(true)
       setBatchProgress(0)
@@ -247,6 +252,7 @@ export default function DashboardContent({ user, handleLogout }) {
       // #region agent log
       debugLog('DashboardContent.jsx:handleBatchConvert', 'calling batch-coloring API', {
         fileCount: batchFiles.length,
+        totalBytes,
         apiBase: import.meta.env.VITE_API_URL || '/api',
       }, 'H1')
       // #endregion
@@ -286,7 +292,6 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handleImageConvert = async (file) => {
     if (!file) return
-    setSelectedImageName(file.name)
     // #region agent log
     debugLog('DashboardContent.jsx:handleImageConvert', 'single image convert started', {
       fileName: file.name,
@@ -325,6 +330,7 @@ export default function DashboardContent({ user, handleLogout }) {
       debugLog('DashboardContent.jsx:handleImageConvert', 'single image convert failed', {
         message: error?.message,
         status: error?.response?.status,
+        code: error?.code,
       }, 'H4')
       // #endregion
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
@@ -341,7 +347,6 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handlePdfProcess = async (file) => {
     if (!file) return
-    setSelectedPdfName(file.name)
     // #region agent log
     debugLog('DashboardContent.jsx:handlePdfProcess', 'pdf convert started', {
       fileName: file.name,
@@ -387,6 +392,7 @@ export default function DashboardContent({ user, handleLogout }) {
       debugLog('DashboardContent.jsx:handlePdfProcess', 'pdf convert failed', {
         message: error?.message,
         status: error?.response?.status,
+        code: error?.code,
       }, 'H4')
       // #endregion
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
@@ -707,18 +713,36 @@ export default function DashboardContent({ user, handleLogout }) {
                     <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
                       <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
                       <p className="text-sm text-muted-foreground mb-2">
-                        {selectedPdfName || 'Drag & drop your PDF here'}
+                        {pendingPdfFile?.name || 'Drag & drop your PDF here'}
                       </p>
                       <p className="text-xs text-muted-foreground mb-4">
-                        {selectedPdfName ? 'Click to choose a different PDF' : 'or click to browse'}
+                        {pendingPdfFile ? 'Click to choose a different PDF' : 'or click to browse'}
                       </p>
                       <Input
                         type="file"
                         accept=".pdf"
-                        onChange={(e) => handlePdfProcess(e.target.files[0])}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null
+                          setPendingPdfFile(file)
+                          e.target.value = ''
+                        }}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                     </div>
+                    <Button
+                      className="w-full"
+                      disabled={!pendingPdfFile || isProcessing}
+                      onClick={() => pendingPdfFile && handlePdfProcess(pendingPdfFile)}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Converting...
+                        </>
+                      ) : (
+                        'Convert PDF'
+                      )}
+                    </Button>
                   </OnboardingTooltip>
                 </CardContent>
               </Card>
@@ -758,18 +782,36 @@ export default function DashboardContent({ user, handleLogout }) {
                     <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
                       <Image className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
                       <p className="text-sm text-muted-foreground mb-2">
-                        {selectedImageName || 'Upload image to convert'}
+                        {pendingImageFile?.name || 'Upload image to convert'}
                       </p>
                       <p className="text-xs text-muted-foreground mb-4">
-                        {selectedImageName ? 'Click to choose a different image' : 'Supports JPG, PNG'}
+                        {pendingImageFile ? 'Click to choose a different image' : 'Supports JPG, PNG'}
                       </p>
                       <Input
                         type="file"
                         accept=".jpg,.jpeg,.png"
-                        onChange={(e) => handleImageConvert(e.target.files[0])}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null
+                          setPendingImageFile(file)
+                          e.target.value = ''
+                        }}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       />
                     </div>
+                    <Button
+                      className="w-full"
+                      disabled={!pendingImageFile || isProcessing}
+                      onClick={() => pendingImageFile && handleImageConvert(pendingImageFile)}
+                    >
+                      {isProcessing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Converting...
+                        </>
+                      ) : (
+                        'Convert to Coloring Page'
+                      )}
+                    </Button>
                   </OnboardingTooltip>
                 </CardContent>
               </Card>
