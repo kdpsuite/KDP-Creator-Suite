@@ -79,6 +79,12 @@ const unwrapOk = (response) => {
 
 const asArray = (value) => (Array.isArray(value) ? value : [])
 
+const apiErrorMessage = (error, fallback) =>
+  error?.response?.data?.error?.message ||
+  error?.response?.data?.message ||
+  error?.message ||
+  fallback
+
 const EMPTY_METRICS = {
   daily_activity: [],
   file_types: {},
@@ -143,6 +149,8 @@ export default function DashboardContent({ user, handleLogout }) {
   const [coverTitle, setCoverTitle] = useState('')
   const [generateCover, setGenerateCover] = useState(false)
   const [libraryTemplates, setLibraryTemplates] = useState([])
+  const [selectedPdfName, setSelectedPdfName] = useState('')
+  const [selectedImageName, setSelectedImageName] = useState('')
 
   useEffect(() => {
     if (darkMode) {
@@ -270,7 +278,7 @@ export default function DashboardContent({ user, handleLogout }) {
       }, 'H3')
       // #endregion
       console.error('Batch conversion failed', error)
-      toast.error(error.message || 'Batch conversion failed')
+      toast.error(apiErrorMessage(error, 'Batch conversion failed'))
     } finally {
       setIsProcessing(false)
     }
@@ -278,6 +286,7 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handleImageConvert = async (file) => {
     if (!file) return
+    setSelectedImageName(file.name)
     // #region agent log
     debugLog('DashboardContent.jsx:handleImageConvert', 'single image convert started', {
       fileName: file.name,
@@ -324,7 +333,7 @@ export default function DashboardContent({ user, handleLogout }) {
         processing_time_ms: Date.now() - startedAt,
       })
       console.error('Coloring conversion failed', error)
-      toast.error(error.message || 'Coloring conversion failed')
+      toast.error(apiErrorMessage(error, 'Coloring conversion failed'))
     } finally {
       setIsProcessing(false)
     }
@@ -332,6 +341,7 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handlePdfProcess = async (file) => {
     if (!file) return
+    setSelectedPdfName(file.name)
     // #region agent log
     debugLog('DashboardContent.jsx:handlePdfProcess', 'pdf convert started', {
       fileName: file.name,
@@ -385,7 +395,7 @@ export default function DashboardContent({ user, handleLogout }) {
         processing_time_ms: Date.now() - startedAt,
       })
       console.error('PDF processing failed', error)
-      toast.error(error.message || 'PDF processing failed')
+      toast.error(apiErrorMessage(error, 'PDF processing failed'))
     } finally {
       setIsProcessing(false)
     }
@@ -696,8 +706,12 @@ export default function DashboardContent({ user, handleLogout }) {
                   >
                     <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
                       <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
-                      <p className="text-sm text-muted-foreground mb-2">Drag & drop your PDF here</p>
-                      <p className="text-xs text-muted-foreground mb-4">or click to browse</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {selectedPdfName || 'Drag & drop your PDF here'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        {selectedPdfName ? 'Click to choose a different PDF' : 'or click to browse'}
+                      </p>
                       <Input
                         type="file"
                         accept=".pdf"
@@ -743,8 +757,12 @@ export default function DashboardContent({ user, handleLogout }) {
                   >
                     <div className="border-2 border-dashed rounded-xl p-8 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
                       <Image className="h-8 w-8 mx-auto text-muted-foreground mb-4 group-hover:text-primary transition-colors" />
-                      <p className="text-sm text-muted-foreground mb-2">Upload image to convert</p>
-                      <p className="text-xs text-muted-foreground mb-4">Supports JPG, PNG</p>
+                      <p className="text-sm text-muted-foreground mb-2">
+                        {selectedImageName || 'Upload image to convert'}
+                      </p>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        {selectedImageName ? 'Click to choose a different image' : 'Supports JPG, PNG'}
+                      </p>
                       <Input
                         type="file"
                         accept=".jpg,.jpeg,.png"
