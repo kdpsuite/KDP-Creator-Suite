@@ -55,17 +55,6 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker
 
-// #region agent log
-const debugLog = (location, message, data, hypothesisId) => {
-  const payload = { sessionId: 'ca3f5d', location, message, data, timestamp: Date.now(), hypothesisId }
-  fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
-    body: JSON.stringify(payload),
-  }).catch(() => {})
-  analyticsApi.trackEvent('debug_session', payload).catch(() => {})
-}
-// #endregion
 
 const unwrapOk = (response) => {
   const body = response?.data
@@ -206,14 +195,6 @@ export default function DashboardContent({ user, handleLogout }) {
   const handleBatchConvert = async () => {
     if (!batchFiles.length) return
     const totalBytes = batchFiles.reduce((sum, f) => sum + (f.size || 0), 0)
-    // #region agent log
-    debugLog('DashboardContent.jsx:handleBatchConvert', 'batch convert started', {
-      fileCount: batchFiles.length,
-      totalBytes,
-      trimSize: batchTrimSize,
-      activeTab,
-    }, 'H1')
-    // #endregion
     if (totalBytes > BATCH_MAX_UPLOAD_BYTES) {
       toast.error(
         `Batch is ${(totalBytes / (1024 * 1024)).toFixed(1)} MB. Keep total under 4 MB (fewer/smaller images) or split into multiple runs.`
@@ -249,21 +230,7 @@ export default function DashboardContent({ user, handleLogout }) {
         formData.append('cover_title', coverTitle.trim())
       }
 
-      // #region agent log
-      debugLog('DashboardContent.jsx:handleBatchConvert', 'calling batch-coloring API', {
-        fileCount: batchFiles.length,
-        totalBytes,
-        apiBase: import.meta.env.VITE_API_URL || '/api',
-      }, 'H1')
-      // #endregion
       const response = await pdfApi.convertColoringBatch(formData)
-      // #region agent log
-      debugLog('DashboardContent.jsx:handleBatchConvert', 'batch-coloring API success', {
-        status: response?.status,
-        hasPreview: Boolean(response?.data?.data?.preview ?? response?.data?.preview),
-        hasDownloadUrl: Boolean(response?.data?.data?.download_url ?? response?.data?.download_url),
-      }, 'H1')
-      // #endregion
       const data = unwrapOk(response)
       setPreviewImage(data.preview)
       setPreviewMeta({ trimSize: batchTrimSize, withBleed: true })
@@ -275,14 +242,6 @@ export default function DashboardContent({ user, handleLogout }) {
       setActiveTab('tools')
       toast.success('Batch conversion complete')
     } catch (error) {
-      // #region agent log
-      debugLog('DashboardContent.jsx:handleBatchConvert', 'batch-coloring API failed', {
-        message: error?.message,
-        status: error?.response?.status,
-        code: error?.code,
-        responseError: error?.response?.data?.error?.message ?? error?.response?.data?.message,
-      }, 'H3')
-      // #endregion
       console.error('Batch conversion failed', error)
       toast.error(apiErrorMessage(error, 'Batch conversion failed'))
     } finally {
@@ -292,13 +251,6 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handleImageConvert = async (file) => {
     if (!file) return
-    // #region agent log
-    debugLog('DashboardContent.jsx:handleImageConvert', 'single image convert started', {
-      fileName: file.name,
-      fileSize: file.size,
-      trimSize: coloringTrimSize,
-    }, 'H4')
-    // #endregion
     const startedAt = Date.now()
     try {
       setIsProcessing(true)
@@ -326,13 +278,6 @@ export default function DashboardContent({ user, handleLogout }) {
       await refreshMetrics()
       toast.success('Coloring conversion complete')
     } catch (error) {
-      // #region agent log
-      debugLog('DashboardContent.jsx:handleImageConvert', 'single image convert failed', {
-        message: error?.message,
-        status: error?.response?.status,
-        code: error?.code,
-      }, 'H4')
-      // #endregion
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
         format: 'coloring',
         success: false,
@@ -347,14 +292,6 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handlePdfProcess = async (file) => {
     if (!file) return
-    // #region agent log
-    debugLog('DashboardContent.jsx:handlePdfProcess', 'pdf convert started', {
-      fileName: file.name,
-      fileSize: file.size,
-      trimSize,
-      targetFormat,
-    }, 'H4')
-    // #endregion
     const startedAt = Date.now()
     try {
       setIsProcessing(true)
@@ -388,13 +325,6 @@ export default function DashboardContent({ user, handleLogout }) {
       await refreshMetrics()
       toast.success('PDF processing complete')
     } catch (error) {
-      // #region agent log
-      debugLog('DashboardContent.jsx:handlePdfProcess', 'pdf convert failed', {
-        message: error?.message,
-        status: error?.response?.status,
-        code: error?.code,
-      }, 'H4')
-      // #endregion
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
         format: targetFormat,
         success: false,
@@ -427,30 +357,21 @@ export default function DashboardContent({ user, handleLogout }) {
     try {
       setLoading(true)
       setLoadError(null)
-      const [subRes, metricsRes] = await Promise.all([
-        subscriptionApi.getStatus(),
-        analyticsApi.getUserMetrics(),
-      ])
+      const subRes = await subscriptionApi.getStatus()
       const subPayload = normalizeSubscription(unwrapOk(subRes))
-      const metricsPayload = normalizeMetrics(unwrapOk(metricsRes))
       if (!subPayload) {
         throw new Error('Subscription data could not be loaded')
       }
       setSubscription(subPayload)
-      setMetrics(metricsPayload)
-      // #region agent log
-      debugLog('DashboardContent.jsx:loadDashboardData', 'dashboard loaded', {
-        tier: subPayload?.tier_details?.name,
-        hasMetrics: Boolean(metricsPayload),
-      }, 'H2')
-      // #endregion
+
+      try {
+        const metricsRes = await analyticsApi.getUserMetrics()
+        setMetrics(normalizeMetrics(unwrapOk(metricsRes)))
+      } catch (metricsError) {
+        console.warn('Failed to load metrics; continuing with empty metrics', metricsError)
+        setMetrics({ ...EMPTY_METRICS })
+      }
     } catch (error) {
-      // #region agent log
-      debugLog('DashboardContent.jsx:loadDashboardData', 'dashboard load failed', {
-        message: error?.message,
-        status: error?.response?.status,
-      }, 'H2')
-      // #endregion
       console.error('Failed to load dashboard data', error)
       setLoadError(error.message || 'Failed to load dashboard data')
       setSubscription(null)
@@ -1175,14 +1096,6 @@ export default function DashboardContent({ user, handleLogout }) {
                         size="sm"
                         className="w-full"
                         onClick={() => {
-                          // #region agent log
-                          debugLog('DashboardContent.jsx:templateUseInTools', 'template use clicked', {
-                            templateId: tpl.id,
-                            templateName: tpl.name,
-                            trimSize: tpl.trim_size,
-                            activeTabBefore: activeTab,
-                          }, 'H5')
-                          // #endregion
                           applyTemplate(tpl)
                         }}
                       >

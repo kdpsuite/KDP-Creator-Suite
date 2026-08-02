@@ -35,6 +35,23 @@ KDP_TRIM_SIZES = {
 }
 BLEED_SIZE = 0.125
 
+
+def record_pdf_analytics(user_id, event_type, event_data):
+    """Best-effort analytics insert; never fail the conversion response."""
+    if not supabase:
+        return
+    try:
+        supabase.table("analytics_events").insert({
+            "user_id": user_id,
+            "event_type": event_type,
+            "event_data": event_data,
+        }).execute()
+    except Exception as analytics_error:
+        current_app.logger.warning(
+            f"Failed to record analytics event {event_type}: {analytics_error}"
+        )
+
+
 @lru_cache(maxsize=128)
 def get_kdp_dimensions(trim_size, target_format):
     """Cache KDP dimension calculations to save CPU cycles"""
@@ -156,11 +173,11 @@ def convert_to_coloring():
             filename = f"coloring_{uuid.uuid4().hex[:8]}.png"
             storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
             
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "pdf_coloring_conversion",
-                "event_data": {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PNG", "trim_size": trim_size}
-            }).execute()
+            record_pdf_analytics(
+                user_id,
+                "pdf_coloring_conversion",
+                {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PNG", "trim_size": trim_size},
+            )
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'image'),
@@ -169,11 +186,11 @@ def convert_to_coloring():
             })
         except Exception as e:
             current_app.logger.error(f"Coloring conversion failed: {str(e)}")
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "pdf_coloring_conversion",
-                "event_data": {"status": "failed", "error": str(e), "trim_size": trim_size}
-            }).execute()
+            record_pdf_analytics(
+                user_id,
+                "pdf_coloring_conversion",
+                {"status": "failed", "error": str(e), "trim_size": trim_size},
+            )
             return error_response("Conversion failed", "CONVERSION_ERROR", status_code=500)
 
 @pdf_bp.route('/pdf/format-kdp', methods=['POST'])
@@ -207,11 +224,11 @@ def format_kdp():
             filename = f"kdp_{uuid.uuid4().hex[:8]}.pdf"
             storage_info = upload_file(output_bytes, str(user_id), filename, 'kdp_formatted_pdf')
             
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "kdp_formatting",
-                "event_data": {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PDF"}
-            }).execute()
+            record_pdf_analytics(
+                user_id,
+                "kdp_formatting",
+                {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PDF"},
+            )
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'pdf'),
@@ -220,11 +237,11 @@ def format_kdp():
             })
         except Exception as e:
             current_app.logger.error(f"KDP formatting failed: {str(e)}")
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "kdp_formatting",
-                "event_data": {"status": "failed", "error": str(e)}
-            }).execute()
+            record_pdf_analytics(
+                user_id,
+                "kdp_formatting",
+                {"status": "failed", "error": str(e)},
+            )
             return error_response("Formatting failed", "FORMATTING_ERROR", status_code=500)
 
 @pdf_bp.route("/pdf/batch-coloring", methods=["POST"])
@@ -307,10 +324,10 @@ def batch_convert_coloring():
             filename = f"batch_coloring_{uuid.uuid4().hex[:8]}.pdf"
             storage_info = upload_file(final_pdf_bytes, str(user_id), filename, 'batch_coloring_pdf')
 
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "batch_coloring_conversion",
-                "event_data": {
+            record_pdf_analytics(
+                user_id,
+                "batch_coloring_conversion",
+                {
                     "status": "success",
                     "file_count": len(output_pdfs),
                     "has_cover": bool(generate_cover and cover_title),
@@ -318,7 +335,7 @@ def batch_convert_coloring():
                     "format": "PDF",
                     "trim_size": trim_size,
                 },
-            }).execute()
+            )
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(final_pdf_bytes, 'pdf'),
@@ -328,11 +345,11 @@ def batch_convert_coloring():
             })
         except Exception as e:
             current_app.logger.error(f"Batch coloring conversion failed: {str(e)}")
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "batch_coloring_conversion",
-                "event_data": {"status": "failed", "error": str(e), "file_count": len(file_keys), "trim_size": trim_size},
-            }).execute()
+            record_pdf_analytics(
+                user_id,
+                "batch_coloring_conversion",
+                {"status": "failed", "error": str(e), "file_count": len(file_keys), "trim_size": trim_size},
+            )
             return error_response("Batch conversion failed", "BATCH_CONVERSION_ERROR", status_code=500)
 
 @pdf_bp.route("/pdf/validate-kdp", methods=["POST"])
@@ -377,11 +394,11 @@ def validate_kdp():
             
             # Add more sophisticated checks here (e.g., font embedding, image resolution)
 
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "kdp_validation",
-                "event_data": {"status": "success", "is_valid": dimension_match and not warnings, "num_pages": num_pages, "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}"}
-            }).execute()
+            record_pdf_analytics(
+                user_id,
+                "kdp_validation",
+                {"status": "success", "is_valid": dimension_match and not warnings, "num_pages": num_pages, "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}"},
+            )
             return success_response({
                 "is_valid": dimension_match and not warnings, # Simplified for now
                 "num_pages": num_pages,
@@ -392,9 +409,9 @@ def validate_kdp():
             })
         except Exception as e:
             current_app.logger.error(f"KDP validation failed: {str(e)}")
-            supabase.table("analytics_events").insert({
-                "user_id": user_id,
-                "event_type": "kdp_validation",
-                "event_data": {"status": "failed", "error": str(e)}
-            }).execute()
+            record_pdf_analytics(
+                user_id,
+                "kdp_validation",
+                {"status": "failed", "error": str(e)},
+            )
             return error_response("Validation failed", "VALIDATION_ERROR", status_code=500)

@@ -19,6 +19,12 @@ const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    'Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Configure these env vars before loading the dashboard.'
+  );
+}
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
@@ -74,6 +80,15 @@ export function getUploadErrorMessage(error, fallback = 'Request failed') {
   );
 }
 
+function isSessionCriticalUrl(requestUrl) {
+  return (
+    requestUrl.includes('/status') ||
+    requestUrl.includes('/sync-session') ||
+    requestUrl.includes('/validate-session') ||
+    requestUrl.includes('/me')
+  );
+}
+
 api.interceptors.request.use(
   async (config) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -96,28 +111,6 @@ api.interceptors.request.use(
       setJsonContentType(config.headers);
     }
 
-    // #region agent log
-    if (config.url?.includes('/pdf/')) {
-      fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
-        body: JSON.stringify({
-          sessionId: 'ca3f5d',
-          location: 'api.js:requestInterceptor',
-          message: 'pdf API request',
-          data: {
-            url: config.url,
-            hasToken: Boolean(session?.access_token),
-            method: config.method,
-            isFormData,
-            contentType: config.headers?.['Content-Type'] ?? config.headers?.get?.('Content-Type') ?? null,
-          },
-          timestamp: Date.now(),
-          hypothesisId: 'H2',
-        }),
-      }).catch(() => {});
-    }
-    // #endregion
     return config;
   },
   (error) => Promise.reject(error)
@@ -141,29 +134,17 @@ api.interceptors.response.use(
 
       console.warn('[AUTH] Unauthorized request, session may be expired', requestUrl);
 
-      // #region agent log
-      fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
-        body: JSON.stringify({
-          sessionId: 'ca3f5d',
-          location: 'api.js:responseInterceptor',
-          message: '401 unauthorized',
-          data: { url: requestUrl, isProfileSync },
-          timestamp: Date.now(),
-          hypothesisId: 'H2',
-        }),
-      }).catch(() => {});
-      // #endregion
-
-      if (!isProfileSync) {
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // ignore sign-out failures during 401 handling
-        }
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
-          window.location.assign('/login');
+      if (!isProfileSync && isSessionCriticalUrl(requestUrl)) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            // ignore sign-out failures during 401 handling
+          }
+          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+            window.location.assign('/login');
+          }
         }
       }
 
@@ -188,27 +169,6 @@ api.interceptors.response.use(
           `[CLIENT_ERROR] HTTP ${error.response.status}:`,
           error.response.data?.error || error.message
         );
-        // #region agent log
-        if (config.url?.includes('/pdf/')) {
-          fetch('http://127.0.0.1:7695/ingest/c2fd6983-8006-4e73-8b39-ed64ec64ab25', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'ca3f5d' },
-            body: JSON.stringify({
-              sessionId: 'ca3f5d',
-              location: 'api.js:responseInterceptor',
-              message: 'pdf API error',
-              data: {
-                url: config.url,
-                status: error.response.status,
-                error: error.response.data?.error?.message ?? error.response.data?.message ?? error.message,
-                code: error.code,
-              },
-              timestamp: Date.now(),
-              hypothesisId: 'H3',
-            }),
-          }).catch(() => {});
-        }
-        // #endregion
       }
       return Promise.reject(error);
     }

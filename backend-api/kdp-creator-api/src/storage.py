@@ -4,19 +4,23 @@ import uuid
 from datetime import datetime, timedelta
 from supabase import create_client, Client
 
-# Initialize Supabase client
+# Initialize Supabase client (prefer service role for storage uploads; same chain as models/user.py)
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
-SUPABASE_ANON_KEY = os.environ.get('SUPABASE_ANON_KEY')
+SUPABASE_KEY = (
+    os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    or os.environ.get('SUPABASE_SERVICE_KEY')
+    or os.environ.get('SUPABASE_ANON_KEY')
+)
 
 supabase: Client = None
-if SUPABASE_URL and SUPABASE_ANON_KEY:
+if SUPABASE_URL and SUPABASE_KEY:
     try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
         print(f"Warning: Failed to initialize Supabase client: {str(e)}")
         supabase = None
 else:
-    print("Warning: SUPABASE_URL and/or SUPABASE_ANON_KEY environment variables not set. File uploads will be disabled.")
+    print("Warning: SUPABASE_URL and/or Supabase key environment variables not set. File uploads will be disabled.")
 
 BUCKET_NAME = 'kdp-created-files'
 SIGNED_URL_EXPIRY = 3600  # 1 hour in seconds
@@ -36,7 +40,10 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
         dict with 'path', 'url', and 'signed_url' keys
     """
     if not supabase:
-        raise Exception("Supabase is not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables.")
+        raise Exception(
+            "Supabase is not configured. Please set SUPABASE_URL and "
+            "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) environment variables."
+        )
     
     try:
         # Create a unique path: user_id/file_type/timestamp_uuid_filename
@@ -80,23 +87,26 @@ def delete_file(file_path: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
+    if not supabase:
+        return False
+    
     try:
         supabase.storage.from_(BUCKET_NAME).remove([file_path])
         return True
     except Exception as e:
-        print(f"Failed to delete file from Supabase: {str(e)}")
+        print(f"Failed to delete file {file_path}: {str(e)}")
         return False
 
 
 def get_content_type(filename: str) -> str:
-    """Determine content type based on file extension."""
-    ext = filename.lower().split('.')[-1]
+    """Get content type based on file extension"""
+    ext = filename.lower().split('.')[-1] if '.' in filename else ''
     content_types = {
         'pdf': 'application/pdf',
         'png': 'image/png',
         'jpg': 'image/jpeg',
         'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
         'webp': 'image/webp',
-        'gif': 'image/gif'
     }
     return content_types.get(ext, 'application/octet-stream')

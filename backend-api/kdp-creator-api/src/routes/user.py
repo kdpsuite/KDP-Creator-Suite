@@ -150,10 +150,20 @@ def sync_user_profile():
     if not profile:
         # Create a new profile if it doesn't exist
         try:
-            # Fetch user email from Supabase auth.users table
-            user_data = supabase.auth.admin.get_user_by_id(user_id).data.user
-            user_email = user_data.email
-            user_username = user_data.user_metadata.get("username", user_email.split("@")[0])
+            # Prefer JWT identity on the request; fall back to admin API (.user, not .data.user)
+            auth_user = getattr(request, "user", None)
+            if auth_user is None:
+                user_resp = supabase.auth.admin.get_user_by_id(user_id)
+                auth_user = getattr(user_resp, "user", None)
+            if auth_user is None:
+                return error_response("Auth user not found", "AUTH_USER_NOT_FOUND", status_code=404)
+
+            user_email = auth_user.email or ""
+            metadata = getattr(auth_user, "user_metadata", None) or {}
+            user_username = metadata.get(
+                "username",
+                user_email.split("@")[0] if user_email else "user",
+            )
 
             new_profile_data = {
                 "id": user_id,
