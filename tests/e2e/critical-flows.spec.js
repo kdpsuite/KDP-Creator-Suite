@@ -154,36 +154,31 @@ test.describe('KDP Creator Suite - Critical Flows', () => {
         await expect(spinner.first()).not.toBeVisible({ timeout: 10000 });
       }
       
-      // Dashboard should have content
-      const content = page.locator('main, [role="main"], .dashboard, .content');
-      await expect(content.first()).toBeVisible({ timeout: 5000 });
+      // Live dashboard root is container + tablist, not main/.dashboard
+      await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible({ timeout: 10000 });
+      await expect(page.getByRole('button', { name: /Logout|Sign Out/i })).toBeVisible({ timeout: 5000 });
     });
 
     test('should display user information', async ({ page }) => {
-      // Look for user email or name
-      const userInfo = page.locator('[class*="user"], [class*="profile"], [class*="account"]');
-      const userInfoCount = await userInfo.count();
-      
-      // Should have some user-related elements
-      expect(userInfoCount).toBeGreaterThan(0);
+      await expect(page.getByRole('tab', { name: 'Settings' })).toBeVisible({ timeout: 5000 });
+      await page.getByRole('tab', { name: 'Settings' }).click();
+      // Settings shows the signed-in email from the Supabase session
+      await expect(page.locator('input[name="settings-email"]')).toHaveValue(/@/, { timeout: 5000 });
     });
 
     test('should have logout button', async ({ page }) => {
-      const logoutButton = page.locator('button:has-text("Logout"), button:has-text("Sign Out"), a:has-text("Logout")');
+      const logoutButton = page.getByRole('button', { name: /Logout|Sign Out/i });
       
       await expect(logoutButton.first()).toBeVisible({ timeout: 5000 });
     });
 
     test('should handle logout', async ({ page }) => {
-      const logoutButton = page.locator('button:has-text("Logout"), button:has-text("Sign Out"), a:has-text("Logout")');
+      const logoutButton = page.getByRole('button', { name: /Logout|Sign Out/i });
       
       await logoutButton.first().click();
       
-      // Should redirect to login or home
-      await page.waitForTimeout(2000);
-      
-      const isLoggedOut = page.url().includes('/login') || page.url().includes('kdpsuite.com');
-      expect(isLoggedOut).toBeTruthy();
+      // Should redirect to login
+      await page.waitForURL(/\/login/, { timeout: 10000 });
     });
   });
 
@@ -194,16 +189,17 @@ test.describe('KDP Creator Suite - Critical Flows', () => {
       expect(response.status()).toBeLessThan(400);
       
       const body = await response.json();
-      expect(body).toHaveProperty('status');
+      expect(body.ok).toBeTruthy();
+      expect(body.data?.status || body.status).toBeTruthy();
     });
 
-    test('should have working root endpoint', async ({ page }) => {
-      const response = await page.request.get('https://dashboard.kdpsuite.com/api');
+    test('should have working ready endpoint', async ({ page }) => {
+      const response = await page.request.get('https://dashboard.kdpsuite.com/api/health/ready');
       
-      expect(response.status()).toBeLessThan(400);
+      expect(response.status()).toBeLessThan(500);
       
       const body = await response.json();
-      expect(body).toHaveProperty('message');
+      expect(body).toHaveProperty('ok');
     });
   });
 

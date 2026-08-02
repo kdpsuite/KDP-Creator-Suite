@@ -50,12 +50,6 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 import { EmptyProjectsIllustration } from '@/components/illustrations/EmptyProjectsIllustration'
 import { EmptyAnalyticsIllustration } from '@/components/illustrations/EmptyAnalyticsIllustration'
 
-import * as pdfjs from 'pdfjs-dist'
-import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-
-pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker
-
-
 const unwrapOk = (response) => {
   const body = response?.data
   if (!body) return null

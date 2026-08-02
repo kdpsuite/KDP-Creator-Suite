@@ -3,6 +3,7 @@ from src.models.user import supabase, UserProfile, BatchJob, jwt_required, get_j
 from src.utils.responses import success_response, error_response
 from src.utils.rate_limit import rate_limit_batch_processing
 from src.utils.logger import PerformanceTimer
+from src.routes.subscription import enforce_batch_quota, record_batch_usage
 from datetime import datetime
 import threading
 import time
@@ -35,9 +36,10 @@ def submit_batch_job():
     if not job_type or total_files < 1:
         return error_response('job_type and total_files are required', 'INVALID_INPUT', status_code=400)
 
-    # Optimization: Pre-check batch limits to save DB operations
-    current_batch_ops = profile.get('batch_operations_this_month', 0)
-    
+    quota_error = enforce_batch_quota(user_id)
+    if quota_error:
+        return quota_error
+
     job_data = {
         'user_id': user_id,
         'job_type': job_type,
@@ -51,11 +53,7 @@ def submit_batch_job():
             return error_response('Failed to create job', 'DATABASE_ERROR', status_code=500)
         
         job = res.data[0]
-        
-        # Increment user batch operations
-        supabase.table('user_profiles').update({
-            'batch_operations_this_month': current_batch_ops + 1
-        }).eq('id', user_id).execute()
+        record_batch_usage(user_id)
 
         # Optimization: Pass app context to thread
         threading.Thread(target=_process_batch_job_optimized, args=(job['id'],), daemon=True).start()

@@ -21,6 +21,12 @@ from src.utils.responses import success_response, error_response
 from src.models.user import supabase
 from src.utils.rate_limit import rate_limit_pdf_processing
 from src.utils.logger import PerformanceTimer
+from src.routes.subscription import (
+    enforce_batch_quota,
+    enforce_conversion_quota,
+    record_batch_usage,
+    record_conversion_usage,
+)
 
 pdf_bp = Blueprint('pdf', __name__)
 
@@ -121,6 +127,9 @@ def generate_optimized_preview(content_bytes, content_type='pdf'):
 @jwt_required()
 def convert_to_coloring():
     user_id = get_jwt_identity()
+    quota_error = enforce_conversion_quota(user_id)
+    if quota_error:
+        return quota_error
     if 'file' not in request.files:
         return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
     
@@ -178,6 +187,7 @@ def convert_to_coloring():
                 "pdf_coloring_conversion",
                 {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PNG", "trim_size": trim_size},
             )
+            record_conversion_usage(user_id)
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'image'),
@@ -198,6 +208,9 @@ def convert_to_coloring():
 @jwt_required()
 def format_kdp():
     user_id = get_jwt_identity()
+    quota_error = enforce_conversion_quota(user_id)
+    if quota_error:
+        return quota_error
     if 'file' not in request.files:
         return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
     
@@ -229,6 +242,7 @@ def format_kdp():
                 "kdp_formatting",
                 {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PDF"},
             )
+            record_conversion_usage(user_id)
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(output_bytes, 'pdf'),
@@ -249,6 +263,9 @@ def format_kdp():
 @jwt_required()
 def batch_convert_coloring():
     user_id = get_jwt_identity()
+    quota_error = enforce_batch_quota(user_id)
+    if quota_error:
+        return quota_error
     if not request.files:
         return error_response("No files uploaded", "MISSING_FILES", status_code=400)
 
@@ -336,6 +353,7 @@ def batch_convert_coloring():
                     "trim_size": trim_size,
                 },
             )
+            record_batch_usage(user_id)
             return success_response({
                 'download_url': storage_info['signed_url'],
                 'preview': generate_optimized_preview(final_pdf_bytes, 'pdf'),

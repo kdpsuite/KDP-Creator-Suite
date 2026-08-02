@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Blueprint, request, jsonify
 from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
 from src.utils.responses import success_response, error_response
@@ -108,6 +110,81 @@ def get_subscription_status():
             'batch_operations': remaining_batch_operations,
         }
     })
+
+def _tier_usage_for_user(user_id):
+    profile = UserProfile.get_by_id(user_id)
+    if not profile:
+        return SUBSCRIPTION_TIERS['free'], 0, 0
+    tier = profile.get('subscription_tier', 'free')
+    limits = SUBSCRIPTION_TIERS.get(tier, SUBSCRIPTION_TIERS['free'])
+    conversions = profile.get('conversions_this_month', 0) or 0
+    batch_ops = profile.get('batch_operations_this_month', 0) or 0
+    return limits, conversions, batch_ops
+
+
+def enforce_conversion_quota(user_id):
+    """Return an error response if the user cannot run another conversion, else None."""
+    limits, used, _ = _tier_usage_for_user(user_id)
+    limit = limits['monthly_conversions']
+    if limit == -1:
+        return None
+    if used >= limit:
+        return error_response(
+            'Monthly conversion limit reached. Upgrade your plan to continue.',
+            'QUOTA_EXCEEDED',
+            details={'kind': 'conversions', 'used': used, 'limit': limit},
+            status_code=403,
+        )
+    return None
+
+
+def enforce_batch_quota(user_id):
+    """Return an error response if the user cannot run another batch op, else None."""
+    limits, _, used = _tier_usage_for_user(user_id)
+    limit = limits['batch_processing_limit']
+    if limit == -1:
+        return None
+    if used >= limit:
+        return error_response(
+            'Monthly batch processing limit reached. Upgrade your plan to continue.',
+            'QUOTA_EXCEEDED',
+            details={'kind': 'batch_operations', 'used': used, 'limit': limit},
+            status_code=403,
+        )
+    return None
+
+
+def record_conversion_usage(user_id, amount=1):
+    if not supabase or amount < 1:
+        return
+    profile = UserProfile.get_by_id(user_id)
+    if not profile:
+        return
+    current = profile.get('conversions_this_month', 0) or 0
+    try:
+        supabase.table('user_profiles').update({
+            'conversions_this_month': current + amount,
+            'updated_at': datetime.utcnow().isoformat(),
+        }).eq('id', str(user_id)).execute()
+    except Exception as usage_error:
+        print(f'Failed to record conversion usage for {user_id}: {usage_error}')
+
+
+def record_batch_usage(user_id, amount=1):
+    if not supabase or amount < 1:
+        return
+    profile = UserProfile.get_by_id(user_id)
+    if not profile:
+        return
+    current = profile.get('batch_operations_this_month', 0) or 0
+    try:
+        supabase.table('user_profiles').update({
+            'batch_operations_this_month': current + amount,
+            'updated_at': datetime.utcnow().isoformat(),
+        }).eq('id', str(user_id)).execute()
+    except Exception as usage_error:
+        print(f'Failed to record batch usage for {user_id}: {usage_error}')
+
 
 @subscription_bp.route('/upgrade', methods=['POST'])
 @jwt_required()
