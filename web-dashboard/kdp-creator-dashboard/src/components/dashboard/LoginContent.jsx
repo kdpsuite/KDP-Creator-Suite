@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { FormField } from '@/components/FormField'
 import { authApi } from '@/lib/api'
+import { validatePassword } from '@/lib/password'
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics'
 
 export default function LoginContent({ setIsAuthenticated }) {
@@ -44,6 +45,11 @@ export default function LoginContent({ setIsAuthenticated }) {
   const handleRegister = async (e) => {
     e.preventDefault()
     setError('')
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      setError(passwordError)
+      return
+    }
     setIsSubmitting(true)
     try {
       const { data, error: authError } = await authApi.register(email, password, username)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button.jsx'
 import { authApi, supabase } from '@/lib/api'
+import { validatePassword } from '@/lib/password'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { FormField } from '@/components/FormField'
 import { AlertCircle, CheckCircle, Loader2, Eye, EyeOff } from 'lucide-react'
@@ -55,22 +56,6 @@ export default function UpdatePasswordPage() {
 
     run()
   }, [type, token_hash, token])
-
-  const validatePassword = (pwd) => {
-    if (pwd.length < 8) {
-      return 'Password must be at least 8 characters'
-    }
-    if (!/[A-Z]/.test(pwd)) {
-      return 'Password must contain at least one uppercase letter'
-    }
-    if (!/[0-9]/.test(pwd)) {
-      return 'Password must contain at least one number'
-    }
-    if (!/[!@#$%^&*]/.test(pwd)) {
-      return 'Password must contain at least one special character (!@#$%^&*)'
-    }
-    return ''
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()

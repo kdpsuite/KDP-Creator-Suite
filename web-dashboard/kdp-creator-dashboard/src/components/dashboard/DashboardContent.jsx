@@ -15,6 +15,7 @@ import {
   Sun,
   Trash2,
   HelpCircle,
+  FileCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
@@ -132,6 +133,9 @@ export default function DashboardContent({ user, handleLogout }) {
   const [libraryTemplates, setLibraryTemplates] = useState([])
   const [pendingPdfFile, setPendingPdfFile] = useState(null)
   const [pendingImageFile, setPendingImageFile] = useState(null)
+  const [pendingValidateFile, setPendingValidateFile] = useState(null)
+  const [validateTrimSize, setValidateTrimSize] = useState('6x9')
+  const [validationResult, setValidationResult] = useState(null)
 
   useEffect(() => {
     if (darkMode) {
@@ -326,6 +330,31 @@ export default function DashboardContent({ user, handleLogout }) {
       })
       console.error('PDF processing failed', error)
       toast.error(apiErrorMessage(error, 'PDF processing failed'))
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleValidatePdf = async (file) => {
+    if (!file) return
+    try {
+      setIsProcessing(true)
+      setValidationResult(null)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('trim_size', validateTrimSize)
+      formData.append('target_format', 'print')
+      const response = await pdfApi.validateCompliance(formData)
+      const data = unwrapOk(response)
+      setValidationResult(data)
+      if (data?.is_valid) {
+        toast.success(data.message || 'PDF meets KDP size checks')
+      } else {
+        toast.warning(data?.warnings?.[0] || data?.message || 'PDF has validation warnings')
+      }
+    } catch (error) {
+      console.error('KDP validation failed', error)
+      toast.error(apiErrorMessage(error, 'KDP validation failed'))
     } finally {
       setIsProcessing(false)
     }
@@ -731,6 +760,88 @@ export default function DashboardContent({ user, handleLogout }) {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="card glass">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  Validate KDP PDF
+                  <Tooltip content="Check page count and trim dimensions against KDP print sizes">
+                    <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                  </Tooltip>
+                </CardTitle>
+                <CardDescription>Compliance check without converting the file</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Trim Size</label>
+                    <select
+                      value={validateTrimSize}
+                      onChange={(e) => setValidateTrimSize(e.target.value)}
+                      className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20"
+                    >
+                      <option value="6x9">6 x 9 in</option>
+                      <option value="8.5x11">8.5 x 11 in</option>
+                      <option value="5x8">5 x 8 in</option>
+                    </select>
+                  </div>
+                  <div className="md:col-span-2 border-2 border-dashed rounded-xl p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
+                    <FileCheck className="h-7 w-7 mx-auto text-muted-foreground mb-2 group-hover:text-primary transition-colors" />
+                    <p className="text-sm text-muted-foreground">
+                      {pendingValidateFile?.name || 'Upload a PDF to validate'}
+                    </p>
+                    <Input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        setPendingValidateFile(file)
+                        setValidationResult(null)
+                        e.target.value = ''
+                      }}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                  </div>
+                </div>
+                <Button
+                  className="w-full md:w-auto"
+                  disabled={!pendingValidateFile || isProcessing}
+                  onClick={() => pendingValidateFile && handleValidatePdf(pendingValidateFile)}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Validating...
+                    </>
+                  ) : (
+                    'Validate PDF'
+                  )}
+                </Button>
+                {validationResult && (
+                  <div
+                    className={`rounded-lg border p-4 text-sm space-y-1 ${
+                      validationResult.is_valid
+                        ? 'border-green-500/30 bg-green-500/5'
+                        : 'border-amber-500/30 bg-amber-500/5'
+                    }`}
+                  >
+                    <p className="font-medium">
+                      {validationResult.is_valid ? 'Valid for selected trim size' : 'Needs attention'}
+                    </p>
+                    <p className="text-muted-foreground">
+                      Pages: {validationResult.num_pages ?? '—'} · PDF:{' '}
+                      {validationResult.pdf_dimensions_inches ?? '—'} · Expected:{' '}
+                      {validationResult.expected_dimensions_inches ?? '—'}
+                    </p>
+                    {(validationResult.warnings || []).map((warning) => (
+                      <p key={warning} className="text-amber-700 dark:text-amber-400">
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {isProcessing && (
               <Card className="card glass border-primary/20">

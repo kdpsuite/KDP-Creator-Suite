@@ -223,17 +223,6 @@ export const analyticsApi = {
     api.post('/analytics/events', { event_type: eventType, event_data: eventData }),
 };
 
-export const totpApi = {
-  setup: () => api.post('/2fa/setup'),
-  verify: (code) => api.post('/2fa/verify', { code }),
-  disable: (code) => api.post('/2fa/disable', { code }),
-};
-
-export const batchApi = {
-  getJobs: () => api.get('/batch/jobs'),
-  submit: (jobType, totalFiles) => api.post('/batch/submit', { job_type: jobType, total_files: totalFiles }),
-};
-
 export const templateApi = {
   getLibrary: (niche) => api.get('/templates', { params: niche ? { niche } : {} }),
   getAll: () => {

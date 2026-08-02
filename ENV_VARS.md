@@ -128,23 +128,10 @@ This document describes all environment variables used by the KDP Creator Suite 
 
 ### Feature Flags
 
-**`ENABLE_2FA`** (Optional)
-- **Type:** Boolean (`True` or `False`)
-- **Default:** `True`
-- **Purpose:** Enable two-factor authentication
-- **Notes:** Can be disabled for testing
-
-**`ENABLE_BATCH_PROCESSING`** (Optional)
-- **Type:** Boolean (`True` or `False`)
-- **Default:** `True`
-- **Purpose:** Enable batch processing of files
-- **Notes:** Requires additional compute resources
-
-**`ENABLE_PDF_PROCESSING`** (Optional)
-- **Type:** Boolean (`True` or `False`)
-- **Default:** `True`
-- **Purpose:** Enable PDF conversion and processing
-- **Notes:** Requires PDF libraries (reportlab, PyPDF2)
+No runtime feature-flag env vars are read by the API or dashboard today.
+PDF processing, batch coloring, and related routes are always registered when
+their dependencies import successfully. Do not set `ENABLE_2FA`,
+`ENABLE_BATCH_PROCESSING`, or `ENABLE_PDF_PROCESSING` — they have no effect.
 
 ### Rate Limiting
 
