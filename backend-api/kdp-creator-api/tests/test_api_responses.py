@@ -112,6 +112,32 @@ def test_templates_list_response_format(client):
     assert 'adult_coloring' in niches
     assert 'kids_workbook' in niches
     assert 'log_book' in niches
+    assert 'kdp_specs' in payload['data']
+    sample = templates[0]
+    assert 'fields' in sample
+    assert 'defaults' in sample
+    assert 'allowed_print_profiles' in sample
+    assert any(f['key'] == 'trim_size' for f in sample['fields'])
+
+
+def test_template_detail_includes_schema(client):
+    response = client.get('/api/templates/tpl-planner-gtd')
+    payload = response.get_json()
+    assert response.status_code == 200
+    assert_success_envelope(payload)
+    template = payload['data']['template']
+    assert template['id'] == 'tpl-planner-gtd'
+    assert template['defaults']['title']
+    assert len(template['fields']) >= 5
+
+
+def test_template_generate_requires_auth(client):
+    response = client.post('/api/templates/tpl-planner-gtd/generate', json={
+        'options': {'page_count': 24, 'title': 'Test', 'author': 'A'},
+    })
+    payload = response.get_json()
+    assert response.status_code == 401
+    assert_error_envelope(payload, 401)
 
 
 def test_templates_niche_filter(client):

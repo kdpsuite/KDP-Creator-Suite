@@ -225,6 +225,8 @@ export const analyticsApi = {
 
 export const templateApi = {
   getLibrary: (niche) => api.get('/templates', { params: niche ? { niche } : {} }),
+  getOne: (id) => api.get(`/templates/${id}`),
+  generate: (id, options) => api.post(`/templates/${id}/generate`, { options }, { timeout: 300000 }),
   getAll: () => {
     const templates = JSON.parse(localStorage.getItem('kdp_templates') || '[]');
     return Promise.resolve({ data: { templates } });

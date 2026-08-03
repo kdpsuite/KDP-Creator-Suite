@@ -1,8 +1,6 @@
 import os
-import io
 import uuid
-from datetime import datetime, timedelta
-from supabase import create_client, Client
+from datetime import datetime
 
 # Initialize Supabase client (prefer service role for storage uploads; same chain as models/user.py)
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
@@ -12,15 +10,16 @@ SUPABASE_KEY = (
     or os.environ.get('SUPABASE_ANON_KEY')
 )
 
-supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
+supabase = None
+try:
+    from supabase import create_client
+    if SUPABASE_URL and SUPABASE_KEY:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        print(f"Warning: Failed to initialize Supabase client: {str(e)}")
-        supabase = None
-else:
-    print("Warning: SUPABASE_URL and/or Supabase key environment variables not set. File uploads will be disabled.")
+    else:
+        print("Warning: SUPABASE_URL and/or Supabase key environment variables not set. File uploads will be disabled.")
+except Exception as e:
+    print(f"Warning: Failed to initialize Supabase client: {str(e)}")
+    supabase = None
 
 BUCKET_NAME = 'kdp-created-files'
 SIGNED_URL_EXPIRY = 3600  # 1 hour in seconds

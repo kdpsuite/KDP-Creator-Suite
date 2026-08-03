@@ -47,9 +47,13 @@ import { Tooltip } from '@/components/Tooltip'
 import { PageTransition } from '@/components/animations/PageTransition'
 import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip'
 import { KdpSafeZoneOverlay } from '@/components/KdpSafeZoneOverlay'
+import { TemplateCustomizer } from '@/components/templates/TemplateCustomizer'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import { EmptyProjectsIllustration } from '@/components/illustrations/EmptyProjectsIllustration'
 import { EmptyAnalyticsIllustration } from '@/components/illustrations/EmptyAnalyticsIllustration'
+import { KDP_TRIM_SIZES } from '@/lib/kdpDimensions'
+
+const TRIM_OPTIONS = Object.keys(KDP_TRIM_SIZES)
 
 const unwrapOk = (response) => {
   const body = response?.data
@@ -115,7 +119,7 @@ export default function DashboardContent({ user, handleLogout }) {
   const [loadError, setLoadError] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
-  const [previewMeta, setPreviewMeta] = useState({ trimSize: '6x9', withBleed: true })
+  const [previewMeta, setPreviewMeta] = useState({ trimSize: '6x9', withBleed: true, pageCount: 24 })
   const [resultData, setResultData] = useState(null)
   const [resultType, setResultType] = useState('image')
   const [batchProgress, setBatchProgress] = useState(0)
@@ -136,6 +140,9 @@ export default function DashboardContent({ user, handleLogout }) {
   const [pendingValidateFile, setPendingValidateFile] = useState(null)
   const [validateTrimSize, setValidateTrimSize] = useState('6x9')
   const [validationResult, setValidationResult] = useState(null)
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const [templateOptions, setTemplateOptions] = useState({})
+  const [productResult, setProductResult] = useState(null)
 
   useEffect(() => {
     if (darkMode) {
@@ -181,13 +188,58 @@ export default function DashboardContent({ user, handleLogout }) {
   }
 
   const applyTemplate = (tpl) => {
-    const trim = tpl.trim_size || '6x9'
+    const next = {
+      ...(tpl.defaults || {}),
+      trim_size: tpl.trim_size || tpl.defaults?.trim_size || '6x9',
+      page_count: tpl.page_count || tpl.defaults?.page_count || 24,
+      with_bleed: typeof tpl.defaults?.with_bleed === 'boolean' ? tpl.defaults.with_bleed : Boolean(tpl.bleed),
+    }
+    setSelectedTemplate(tpl)
+    setTemplateOptions(next)
+    setProductResult(null)
+    const trim = next.trim_size || '6x9'
     setTrimSize(trim)
     setColoringTrimSize(trim)
     setBatchTrimSize(trim)
-    const isColoring = (tpl.tags || []).includes('coloring')
-    setActiveTab(isColoring ? 'batch' : 'tools')
-    toast.success(`Applied "${tpl.name}" — trim size set to ${trim.replace('x', ' × ')} in`)
+    setValidateTrimSize(trim)
+    setActiveTab('tools')
+    toast.success(`Loaded "${tpl.name}" in Product Builder`)
+  }
+
+  const updateTemplateOption = (key, value) => {
+    setTemplateOptions((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleGenerateProduct = async () => {
+    if (!selectedTemplate?.id) return
+    try {
+      setIsProcessing(true)
+      setProductResult(null)
+      const response = await templateApi.generate(selectedTemplate.id, templateOptions)
+      const data = unwrapOk(response)
+      setProductResult(data)
+      if (data?.preview) {
+        setPreviewImage(data.preview)
+        setPreviewMeta({
+          trimSize: data.trim_size || templateOptions.trim_size || '6x9',
+          withBleed: Boolean(data.with_bleed),
+          pageCount: data.page_count || 24,
+        })
+        setResultType('pdf')
+        setResultData(data.interior_download_url)
+      }
+      await refreshMetrics()
+      if (data?.compliance?.is_valid) {
+        toast.success('Product generated — download interior and cover')
+      } else {
+        toast.warning('Generated with preflight warnings — review compliance report')
+      }
+    } catch (error) {
+      console.error('Template generation failed', error)
+      toast.error(apiErrorMessage(error, 'Template generation failed'))
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const handleBatchConvert = async () => {
@@ -231,7 +283,7 @@ export default function DashboardContent({ user, handleLogout }) {
       const response = await pdfApi.convertColoringBatch(formData)
       const data = unwrapOk(response)
       setPreviewImage(data.preview)
-      setPreviewMeta({ trimSize: batchTrimSize, withBleed: true })
+      setPreviewMeta({ trimSize: batchTrimSize, withBleed: true, pageCount: data.page_count || 24 })
       setResultData(data.download_url)
       setResultType('pdf')
       setBatchProgress(100)
@@ -265,7 +317,7 @@ export default function DashboardContent({ user, handleLogout }) {
       const response = await pdfApi.convertColoring(formData)
       const data = unwrapOk(response)
       setPreviewImage(data.preview)
-      setPreviewMeta({ trimSize: coloringTrimSize, withBleed: true })
+      setPreviewMeta({ trimSize: coloringTrimSize, withBleed: true, pageCount: 24 })
       setResultData(data.download_url)
       setResultType('image')
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
@@ -313,6 +365,7 @@ export default function DashboardContent({ user, handleLogout }) {
       setPreviewMeta({
         trimSize,
         withBleed: targetFormat === 'kdp-print',
+        pageCount: data.page_count || 24,
       })
       setResultData(data.download_url)
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
@@ -609,6 +662,15 @@ export default function DashboardContent({ user, handleLogout }) {
 
         <TabsContent value="tools">
           <PageTransition className="space-y-6">
+            <TemplateCustomizer
+              template={selectedTemplate}
+              options={templateOptions}
+              onChange={updateTemplateOption}
+              onGenerate={handleGenerateProduct}
+              isProcessing={isProcessing}
+              result={productResult}
+            />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card className="card glass">
                 <CardHeader>
@@ -629,9 +691,9 @@ export default function DashboardContent({ user, handleLogout }) {
                         onChange={(e) => setTrimSize(e.target.value)}
                         className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="6x9">6 x 9 in</option>
-                        <option value="8.5x11">8.5 x 11 in</option>
-                        <option value="5.5x8.5">5.5 x 8.5 in</option>
+                        {TRIM_OPTIONS.map((size) => (
+                          <option key={size} value={size}>{size.replace('x', ' × ')} in</option>
+                        ))}
                       </select>
                     </div>
                     <div className="space-y-2">
@@ -710,9 +772,9 @@ export default function DashboardContent({ user, handleLogout }) {
                         onChange={(e) => setColoringTrimSize(e.target.value)}
                         className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20"
                       >
-                        <option value="6x9">6 x 9 in</option>
-                        <option value="8.5x11">8.5 x 11 in</option>
-                        <option value="5.5x8.5">5.5 x 8.5 in</option>
+                        {TRIM_OPTIONS.map((size) => (
+                          <option key={size} value={size}>{size.replace('x', ' × ')} in</option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -780,9 +842,9 @@ export default function DashboardContent({ user, handleLogout }) {
                       onChange={(e) => setValidateTrimSize(e.target.value)}
                       className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="6x9">6 x 9 in</option>
-                      <option value="8.5x11">8.5 x 11 in</option>
-                      <option value="5x8">5 x 8 in</option>
+                      {TRIM_OPTIONS.map((size) => (
+                        <option key={size} value={size}>{size.replace('x', ' × ')} in</option>
+                      ))}
                     </select>
                   </div>
                   <div className="md:col-span-2 border-2 border-dashed rounded-xl p-6 text-center hover:bg-muted/50 transition-colors cursor-pointer relative group">
@@ -877,10 +939,12 @@ export default function DashboardContent({ user, handleLogout }) {
                     <KdpSafeZoneOverlay
                       trimSize={previewMeta.trimSize}
                       withBleed={previewMeta.withBleed}
+                      pageCount={previewMeta.pageCount || 24}
+                      pageSide="right"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground text-center">
-                    Blue = trim line · Dashed amber = bleed · Green = safe margin (keep text/art inside)
+                    Blue = trim line · Dashed amber = bleed · Green = safe zone (mirrored gutters by page side)
                   </p>
                   <div className="flex justify-end gap-4">
                     <Button
@@ -1080,9 +1144,9 @@ export default function DashboardContent({ user, handleLogout }) {
                       onChange={(e) => setBatchTrimSize(e.target.value)}
                       className="w-full p-2 rounded-md border bg-background focus:ring-2 focus:ring-primary/20"
                     >
-                      <option value="6x9">6 x 9 in</option>
-                      <option value="8.5x11">8.5 x 11 in</option>
-                      <option value="5.5x8.5">5.5 x 8.5 in</option>
+                      {TRIM_OPTIONS.map((size) => (
+                        <option key={size} value={size}>{size.replace('x', ' × ')} in</option>
+                      ))}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -1167,8 +1231,7 @@ export default function DashboardContent({ user, handleLogout }) {
             <div>
               <h2 className="text-2xl font-bold mb-2">Template Library</h2>
               <p className="text-muted-foreground text-sm">
-                Starter KDP templates from niche research — more coming in the 10-week rollout.
-                Full plan: <code className="text-xs">web-dashboard/template_library/template_library/template_library_action_plan.md</code>
+                Choose a starter template, customize print options, and generate a KDP-ready interior plus paperback cover.
               </p>
             </div>
             {libraryTemplates.length === 0 ? (
@@ -1204,7 +1267,7 @@ export default function DashboardContent({ user, handleLogout }) {
                           applyTemplate(tpl)
                         }}
                       >
-                        Use in Tools
+                        Customize & Generate
                       </Button>
                     </CardContent>
                   </Card>
