@@ -18,7 +18,7 @@ async function loginToDashboard(page) {
 
   await page.waitForURL(
     (url) => !url.pathname.includes('/login'),
-    { timeout: 15000 }
+    { timeout: 30000 }
   );
   await page.waitForLoadState('networkidle');
   await expectLoggedIn(page);

@@ -34,7 +34,9 @@ test.describe('KDP Creator Suite - Template Product Generation', () => {
 
     await customizeButton.click();
     await expect(page.getByRole('tab', { name: 'Tools' })).toHaveAttribute('data-state', 'active');
-    await expect(page.getByText('Product Builder')).toBeVisible();
+    await expect(
+      page.locator('[data-slot="card-title"]').filter({ hasText: 'Product Builder' })
+    ).toBeVisible();
     await expect(page.getByText('Generate interior + cover')).toBeVisible();
   });
 
@@ -44,7 +46,9 @@ test.describe('KDP Creator Suite - Template Product Generation', () => {
     test.skip(!(await customizeButton.count()), 'Product Builder UI not deployed yet');
 
     await customizeButton.click();
-    await expect(page.getByText('Product Builder')).toBeVisible();
+    await expect(
+      page.locator('[data-slot="card-title"]').filter({ hasText: 'Product Builder' })
+    ).toBeVisible();
     await page.getByRole('button', { name: /Show template options/i }).click();
     await expect(page.getByRole('button', { name: /Hide template options/i })).toBeVisible();
   });

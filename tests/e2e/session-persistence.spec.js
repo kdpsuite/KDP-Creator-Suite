@@ -1,29 +1,24 @@
 const { test, expect } = require('@playwright/test');
+const { loginToDashboard } = require('../helpers/auth');
+const { getDashboardUrl, isMarketingReachable, getBaseUrl } = require('../helpers/env');
 
 /**
  * Cross-domain session persistence tests.
- *
- * Requires TEST_USER_EMAIL and TEST_USER_PASSWORD when running against live deployments.
  */
 
 test.describe('Cross-Domain Session Persistence', () => {
-  test('should persist session tokens in localStorage after dashboard login', async ({ page }) => {
-    const email = process.env.TEST_USER_EMAIL;
-    const password = process.env.TEST_USER_PASSWORD;
-
-    test.skip(!email || !password, 'TEST_USER_EMAIL and TEST_USER_PASSWORD required');
-
-    const dashboardUrl = process.env.DASHBOARD_URL || 'https://dashboard.kdpsuite.com';
-
-    await page.goto(`${dashboardUrl}/login`, { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"], button:has-text("Login"), button:has-text("Sign In")');
-    await page.waitForURL(`${dashboardUrl}/**`, { timeout: 15000 });
+  test('should persist session tokens in localStorage after dashboard login', async ({
+    page,
+  }) => {
+    await loginToDashboard(page);
 
     const token = await page.evaluate(() => localStorage.getItem('kdp_session_token'));
-    const refresh = await page.evaluate(() => localStorage.getItem('kdp_session_refresh'));
-    const userId = await page.evaluate(() => localStorage.getItem('kdp_session_user_id'));
+    const refresh = await page.evaluate(() =>
+      localStorage.getItem('kdp_session_refresh')
+    );
+    const userId = await page.evaluate(() =>
+      localStorage.getItem('kdp_session_user_id')
+    );
 
     expect(token).toBeTruthy();
     expect(refresh).toBeTruthy();
@@ -31,18 +26,7 @@ test.describe('Cross-Domain Session Persistence', () => {
   });
 
   test('should remain authenticated after dashboard refresh', async ({ page }) => {
-    const email = process.env.TEST_USER_EMAIL;
-    const password = process.env.TEST_USER_PASSWORD;
-
-    test.skip(!email || !password, 'TEST_USER_EMAIL and TEST_USER_PASSWORD required');
-
-    const dashboardUrl = process.env.DASHBOARD_URL || 'https://dashboard.kdpsuite.com';
-
-    await page.goto(`${dashboardUrl}/login`, { waitUntil: 'networkidle' });
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"], button:has-text("Login"), button:has-text("Sign In")');
-    await page.waitForURL(`${dashboardUrl}/`, { timeout: 15000 });
+    await loginToDashboard(page);
 
     await page.reload({ waitUntil: 'networkidle' });
 
@@ -50,25 +34,19 @@ test.describe('Cross-Domain Session Persistence', () => {
     await expect(loginForm).not.toBeVisible({ timeout: 5000 });
   });
 
-  test('should maintain session when navigating marketing to dashboard', async ({ page }) => {
-    const email = process.env.TEST_USER_EMAIL;
-    const password = process.env.TEST_USER_PASSWORD;
+  test('should maintain session when navigating marketing to dashboard', async ({
+    page,
+  }) => {
+    await loginToDashboard(page);
 
-    test.skip(!email || !password, 'TEST_USER_EMAIL and TEST_USER_PASSWORD required');
+    const dashboardUrl = getDashboardUrl();
+    const marketingReachable = await isMarketingReachable();
 
-    const baseUrl = process.env.BASE_URL || 'https://kdpsuite.com';
-    const dashboardUrl = process.env.DASHBOARD_URL || 'https://dashboard.kdpsuite.com';
-
-    await page.goto(`${baseUrl}/login`, { waitUntil: 'networkidle' }).catch(async () => {
+    if (marketingReachable) {
+      await page.goto(getBaseUrl(), { waitUntil: 'networkidle' });
+    } else {
+      // Marketing apex→www is broken (DNS/TLS); still verify session survives navigation.
       await page.goto(`${dashboardUrl}/login`, { waitUntil: 'networkidle' });
-    });
-
-    const emailInput = page.locator('input[type="email"]');
-    if (await emailInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await page.fill('input[type="email"]', email);
-      await page.fill('input[type="password"]', password);
-      await page.click('button[type="submit"], button:has-text("Login"), button:has-text("Sign In")');
-      await page.waitForTimeout(2000);
     }
 
     await page.goto(dashboardUrl, { waitUntil: 'networkidle' });
@@ -76,10 +54,7 @@ test.describe('Cross-Domain Session Persistence', () => {
     const token = await page.evaluate(() => localStorage.getItem('kdp_session_token'));
     const loginForm = page.locator('input[type="email"]');
 
-    if (token) {
-      await expect(loginForm).not.toBeVisible({ timeout: 5000 });
-    } else {
-      await expect(loginForm).toBeVisible({ timeout: 5000 });
-    }
+    expect(token).toBeTruthy();
+    await expect(loginForm).not.toBeVisible({ timeout: 5000 });
   });
 });

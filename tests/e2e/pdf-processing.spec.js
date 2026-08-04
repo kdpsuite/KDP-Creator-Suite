@@ -35,6 +35,7 @@ test.describe('KDP Creator Suite - PDF Processing', () => {
     await page.getByRole('tab', { name: 'Tools' }).click();
     await uploadFileViaChooser(page, 1, getSamplePngPath());
 
+    await page.getByRole('button', { name: 'Convert to Coloring Page' }).click();
     await expect(page.getByText('Processing your file...')).toBeVisible({ timeout: 15000 });
   });
 
@@ -44,6 +45,7 @@ test.describe('KDP Creator Suite - PDF Processing', () => {
     await page.getByRole('tab', { name: 'Tools' }).click();
     await uploadFileViaChooser(page, 0, getSamplePdfPath());
 
+    await page.getByRole('button', { name: 'Convert PDF' }).click();
     await expect(page.getByText('Processing your file...')).toBeVisible({ timeout: 15000 });
   });
 
