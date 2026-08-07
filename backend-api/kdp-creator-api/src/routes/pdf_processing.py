@@ -203,23 +203,23 @@ def convert_to_coloring():
 
     with PerformanceTimer("coloring_conversion"):
         try:
-            output_bytes = _coloring_bitmap(file.read(), trim_size, threshold, with_bleed=with_bleed)
+            png_bytes = _coloring_bitmap(file.read(), trim_size, threshold, with_bleed=with_bleed)
+            preview = generate_optimized_preview(png_bytes, 'image')
 
             # Prefer single-page PDF for KDP interior upload readiness
             as_pdf = request.form.get("output_format", "pdf").lower() != "png"
             if as_pdf:
                 writer = PdfWriter()
-                writer.add_page(_png_bytes_to_pdf_page(output_bytes, trim_size, with_bleed=with_bleed))
+                writer.add_page(_png_bytes_to_pdf_page(png_bytes, trim_size, with_bleed=with_bleed))
                 pdf_buffer = io.BytesIO()
                 writer.write(pdf_buffer)
                 output_bytes = pdf_buffer.getvalue()
                 filename = f"coloring_{uuid.uuid4().hex[:8]}.pdf"
                 file_format = 'PDF'
-                preview = generate_optimized_preview(output_bytes, 'pdf')
             else:
+                output_bytes = png_bytes
                 filename = f"coloring_{uuid.uuid4().hex[:8]}.png"
                 file_format = 'PNG'
-                preview = generate_optimized_preview(output_bytes, 'image')
 
             storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
 
@@ -402,7 +402,7 @@ def batch_convert_coloring():
             record_batch_usage(user_id)
             return success_response({
                 'download_url': storage_info['signed_url'],
-                'preview': generate_optimized_preview(final_pdf_bytes, 'pdf'),
+                'preview': generate_optimized_preview(output_pngs[0], 'image') if output_pngs else None,
                 'file_size_mb': round(len(final_pdf_bytes) / (1024 * 1024), 2),
                 'format': 'PDF',
                 'page_count': len(pdf_writer.pages),

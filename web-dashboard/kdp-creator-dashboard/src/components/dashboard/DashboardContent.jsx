@@ -132,6 +132,7 @@ export default function DashboardContent({ user, handleLogout }) {
   const [coloringTrimSize, setColoringTrimSize] = useState('6x9')
   const [batchTrimSize, setBatchTrimSize] = useState('6x9')
   const [batchFiles, setBatchFiles] = useState([])
+  const [batchFailed, setBatchFailed] = useState(false)
   const [coverTitle, setCoverTitle] = useState('')
   const [generateCover, setGenerateCover] = useState(false)
   const [libraryTemplates, setLibraryTemplates] = useState([])
@@ -253,6 +254,7 @@ export default function DashboardContent({ user, handleLogout }) {
     }
     try {
       setIsProcessing(true)
+      setBatchFailed(false)
       setBatchProgress(0)
       setProcessedCount(0)
       setTotalFiles(batchFiles.length)
@@ -289,10 +291,14 @@ export default function DashboardContent({ user, handleLogout }) {
       setBatchProgress(100)
       setProcessedCount(batchFiles.length)
       await refreshMetrics()
-      setActiveTab('tools')
       toast.success('Batch conversion complete')
     } catch (error) {
       console.error('Batch conversion failed', error)
+      setBatchProgress(0)
+      setProcessedCount(0)
+      setPreviewImage(null)
+      setResultData(null)
+      setBatchFailed(true)
       toast.error(apiErrorMessage(error, 'Batch conversion failed'))
     } finally {
       setIsProcessing(false)
@@ -319,7 +325,7 @@ export default function DashboardContent({ user, handleLogout }) {
       setPreviewImage(data.preview)
       setPreviewMeta({ trimSize: coloringTrimSize, withBleed: true, pageCount: 24 })
       setResultData(data.download_url)
-      setResultType('image')
+      setResultType(data.format === 'PDF' ? 'pdf' : 'image')
       await trackEvent(AnalyticsEvents.PDF_CONVERSION_COMPLETED, {
         format: 'coloring',
         success: true,
@@ -917,7 +923,7 @@ export default function DashboardContent({ user, handleLogout }) {
               </Card>
             )}
 
-            {previewImage && !isProcessing && (
+            {(previewImage || resultData) && !isProcessing && (
               <Card className="card glass border-green-500/20">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-green-600">
@@ -926,26 +932,34 @@ export default function DashboardContent({ user, handleLogout }) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="relative aspect-video rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
-                    <img
-                      src={
-                        previewImage.startsWith('http') || previewImage.startsWith('data:')
-                          ? previewImage
-                          : `data:image/jpeg;base64,${previewImage}`
-                      }
-                      alt="Preview"
-                      className="max-h-full max-w-full object-contain relative z-0"
-                    />
-                    <KdpSafeZoneOverlay
-                      trimSize={previewMeta.trimSize}
-                      withBleed={previewMeta.withBleed}
-                      pageCount={previewMeta.pageCount || 24}
-                      pageSide="right"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground text-center">
-                    Blue = trim line · Dashed amber = bleed · Green = safe zone (mirrored gutters by page side)
-                  </p>
+                  {previewImage ? (
+                    <>
+                      <div className="relative aspect-video rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
+                        <img
+                          src={
+                            previewImage.startsWith('http') || previewImage.startsWith('data:')
+                              ? previewImage
+                              : `data:image/jpeg;base64,${previewImage}`
+                          }
+                          alt="Preview"
+                          className="max-h-full max-w-full object-contain relative z-0"
+                        />
+                        <KdpSafeZoneOverlay
+                          trimSize={previewMeta.trimSize}
+                          withBleed={previewMeta.withBleed}
+                          pageCount={previewMeta.pageCount || 24}
+                          pageSide="right"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center">
+                        Blue = trim line · Dashed amber = bleed · Green = safe zone (mirrored gutters by page side)
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center">
+                      Preview unavailable — download is ready
+                    </p>
+                  )}
                   <div className="flex justify-end gap-4">
                     <Button
                       variant="outline"
@@ -1219,6 +1233,70 @@ export default function DashboardContent({ user, handleLogout }) {
                         ? `Processing ${processedCount} of ${totalFiles} files...`
                         : `Uploading and processing ${totalFiles} file(s) on the server...`}
                     </p>
+                  </div>
+                )}
+                {!isProcessing && resultData && (
+                  <div className="space-y-4 rounded-lg border border-green-500/20 bg-muted/30 p-4">
+                    <div className="flex items-center gap-2 text-green-600 font-semibold">
+                      <CheckCircle className="h-5 w-5" />
+                      Batch Complete
+                    </div>
+                    {previewImage ? (
+                      <div className="relative aspect-video rounded-lg overflow-hidden border bg-muted flex items-center justify-center">
+                        <img
+                          src={
+                            previewImage.startsWith('http') || previewImage.startsWith('data:')
+                              ? previewImage
+                              : `data:image/jpeg;base64,${previewImage}`
+                          }
+                          alt="Batch preview"
+                          className="max-h-full max-w-full object-contain relative z-0"
+                        />
+                        <KdpSafeZoneOverlay
+                          trimSize={previewMeta.trimSize}
+                          withBleed={previewMeta.withBleed}
+                          pageCount={previewMeta.pageCount || 24}
+                          pageSide="right"
+                        />
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center">
+                        Preview unavailable — download is ready
+                      </p>
+                    )}
+                    <div className="flex justify-end gap-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setPreviewImage(null)
+                          setResultData(null)
+                          setBatchProgress(0)
+                          setProcessedCount(0)
+                          setBatchFailed(false)
+                        }}
+                      >
+                        Process Another
+                      </Button>
+                      <Button onClick={downloadResult} className="transition-premium">
+                        <Download className="mr-2 h-4 w-4" />
+                        Download {resultType === 'pdf' ? 'PDF' : 'Image'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {!isProcessing && batchFailed && !resultData && (
+                  <div className="rounded-lg border border-destructive/30 bg-muted/30 p-4 text-center space-y-2">
+                    <p className="text-sm font-medium text-destructive">Batch conversion failed</p>
+                    <p className="text-xs text-muted-foreground">
+                      Adjust your files and try again. You are still on the Batch tab.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setBatchFailed(false)}
+                    >
+                      Dismiss
+                    </Button>
                   </div>
                 )}
               </CardContent>

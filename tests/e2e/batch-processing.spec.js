@@ -35,7 +35,10 @@ test.describe('KDP Creator Suite - Batch Processing', () => {
 
       await page.getByRole('button', { name: /Process \d+ file\(s\)/i }).click();
 
-      await expect(page.getByText(/Processing \d+ of \d+ files/i)).toBeVisible({ timeout: 15000 });
+      // Mid-run copy stays on Batch (no Tools redirect); processedCount only advances at completion.
+      await expect(
+        page.getByText(/Uploading and processing \d+ file\(s\) on the server/i)
+      ).toBeVisible({ timeout: 15000 });
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
