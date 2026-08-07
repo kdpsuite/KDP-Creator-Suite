@@ -27,16 +27,32 @@ Thumbs.db
 *.swp
 
 # Misc
-coverage/
 *.log
 mobile-app/commandlinetools-linux-11076708_latest.zip
 __pycache__/
 *.pyc
 .vercel
 
-# Playwright
+# Test reports & artifacts (keep tests/ source tracked)
+coverage/
+.nyc_output/
+htmlcov/
+*.lcov
 playwright-report/
 test-results/
+test-reports/
+test-output/
 blob-report/
 playwright/.cache/
 playwright-full-report.zip
+*-report.zip
+junit.xml
+junit-*.xml
+results.xml
+mocha.json
+.vitest/
+.jest/
+cypress/videos/
+cypress/screenshots/
+allure-results/
+allure-report/
