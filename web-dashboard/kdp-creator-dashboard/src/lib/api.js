@@ -214,7 +214,16 @@ export const sessionApi = {
 export const subscriptionApi = {
   getStatus: () => api.get('/status'),
   getTiers: () => api.get('/tiers'),
-  upgrade: (tier) => api.post('/upgrade', { tier }),
+  /** @deprecated Free self-upgrade is disabled server-side. Use createCheckout. */
+  upgrade: () =>
+    Promise.reject(new Error('Direct upgrades are disabled. Use Stripe Checkout.')),
+  createCheckout: (tier) => api.post('/checkout', { tier }),
+  openBillingPortal: () => api.post('/billing-portal'),
+};
+
+export const accountApi = {
+  deleteAccount: () => api.delete('/account'),
+  deleteUser: (userId) => api.delete(`/users/${userId}`),
 };
 
 export const analyticsApi = {

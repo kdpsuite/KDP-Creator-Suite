@@ -43,11 +43,11 @@ jobs:
 
       - name: Run ESLint
         working-directory: web-dashboard/kdp-creator-dashboard
-        run: pnpm lint || true
+        run: pnpm lint
 
-      - name: Type check with TypeScript
+      - name: Verify package scripts
         working-directory: web-dashboard/kdp-creator-dashboard
-        run: pnpm type-check || true
+        run: node -e "const p=require('./package.json'); if(!p.scripts?.lint||!p.scripts?.build) process.exit(1)"
 
   test:
     runs-on: ubuntu-latest

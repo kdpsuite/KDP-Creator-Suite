@@ -37,6 +37,7 @@
     "@radix-ui/react-toggle": "^1.1.14",
     "@radix-ui/react-toggle-group": "^1.1.15",
     "@radix-ui/react-tooltip": "^1.2.12",
+    "@sentry/browser": "^8.0.0",
     "@supabase/supabase-js": "^2.110.3",
     "@tailwindcss/vite": "^4.3.2",
     "axios": "^1.18.1",

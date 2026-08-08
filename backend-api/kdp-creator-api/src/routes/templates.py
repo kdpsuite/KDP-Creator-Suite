@@ -29,7 +29,11 @@ def get_template_detail(template_id):
 @rate_limit_pdf_processing
 @jwt_required()
 def generate_template_product(template_id):
-    from src.routes.subscription import enforce_conversion_quota, record_conversion_usage
+    from src.routes.subscription import (
+        enforce_conversion_quota,
+        enforce_template_tier,
+        record_conversion_usage,
+    )
     from src.services.template_generator import generate_product
     from src.storage import upload_file
 
@@ -41,6 +45,10 @@ def generate_template_product(template_id):
     template = get_template(template_id)
     if not template:
         return error_response('Template not found', 'NOT_FOUND', status_code=404)
+
+    tier_error = enforce_template_tier(user_id, template.get('tier_required', 'free'))
+    if tier_error:
+        return tier_error
 
     payload = request.get_json(silent=True) or {}
     options = payload.get('options') if isinstance(payload.get('options'), dict) else payload

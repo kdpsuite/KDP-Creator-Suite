@@ -40,6 +40,21 @@ from src.routes.auth_sync import auth_sync_bp
 from src.routes.templates import templates_bp
 from src.utils.responses import success_response, error_response
 
+_sentry_dsn = os.environ.get('SENTRY_DSN')
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.flask import FlaskIntegration
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            integrations=[FlaskIntegration()],
+            traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
+            environment=os.environ.get('ENVIRONMENT', 'development'),
+        )
+        print('[STARTUP] Sentry enabled')
+    except Exception as sentry_error:
+        print(f'[WARNING] Sentry init failed: {sentry_error}')
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'kdp-creator-suite-secret-key-2024')
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'kdp-jwt-secret-key-2024')

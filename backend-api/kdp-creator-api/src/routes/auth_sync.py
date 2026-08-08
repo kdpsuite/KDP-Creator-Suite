@@ -21,7 +21,17 @@ def verify_supabase_token(token: str) -> dict:
     """Verify a Supabase JWT token and extract user information."""
     try:
         if SUPABASE_JWT_SECRET:
-            return pyjwt.decode(token, SUPABASE_JWT_SECRET, algorithms=['HS256'])
+            return pyjwt.decode(
+                token,
+                SUPABASE_JWT_SECRET,
+                algorithms=['HS256'],
+                audience='authenticated',
+            )
+        env = (os.environ.get('ENVIRONMENT') or 'development').lower()
+        if env in ('production', 'prod', 'staging'):
+            print('Token verification failed: SUPABASE_JWT_SECRET is required in production')
+            return None
+        print('[WARNING] SUPABASE_JWT_SECRET unset — decoding JWT without signature verify (dev only)')
         return pyjwt.decode(token, options={'verify_signature': False})
     except Exception as token_error:
         print(f'Token verification failed: {token_error}')

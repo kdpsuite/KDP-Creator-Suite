@@ -23,6 +23,10 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Env var startup validation | Done | `backend-api/kdp-creator-api/src/main.py` |
 | Rate limiting | Done | `src/utils/rate_limit.py` |
 | Analytics event recording | Done | `POST /api/analytics/events` |
+| Stripe Checkout + webhook entitlement | Done (needs env) | `POST /api/checkout`, `POST /api/webhooks/stripe` |
+| Free `/upgrade` disabled | Done | Returns `UPGRADE_DISABLED` |
+| Account self-delete | Done | `DELETE /api/account` |
+| Member readiness smoke | Done | `scripts/member-readiness-smoke.sh` |
 
 ## Launch Week
 
