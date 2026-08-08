@@ -5,8 +5,6 @@ import json
 from flask import Blueprint, request, current_app
 from pypdf import PdfReader, PdfWriter, Transformation
 from PIL import Image
-import cv2
-import numpy as np
 from reportlab.pdfgen import canvas
 from reportlab.lib.utils import ImageReader
 from reportlab.lib.colors import grey
@@ -23,6 +21,7 @@ from src.routes.subscription import (
     record_batch_usage,
     record_conversion_usage,
 )
+from src.services.coloring import ColoringParamError, coloring_bitmap, parse_coloring_form
 from src.services.kdp_specs import (
     PRINT_DPI,
     KdpSpecError,
@@ -149,35 +148,9 @@ def _fit_page_to_target(page, target_w, target_h):
     return blank
 
 
-def _coloring_bitmap(img_bytes, trim_size, threshold=127, with_bleed=True):
-    image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    target_width_pt, target_height_pt = get_kdp_dimensions(trim_size, 'print', with_bleed=with_bleed)
-    target_width_px = int(target_width_pt / 72 * PRINT_DPI)
-    target_height_px = int(target_height_pt / 72 * PRINT_DPI)
-
-    img_width, img_height = image.size
-    aspect_ratio = img_width / img_height
-    target_aspect = target_width_px / target_height_px
-
-    if aspect_ratio > target_aspect:
-        new_width = target_width_px
-        new_height = int(new_width / aspect_ratio)
-    else:
-        new_height = target_height_px
-        new_width = int(new_height * aspect_ratio)
-    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-
-    padded_image = Image.new('RGB', (target_width_px, target_height_px), (255, 255, 255))
-    paste_x = (target_width_px - image.width) // 2
-    paste_y = (target_height_px - image.height) // 2
-    padded_image.paste(image, (paste_x, paste_y))
-
-    cv_image = cv2.cvtColor(np.array(padded_image), cv2.COLOR_RGB2BGR)
-    gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-    _, binary = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
-    output_buffer = io.BytesIO()
-    Image.fromarray(binary).save(output_buffer, format='PNG')
-    return output_buffer.getvalue()
+def _coloring_bitmap(img_bytes, trim_size, with_bleed=True, **coloring_opts):
+    """Thin dispatcher — default engine=legacy via coloring_bitmap."""
+    return coloring_bitmap(img_bytes, trim_size, with_bleed=with_bleed, **coloring_opts)
 
 
 @pdf_bp.route('/pdf/convert-coloring', methods=['POST'])
@@ -192,18 +165,25 @@ def convert_to_coloring():
         return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
 
     file = request.files["file"]
-    threshold = int(request.form.get("threshold", 127))
     trim_size = request.form.get("trim_size", "8.5x11")
     with_bleed = request.form.get("with_bleed", "true").lower() in ("1", "true", "yes")
 
     try:
         get_trim(trim_size)
+        coloring_opts = parse_coloring_form(request.form)
     except KdpSpecError as exc:
         return error_response(str(exc), 'INVALID_TRIM', status_code=400)
+    except ColoringParamError as exc:
+        return error_response(str(exc), exc.code, status_code=400)
 
     with PerformanceTimer("coloring_conversion"):
         try:
-            png_bytes = _coloring_bitmap(file.read(), trim_size, threshold, with_bleed=with_bleed)
+            png_bytes = _coloring_bitmap(
+                file.read(),
+                trim_size,
+                with_bleed=with_bleed,
+                **coloring_opts,
+            )
             preview = generate_optimized_preview(png_bytes, 'image')
 
             # Prefer single-page PDF for KDP interior upload readiness
@@ -226,7 +206,13 @@ def convert_to_coloring():
             record_pdf_analytics(
                 user_id,
                 "pdf_coloring_conversion",
-                {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": file_format, "trim_size": trim_size},
+                {
+                    "status": "success",
+                    "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2),
+                    "format": file_format,
+                    "trim_size": trim_size,
+                    "engine": coloring_opts["engine"],
+                },
             )
             record_conversion_usage(user_id)
             return success_response({
@@ -237,6 +223,8 @@ def convert_to_coloring():
                 'with_bleed': with_bleed,
                 'trim_size': trim_size,
             })
+        except ColoringParamError as exc:
+            return error_response(str(exc), exc.code, status_code=400)
         except Exception as e:
             current_app.logger.error(f"Coloring conversion failed: {str(e)}")
             record_pdf_analytics(
@@ -337,15 +325,17 @@ def batch_convert_coloring():
         return error_response("No files uploaded", "MISSING_FILES", status_code=400)
 
     trim_size = request.form.get("trim_size", "8.5x11")
-    threshold = int(request.form.get("threshold", 127))
     cover_title = request.form.get("cover_title", "").strip()
     generate_cover = request.form.get("generate_cover", "false").lower() in ("1", "true", "yes")
     with_bleed = request.form.get("with_bleed", "true").lower() in ("1", "true", "yes")
 
     try:
         get_trim(trim_size)
+        coloring_opts = parse_coloring_form(request.form)
     except KdpSpecError as exc:
         return error_response(str(exc), 'INVALID_TRIM', status_code=400)
+    except ColoringParamError as exc:
+        return error_response(str(exc), exc.code, status_code=400)
 
     file_order_raw = request.form.get("file_order")
     if file_order_raw:
@@ -364,7 +354,14 @@ def batch_convert_coloring():
                 if key not in request.files:
                     continue
                 file = request.files[key]
-                output_pngs.append(_coloring_bitmap(file.read(), trim_size, threshold, with_bleed=with_bleed))
+                output_pngs.append(
+                    _coloring_bitmap(
+                        file.read(),
+                        trim_size,
+                        with_bleed=with_bleed,
+                        **coloring_opts,
+                    )
+                )
 
             pdf_writer = PdfWriter()
 
@@ -397,6 +394,7 @@ def batch_convert_coloring():
                     "file_size_mb": round(len(final_pdf_bytes) / (1024 * 1024), 2),
                     "format": "PDF",
                     "trim_size": trim_size,
+                    "engine": coloring_opts["engine"],
                 },
             )
             record_batch_usage(user_id)
@@ -408,6 +406,8 @@ def batch_convert_coloring():
                 'page_count': len(pdf_writer.pages),
                 'with_bleed': with_bleed,
             })
+        except ColoringParamError as exc:
+            return error_response(str(exc), exc.code, status_code=400)
         except Exception as e:
             current_app.logger.error(f"Batch coloring conversion failed: {str(e)}")
             record_pdf_analytics(
