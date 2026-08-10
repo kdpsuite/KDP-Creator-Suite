@@ -67,12 +67,16 @@ PUBLIC_TIERS = ('free', 'pro', 'studio')
 PAID_TIERS = ('pro', 'studio')
 
 
+def _stripe_api_key():
+    return os.environ.get('STRIPE_API_KEY') or os.environ.get('STRIPE_SECRET_KEY')
+
+
 def _stripe_configured():
-    return bool(os.environ.get('STRIPE_API_KEY'))
+    return bool(_stripe_api_key())
 
 
 def _get_stripe():
-    api_key = os.environ.get('STRIPE_API_KEY')
+    api_key = _stripe_api_key()
     if not api_key:
         return None
     stripe.api_key = api_key

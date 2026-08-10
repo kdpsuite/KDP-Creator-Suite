@@ -53,7 +53,8 @@ This document describes all environment variables used by the KDP Creator Suite 
 
 ### Stripe Configuration
 
-**`STRIPE_API_KEY`** (Optional)
+**`STRIPE_API_KEY`** or **`STRIPE_SECRET_KEY`** (Optional — required for Checkout)
+Code accepts either name (`STRIPE_API_KEY` preferred; `STRIPE_SECRET_KEY` common on Vercel).
 - **Type:** String (Stripe secret key)
 - **Example:** `sk_test_...` or `sk_live_...`
 - **Purpose:** Stripe API key for payment processing
