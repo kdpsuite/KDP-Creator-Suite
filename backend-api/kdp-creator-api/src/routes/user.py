@@ -118,11 +118,28 @@ def delete_user(user_id):
     try:
         with PerformanceTimer(f'delete_user:{user_id}'):
             supabase.table('user_profiles').delete().eq('id', user_id).execute()
+            try:
+                supabase.auth.admin.delete_user(user_id)
+            except Exception as auth_delete_error:
+                log_warning(
+                    'Profile deleted but auth user delete failed',
+                    user_id=user_id,
+                    error=str(auth_delete_error),
+                )
             log_info(f'User deleted', user_id=user_id)
             return success_response(message='User deleted successfully')
     except Exception as e:
         log_error_msg(f'Failed to delete user', user_id=user_id, error=str(e))
         return error_response(f'Failed to delete user: {str(e)}', 'DATABASE_ERROR', status_code=500)
+
+
+@user_bp.route('/account', methods=['DELETE'])
+@jwt_required()
+@log_request
+def delete_own_account():
+    """Self-service account deletion (profile + auth user)."""
+    user_id = get_jwt_identity()
+    return delete_user(user_id)
 
 @user_bp.route('/request-password-reset', methods=['POST'])
 @validate_json(PasswordResetSchema())

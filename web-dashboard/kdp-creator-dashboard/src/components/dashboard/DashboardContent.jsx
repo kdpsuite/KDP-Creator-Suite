@@ -24,7 +24,8 @@ import { Badge } from '@/components/ui/badge.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { toast } from 'sonner'
-import { subscriptionApi, analyticsApi, pdfApi, templateApi, getUploadErrorMessage } from '@/lib/api'
+import { subscriptionApi, analyticsApi, pdfApi, templateApi, accountApi, getUploadErrorMessage } from '@/lib/api'
+import { SUPPORT_EMAIL } from '@/lib/monitoring'
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics'
 import { BatchFileQueue } from '@/components/batch/BatchFileQueue'
 import {
@@ -111,12 +112,25 @@ const normalizeSubscription = (payload) => {
   return payload
 }
 
+
+const TIER_RANK = { free: 0, pro: 1, studio: 2, unlimited: 3 }
+
+const tierMeetsRequirement = (userTier, requiredTier) =>
+  (TIER_RANK[userTier] ?? 0) >= (TIER_RANK[requiredTier] ?? 0)
+
+const isUpgradeError = (error) => {
+  const code = error?.response?.data?.error?.code
+  return code === 'QUOTA_EXCEEDED' || code === 'TIER_REQUIRED'
+}
+
 export default function DashboardContent({ user, handleLogout }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [subscription, setSubscription] = useState(null)
   const [metrics, setMetrics] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [checkoutLoading, setCheckoutLoading] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
   const [previewMeta, setPreviewMeta] = useState({ trimSize: '6x9', withBleed: true, pageCount: 24 })
@@ -131,6 +145,18 @@ export default function DashboardContent({ user, handleLogout }) {
   const [targetFormat, setTargetFormat] = useState('kdp-print')
   const [coloringTrimSize, setColoringTrimSize] = useState('6x9')
   const [batchTrimSize, setBatchTrimSize] = useState('6x9')
+  const [coloringEnhanced, setColoringEnhanced] = useState(false)
+  const [coloringDetailLevel, setColoringDetailLevel] = useState('medium')
+  const [coloringContrast, setColoringContrast] = useState(0)
+  const [coloringEdgeEnhancement, setColoringEdgeEnhancement] = useState('mild')
+  const [coloringAutoThreshold, setColoringAutoThreshold] = useState(true)
+  const [coloringThreshold, setColoringThreshold] = useState(127)
+  const [batchEnhanced, setBatchEnhanced] = useState(false)
+  const [batchDetailLevel, setBatchDetailLevel] = useState('medium')
+  const [batchContrast, setBatchContrast] = useState(0)
+  const [batchEdgeEnhancement, setBatchEdgeEnhancement] = useState('mild')
+  const [batchAutoThreshold, setBatchAutoThreshold] = useState(true)
+  const [batchThreshold, setBatchThreshold] = useState(127)
   const [batchFiles, setBatchFiles] = useState([])
   const [batchFailed, setBatchFailed] = useState(false)
   const [coverTitle, setCoverTitle] = useState('')
@@ -188,7 +214,70 @@ export default function DashboardContent({ user, handleLogout }) {
     setBatchFiles((prev) => [...prev, ...files])
   }
 
+  const promptUpgrade = (message) => {
+    toast.error(message || 'Upgrade required to continue', {
+      action: {
+        label: 'View plans',
+        onClick: () => setActiveTab('overview'),
+      },
+    })
+    setActiveTab('overview')
+  }
+
+  const handleCheckout = async (tier) => {
+    try {
+      setCheckoutLoading(tier)
+      const res = await subscriptionApi.createCheckout(tier)
+      const data = unwrapOk(res)
+      if (!data?.checkout_url) {
+        throw new Error('Checkout URL missing')
+      }
+      await trackEvent(AnalyticsEvents.SUBSCRIPTION_UPGRADED, { tier, stage: 'checkout_started' })
+      window.location.assign(data.checkout_url)
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Unable to start checkout'))
+    } finally {
+      setCheckoutLoading(null)
+    }
+  }
+
+  const handleBillingPortal = async () => {
+    try {
+      const res = await subscriptionApi.openBillingPortal()
+      const data = unwrapOk(res)
+      if (!data?.portal_url) {
+        throw new Error('Billing portal URL missing')
+      }
+      window.location.assign(data.portal_url)
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Unable to open billing portal'))
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      'Permanently delete your account and profile data? This cannot be undone.'
+    )
+    if (!confirmed) return
+    try {
+      setIsDeletingAccount(true)
+      await accountApi.deleteAccount()
+      toast.success('Account deleted')
+      await handleLogout()
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Account deletion failed'))
+    } finally {
+      setIsDeletingAccount(false)
+    }
+  }
+
   const applyTemplate = (tpl) => {
+    const required = (tpl.tier_required || 'free').toLowerCase()
+    const currentTier = (subscription?.tier || 'free').toLowerCase()
+    if (!tierMeetsRequirement(currentTier, required)) {
+      promptUpgrade(`"${tpl.name}" requires the ${required} plan.`)
+      return
+    }
     const next = {
       ...(tpl.defaults || {}),
       trim_size: tpl.trim_size || tpl.defaults?.trim_size || '6x9',
@@ -210,6 +299,16 @@ export default function DashboardContent({ user, handleLogout }) {
   const updateTemplateOption = (key, value) => {
     setTemplateOptions((prev) => ({ ...prev, [key]: value }))
   }
+
+  const notifyApiError = (error, fallback) => {
+    const message = apiErrorMessage(error, fallback)
+    if (isUpgradeError(error)) {
+      promptUpgrade(message)
+      return
+    }
+    toast.error(message)
+  }
+
 
   const handleGenerateProduct = async () => {
     if (!selectedTemplate?.id) return
@@ -237,7 +336,7 @@ export default function DashboardContent({ user, handleLogout }) {
       }
     } catch (error) {
       console.error('Template generation failed', error)
-      toast.error(apiErrorMessage(error, 'Template generation failed'))
+      notifyApiError(error, 'Template generation failed')
     } finally {
       setIsProcessing(false)
     }
@@ -277,6 +376,15 @@ export default function DashboardContent({ user, handleLogout }) {
       })
       formData.append('file_order', JSON.stringify(fileOrder))
       formData.append('trim_size', batchTrimSize)
+      if (batchEnhanced) {
+        formData.append('engine', 'enhanced')
+        formData.append('detail_level', batchDetailLevel)
+        formData.append('contrast', String(batchContrast))
+        formData.append('edge_enhancement', batchEdgeEnhancement)
+        formData.append('threshold', batchAutoThreshold ? 'auto' : String(batchThreshold))
+      } else {
+        formData.append('engine', 'legacy')
+      }
       if (generateCover && coverTitle.trim()) {
         formData.append('generate_cover', 'true')
         formData.append('cover_title', coverTitle.trim())
@@ -299,7 +407,7 @@ export default function DashboardContent({ user, handleLogout }) {
       setPreviewImage(null)
       setResultData(null)
       setBatchFailed(true)
-      toast.error(apiErrorMessage(error, 'Batch conversion failed'))
+      notifyApiError(error, 'Batch conversion failed')
     } finally {
       setIsProcessing(false)
     }
@@ -319,6 +427,15 @@ export default function DashboardContent({ user, handleLogout }) {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('trim_size', coloringTrimSize)
+      if (coloringEnhanced) {
+        formData.append('engine', 'enhanced')
+        formData.append('detail_level', coloringDetailLevel)
+        formData.append('contrast', String(coloringContrast))
+        formData.append('edge_enhancement', coloringEdgeEnhancement)
+        formData.append('threshold', coloringAutoThreshold ? 'auto' : String(coloringThreshold))
+      } else {
+        formData.append('engine', 'legacy')
+      }
 
       const response = await pdfApi.convertColoring(formData)
       const data = unwrapOk(response)
@@ -340,7 +457,7 @@ export default function DashboardContent({ user, handleLogout }) {
         processing_time_ms: Date.now() - startedAt,
       })
       console.error('Coloring conversion failed', error)
-      toast.error(apiErrorMessage(error, 'Coloring conversion failed'))
+      notifyApiError(error, 'Coloring conversion failed')
     } finally {
       setIsProcessing(false)
     }
@@ -388,7 +505,7 @@ export default function DashboardContent({ user, handleLogout }) {
         processing_time_ms: Date.now() - startedAt,
       })
       console.error('PDF processing failed', error)
-      toast.error(apiErrorMessage(error, 'PDF processing failed'))
+      notifyApiError(error, 'PDF processing failed')
     } finally {
       setIsProcessing(false)
     }
@@ -465,6 +582,33 @@ export default function DashboardContent({ user, handleLogout }) {
 
   useEffect(() => {
     loadDashboardData()
+  }, [loadDashboardData])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const checkout = params.get('checkout')
+    const tab = params.get('tab')
+    if (tab === 'settings' || tab === 'overview' || tab === 'templates') {
+      setActiveTab(tab)
+    }
+    if (checkout === 'success') {
+      toast.success('Payment received — refreshing your plan')
+      trackEvent(AnalyticsEvents.SUBSCRIPTION_UPGRADED, {
+        tier: params.get('tier') || 'unknown',
+        stage: 'checkout_success',
+      })
+      loadDashboardData()
+      params.delete('checkout')
+      params.delete('tier')
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+      window.history.replaceState({}, '', next)
+    } else if (checkout === 'canceled') {
+      toast.message('Checkout canceled')
+      params.delete('checkout')
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+      window.history.replaceState({}, '', next)
+    }
   }, [loadDashboardData])
 
   const { shouldShowTooltip, dismissTooltip } = useOnboarding()
@@ -598,6 +742,35 @@ export default function DashboardContent({ user, handleLogout }) {
                     className="h-2"
                   />
                 </div>
+                {(subscription?.tier === 'free' || !subscription?.tier) && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      disabled={checkoutLoading === 'pro'}
+                      onClick={() => handleCheckout('pro')}
+                    >
+                      {checkoutLoading === 'pro' ? 'Redirecting…' : 'Upgrade to Pro'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={checkoutLoading === 'studio'}
+                      onClick={() => handleCheckout('studio')}
+                    >
+                      {checkoutLoading === 'studio' ? 'Redirecting…' : 'Upgrade to Studio'}
+                    </Button>
+                  </div>
+                )}
+                {subscription?.billing?.has_customer && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-3 px-0"
+                    onClick={handleBillingPortal}
+                  >
+                    Manage billing
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -625,6 +798,53 @@ export default function DashboardContent({ user, handleLogout }) {
               </CardContent>
             </Card>
           </PageTransition>
+
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="card glass">
+              <CardHeader>
+                <CardTitle>Free</CardTitle>
+                <CardDescription>$0 / month</CardDescription>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>5 conversions / month</p>
+                <p>1 batch job / month</p>
+                <Badge variant="secondary">{subscription?.tier === 'free' ? 'Current plan' : 'Included'}</Badge>
+              </CardContent>
+            </Card>
+            <Card className="card glass border-primary/30">
+              <CardHeader>
+                <CardTitle>Pro</CardTitle>
+                <CardDescription>$19.99 / month</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">Unlimited conversions · 10 batch jobs · Pro templates</p>
+                <Button
+                  className="w-full"
+                  disabled={subscription?.tier === 'pro' || checkoutLoading === 'pro'}
+                  onClick={() => handleCheckout('pro')}
+                >
+                  {subscription?.tier === 'pro' ? 'Current plan' : checkoutLoading === 'pro' ? 'Redirecting…' : 'Choose Pro'}
+                </Button>
+              </CardContent>
+            </Card>
+            <Card className="card glass">
+              <CardHeader>
+                <CardTitle>Studio</CardTitle>
+                <CardDescription>$49.99 / month</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <p className="text-sm text-muted-foreground">Unlimited conversions & batch · priority support</p>
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  disabled={subscription?.tier === 'studio' || checkoutLoading === 'studio'}
+                  onClick={() => handleCheckout('studio')}
+                >
+                  {subscription?.tier === 'studio' ? 'Current plan' : checkoutLoading === 'studio' ? 'Redirecting…' : 'Choose Studio'}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
 
           <div className="mt-8">
             <h2 className="text-2xl font-bold mb-4">Recent Projects</h2>
@@ -783,6 +1003,76 @@ export default function DashboardContent({ user, handleLogout }) {
                         ))}
                       </select>
                     </div>
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={coloringEnhanced}
+                        onChange={(e) => setColoringEnhanced(e.target.checked)}
+                        className="rounded"
+                      />
+                      Enhanced line art
+                    </label>
+                    {coloringEnhanced && (
+                      <div className="space-y-3 rounded-md border p-3 bg-muted/30">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Detail</label>
+                          <select
+                            value={coloringDetailLevel}
+                            onChange={(e) => setColoringDetailLevel(e.target.value)}
+                            className="w-full p-2 rounded-md border bg-background"
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Contrast ({coloringContrast})</label>
+                          <input
+                            type="range"
+                            min={-50}
+                            max={50}
+                            value={coloringContrast}
+                            onChange={(e) => setColoringContrast(Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Edge enhancement</label>
+                          <select
+                            value={coloringEdgeEnhancement}
+                            onChange={(e) => setColoringEdgeEnhancement(e.target.value)}
+                            className="w-full p-2 rounded-md border bg-background"
+                          >
+                            <option value="off">Off</option>
+                            <option value="mild">Mild</option>
+                            <option value="strong">Strong</option>
+                          </select>
+                        </div>
+                        <label className="text-sm font-medium flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={coloringAutoThreshold}
+                            onChange={(e) => setColoringAutoThreshold(e.target.checked)}
+                            className="rounded"
+                          />
+                          Auto threshold
+                        </label>
+                        {!coloringAutoThreshold && (
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Threshold ({coloringThreshold})</label>
+                            <input
+                              type="range"
+                              min={0}
+                              max={255}
+                              value={coloringThreshold}
+                              onChange={(e) => setColoringThreshold(Number(e.target.value))}
+                              className="w-full"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <OnboardingTooltip
                     content="Upload JPG or PNG images to convert into KDP-ready coloring pages."
@@ -1182,6 +1472,76 @@ export default function DashboardContent({ user, handleLogout }) {
                     )}
                   </div>
                 </div>
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={batchEnhanced}
+                    onChange={(e) => setBatchEnhanced(e.target.checked)}
+                    className="rounded"
+                  />
+                  Enhanced line art
+                </label>
+                {batchEnhanced && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-md border p-3 bg-muted/30">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Detail</label>
+                      <select
+                        value={batchDetailLevel}
+                        onChange={(e) => setBatchDetailLevel(e.target.value)}
+                        className="w-full p-2 rounded-md border bg-background"
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Edge enhancement</label>
+                      <select
+                        value={batchEdgeEnhancement}
+                        onChange={(e) => setBatchEdgeEnhancement(e.target.value)}
+                        className="w-full p-2 rounded-md border bg-background"
+                      >
+                        <option value="off">Off</option>
+                        <option value="mild">Mild</option>
+                        <option value="strong">Strong</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-sm font-medium">Contrast ({batchContrast})</label>
+                      <input
+                        type="range"
+                        min={-50}
+                        max={50}
+                        value={batchContrast}
+                        onChange={(e) => setBatchContrast(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={batchAutoThreshold}
+                        onChange={(e) => setBatchAutoThreshold(e.target.checked)}
+                        className="rounded"
+                      />
+                      Auto threshold
+                    </label>
+                    {!batchAutoThreshold && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Threshold ({batchThreshold})</label>
+                        <input
+                          type="range"
+                          min={0}
+                          max={255}
+                          value={batchThreshold}
+                          onChange={(e) => setBatchThreshold(Number(e.target.value))}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
                 <OnboardingTooltip
                   content="Add multiple images, reorder them, then process into one PDF."
                   tooltipId="batch-queue-tooltip"
@@ -1341,11 +1701,14 @@ export default function DashboardContent({ user, handleLogout }) {
                       <Button
                         size="sm"
                         className="w-full"
+                        variant={tierMeetsRequirement((subscription?.tier || 'free').toLowerCase(), (tpl.tier_required || 'free').toLowerCase()) ? 'default' : 'outline'}
                         onClick={() => {
                           applyTemplate(tpl)
                         }}
                       >
-                        Customize & Generate
+                        {tierMeetsRequirement((subscription?.tier || 'free').toLowerCase(), (tpl.tier_required || 'free').toLowerCase())
+                          ? 'Customize & Generate'
+                          : `Requires ${tpl.tier_required}`}
                       </Button>
                     </CardContent>
                   </Card>
@@ -1379,15 +1742,24 @@ export default function DashboardContent({ user, handleLogout }) {
                   helperText="Managed by Supabase Auth"
                 />
                 <div className="space-y-2">
+                  <label className="text-sm font-medium">Support</label>
+                  <p className="text-sm text-muted-foreground">
+                    Need help with billing, quotas, or account access? Email{' '}
+                    <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+                  </p>
+                </div>
+                <div className="space-y-2">
                   <label className="text-sm font-medium">API access</label>
                   <p className="text-sm text-muted-foreground">
                     Personal API keys are not available yet. Authenticated dashboard sessions use your
                     Supabase token via the proxied <code>/api</code> routes.
                   </p>
-                  <Button variant="outline" disabled>
-                    Coming soon
-                  </Button>
                 </div>
+                {subscription?.billing?.has_customer && (
+                  <Button variant="outline" onClick={handleBillingPortal}>
+                    Manage billing
+                  </Button>
+                )}
               </CardContent>
             </Card>
             </OnboardingTooltip>
@@ -1399,10 +1771,15 @@ export default function DashboardContent({ user, handleLogout }) {
               </CardHeader>
               <CardContent className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  Account deletion is not wired yet. Contact support to remove your data.
+                  Deletes your profile and auth account. Local project drafts in this browser are cleared on logout.
                 </p>
-                <Button variant="destructive" className="w-full sm:w-auto" disabled>
-                  Delete Account & Data (coming soon)
+                <Button
+                  variant="destructive"
+                  className="w-full sm:w-auto"
+                  disabled={isDeletingAccount}
+                  onClick={handleDeleteAccount}
+                >
+                  {isDeletingAccount ? 'Deleting…' : 'Delete Account & Data'}
                 </Button>
               </CardContent>
             </Card>

@@ -63,7 +63,27 @@ This document describes all environment variables used by the KDP Creator Suite 
 - **Type:** String (Stripe webhook secret)
 - **Example:** `whsec_...`
 - **Purpose:** Secret for verifying Stripe webhook signatures
-- **Notes:** Get from Stripe dashboard > Webhooks
+- **Notes:** Get from Stripe dashboard > Webhooks. Point endpoint to `POST /api/webhooks/stripe`.
+
+**`STRIPE_PRICE_PRO`** (Optional — required for Pro checkout)
+- **Type:** String (Stripe Price ID)
+- **Example:** `price_...`
+- **Purpose:** Recurring price for Pro tier Checkout Sessions
+
+**`STRIPE_PRICE_STUDIO`** (Optional — required for Studio checkout)
+- **Type:** String (Stripe Price ID)
+- **Example:** `price_...`
+- **Purpose:** Recurring price for Studio tier Checkout Sessions
+
+**`FRONTEND_URL`** (Optional)
+- **Type:** String (HTTPS URL)
+- **Example:** `https://dashboard.kdpsuite.com`
+- **Purpose:** Checkout success/cancel and billing portal return URLs
+- **Default:** `https://dashboard.kdpsuite.com`
+
+**`SENTRY_DSN`** (Optional)
+- **Type:** String
+- **Purpose:** Enable Flask error monitoring via Sentry
 
 **`SENTRY_DSN`** (Optional)
 - **Type:** String (Sentry DSN)

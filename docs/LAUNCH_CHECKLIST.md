@@ -11,7 +11,7 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Security audit | Manual | JWT auth, rate limiting, CORS configured; formal audit pending |
 | Performance testing | Manual | Load tests not automated; use `scripts/pre-launch-check.sh` for smoke |
 | Beta user testing | Manual | Recruit beta cohort; no code dependency |
-| Payment processing testing | Manual | RevenueCat/Stripe sandbox verification — Stripe Checkout code is on `feat/coloring-engine-upgrade`, not `main` |
+| Payment processing testing | Manual | Stripe sandbox verification — Checkout coded on `main`; needs Stripe env + webhook |
 | App store submissions | Manual | iOS/Android store listings |
 
 ### Coded pre-launch hooks (`main`)
@@ -25,13 +25,8 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Env var startup validation | Done | `backend-api/kdp-creator-api/src/main.py` |
 | Rate limiting | Done | `src/utils/rate_limit.py` |
 | Analytics event recording | Done | `POST /api/analytics/events` |
-| Sentry (Flask + React) | Done (env set) | `SENTRY_DSN` / `VITE_SENTRY_DSN` on Vercel; **redeploy required** for frontend bake-in |
-
-### On `feat/coloring-engine-upgrade` (not yet on `main`)
-
-| Item | Status | Location |
-|------|--------|----------|
-| Stripe Checkout + webhook entitlement | Done (needs Stripe env after merge) | `POST /api/checkout`, `POST /api/webhooks/stripe` |
+| Sentry (Flask + React) | Done (verified) | Events confirmed 2026-08-10; `SENTRY_DSN` / `VITE_SENTRY_DSN` on Vercel |
+| Stripe Checkout + webhook entitlement | Done (needs Stripe env) | `POST /api/checkout`, `POST /api/webhooks/stripe` |
 | Free `/upgrade` disabled | Done | Returns `UPGRADE_DISABLED` |
 | Account self-delete | Done | `DELETE /api/account` |
 | Member readiness smoke | Done | `scripts/member-readiness-smoke.sh` |
@@ -42,9 +37,9 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Item | Status | Notes |
 |------|--------|-------|
 | Deploy production systems | Manual | Vercel (API + dashboard); see deployment_guide.md |
-| Configure monitoring | Partial | Sentry **coded + Vercel DSNs set**; confirm events after redeploy. New Relic not used |
+| Configure monitoring | Done | Sentry verified on FE+BE |
 | Launch marketing campaigns | Manual | Out of scope for code |
-| Monitor system performance | Partial | `/api/health/*` + analytics + Sentry (post-redeploy) |
+| Monitor system performance | Partial | `/api/health/*` + analytics + Sentry |
 | Customer support readiness | Manual | Help desk, docs, status page |
 
 ## Post-Launch (Week +1)

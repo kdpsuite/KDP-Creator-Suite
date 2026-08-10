@@ -1,5 +1,10 @@
 import * as Sentry from '@sentry/react'
 
+import { trackEvent } from './analytics'
+
+export const SUPPORT_EMAIL =
+  import.meta.env.VITE_SUPPORT_EMAIL || 'support@kdpsuite.com'
+
 let sentryReady = false
 
 export function initMonitoring() {
@@ -35,7 +40,13 @@ export function captureException(error, context = {}) {
   const err = error instanceof Error ? error : new Error(String(error))
   if (sentryReady) {
     Sentry.captureException(err, { extra: context })
-    return
+  } else {
+    console.error('[monitoring]', err, context)
   }
-  console.error('[monitoring]', err, context)
+
+  trackEvent('client_error', {
+    message: err.message,
+    name: err.name,
+    ...context,
+  })
 }
