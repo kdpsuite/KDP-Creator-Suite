@@ -33,7 +33,7 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Item | Status | Notes |
 |------|--------|-------|
 | Deploy production systems | Manual | Vercel (API + dashboard); see deployment_guide.md |
-| Configure monitoring | Partial | Health probes ready; Sentry/New Relic not wired |
+| Configure monitoring | Partial | Health probes ready; Sentry **coded** (`SENTRY_DSN` / `VITE_SENTRY_DSN`) but DSN unset; New Relic not used |
 | Launch marketing campaigns | Manual | Out of scope for code |
 | Monitor system performance | Partial | `/api/health/*` + analytics events foundation |
 | Customer support readiness | Manual | Help desk, docs, status page |
@@ -52,5 +52,5 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 ## Deferred (not in this launch)
 
 - Multi-user batch collaboration
-- Mixpanel / New Relic / Sentry integration (external SaaS)
+- Mixpanel / New Relic; Sentry DSN not set (integration coded, inactive)
 - APF, Shadowcast, Mission Control — **out of scope permanently**
