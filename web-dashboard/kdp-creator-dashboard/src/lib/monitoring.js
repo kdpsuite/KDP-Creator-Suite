@@ -26,6 +26,9 @@ export function initMonitoring() {
     enableLogs: true,
   })
   sentryReady = true
+  if (typeof window !== 'undefined') {
+    window.Sentry = Sentry
+  }
 }
 
 export function captureException(error, context = {}) {

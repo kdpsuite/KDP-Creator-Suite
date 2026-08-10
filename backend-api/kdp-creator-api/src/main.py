@@ -118,10 +118,21 @@ with app.app_context():
 @app.route('/api/health')
 def health():
     return success_response(
-        data={'status': 'ok'},
+        data={
+            'status': 'ok',
+            'sentry_configured': bool(os.environ.get('SENTRY_DSN')),
+        },
         message='KDP Creator Suite API is running',
         status_code=200
     )
+
+
+@app.route('/api/debug-sentry')
+def debug_sentry():
+    """Raises so Sentry can capture. Enabled only when ALLOW_SENTRY_DEBUG=1."""
+    if os.environ.get('ALLOW_SENTRY_DEBUG') != '1':
+        return error_response('Not found', 'NOT_FOUND', status_code=404)
+    raise RuntimeError('kdp-sentry-verify-backend')
 
 
 @app.route('/api/health/live')
