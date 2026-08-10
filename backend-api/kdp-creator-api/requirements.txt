@@ -25,3 +25,4 @@ psycopg2-binary
 python-dotenv
 supabase
 pytest==8.3.4
+sentry-sdk[flask]>=2.0.0

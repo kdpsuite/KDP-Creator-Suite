@@ -1,5 +1,6 @@
 import React from 'react'
 import { AlertCircle, RefreshCw } from 'lucide-react'
+import { captureException } from '@/lib/monitoring.js'
 
 /**
  * ErrorBoundary Component
@@ -29,6 +30,10 @@ export class ErrorBoundary extends React.Component {
 
   componentDidCatch(error, errorInfo) {
     console.error('Error caught by ErrorBoundary:', error, errorInfo)
+    captureException(error, {
+      source: 'ErrorBoundary',
+      componentStack: errorInfo?.componentStack,
+    })
     this.setState((prevState) => ({
       errorInfo,
       errorCount: prevState.errorCount + 1,

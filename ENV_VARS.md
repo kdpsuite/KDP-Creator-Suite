@@ -65,6 +65,17 @@ This document describes all environment variables used by the KDP Creator Suite 
 - **Purpose:** Secret for verifying Stripe webhook signatures
 - **Notes:** Get from Stripe dashboard > Webhooks
 
+**`SENTRY_DSN`** (Optional)
+- **Type:** String (Sentry DSN)
+- **Example:** `https://<key>@o<org>.ingest.sentry.io/<project>`
+- **Purpose:** Flask/API error monitoring
+- **Notes:** Create a **Python / Flask** Sentry project. Do not reuse the browser DSN.
+
+**`SENTRY_TRACES_SAMPLE_RATE`** (Optional)
+- **Type:** Float `0`–`1`
+- **Default:** `0.1`
+- **Purpose:** Fraction of API requests to trace
+
 ### Application Configuration
 
 **`ENVIRONMENT`** (Optional)
@@ -202,6 +213,16 @@ their dependencies import successfully. Do not set `ENABLE_2FA`,
 - **Purpose:** Supabase anonymous key for client-side auth
 - **Notes:** Must match backend SUPABASE_KEY
 
+**`VITE_SENTRY_DSN`** (Optional)
+- **Type:** String (Sentry DSN)
+- **Example:** `https://<key>@o<org>.ingest.sentry.io/<project>`
+- **Purpose:** Dashboard browser error monitoring
+- **Notes:** Create a **Browser JavaScript / React** Sentry project. Safe to expose (public client DSN). Do not reuse the Flask DSN.
+
+**`VITE_SENTRY_TRACES_SAMPLE_RATE`** (Optional)
+- **Type:** Float `0`–`1`
+- **Default:** `0.1`
+
 ---
 
 ## Setting Environment Variables in Vercel
@@ -219,6 +240,7 @@ their dependencies import successfully. Do not set `ENABLE_2FA`,
    - `JWT_SECRET_KEY`
    - `STRIPE_API_KEY`
    - `STRIPE_WEBHOOK_SECRET`
+   - `SENTRY_DSN` (Python/Flask project)
    - `ENVIRONMENT` (set to `production`)
    - `DEBUG` (set to `False`)
 
@@ -230,6 +252,7 @@ their dependencies import successfully. Do not set `ENABLE_2FA`,
    - `VITE_API_URL` (set to `/api`)
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_SENTRY_DSN` (Browser/React project)
 
 ---
 
