@@ -13,13 +13,19 @@ if _sentry_dsn:
         import sentry_sdk
         from sentry_sdk.integrations.flask import FlaskIntegration
 
-        sentry_sdk.init(
-            dsn=_sentry_dsn,
-            integrations=[FlaskIntegration(transaction_style='url')],
-            traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
-            environment=os.environ.get('ENVIRONMENT', 'development'),
-            send_default_pii=False,
-        )
+        _sentry_kwargs = {
+            'dsn': _sentry_dsn,
+            'integrations': [FlaskIntegration(transaction_style='url')],
+            'traces_sample_rate': float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
+            'environment': os.environ.get('ENVIRONMENT', 'development'),
+            'send_default_pii': False,
+            'enable_logs': True,
+        }
+        try:
+            sentry_sdk.init(**_sentry_kwargs)
+        except TypeError:
+            _sentry_kwargs.pop('enable_logs', None)
+            sentry_sdk.init(**_sentry_kwargs)
         print('[STARTUP] Sentry enabled')
     except Exception as sentry_error:
         print(f'[WARNING] Sentry init failed: {sentry_error}')
