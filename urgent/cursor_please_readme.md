@@ -1,60 +1,98 @@
 # Cursor, Please Readme: KDP Creator Suite Dashboard Status
 
-This document provides a comprehensive overview of the recent developments, improvements, and outstanding tasks for the KDP Creator Suite dashboard and its associated backend services.
+**Updated:** 2026-08-10  
+**Branch:** `main`  
+**Member readiness:** [`docs/MEMBER_READINESS.md`](../docs/MEMBER_READINESS.md)  
+**Launch ops:** [`docs/LAUNCH_CHECKLIST.md`](../docs/LAUNCH_CHECKLIST.md)
 
-**Out of scope:** APF, Shadowcast, and Mission Control are separate products and must not be integrated into this dashboard or the Android app.
+Trust this file and those two docs over older root “complete” banners.
 
-## I. Completed Improvements
+**Out of scope permanently:** APF, Shadowcast, Mission Control — do not integrate into this dashboard or the Android app.
 
-### A. Dashboard UI/UX Polish (Phases 1-3)
-All UI/UX enhancements have been implemented and deployed, transforming the dashboard into a premium, user-friendly interface.
-
-*   **Refined OKLCH Color Palette**: Shifted from basic black/white to a sophisticated blue-toned palette with premium dark mode (`oklch(0.12 0.01 240)` background).
-*   **Typography System**: Implemented a structured heading hierarchy (h1-h4) with proper tracking and font weights for improved readability.
-*   **Premium Transitions**: Added smooth `cubic-bezier` easing for professional interactions across the dashboard.
-*   **Tooltip Component**: Developed a lightweight, reusable tooltip component with four positioning options for contextual help without UI clutter.
-*   **Component Polish**: Enhanced interactive elements including buttons (brightness shifts on hover), cards (lift animations), and input fields (focus states).
-*   **Custom SVG Illustrations**: Created and integrated custom SVG illustrations for empty states (e.g., `EmptyProjectsIllustration`, `EmptyJobsIllustration`, `EmptyAnalyticsIllustration`) to provide visual cues and improve user experience.
-*   **Onboarding System**: Implemented a `useOnboarding` hook and an `OnboardingTooltip` component with `localStorage` persistence to guide new users through key features.
-*   **Page Transitions**: Integrated `PageTransition` wrapper components with staggered entry animations for smooth tab switching and section transitions.
-*   **Animation Additions**: Added `.animate-shimmer` and `.animate-pulse` utility classes for loading states and enhanced visual feedback.
-
-### B. Core Functionality & Backend Hardening
-Critical backend and frontend issues have been resolved, and the system has been hardened for stability and reliability.
-
-*   **"Spinning Butthole" Login Fix**: Resolved the infinite loading spinner issue after login by:
-    *   Correcting frontend API response parsing to properly handle the backend's standardized `success_response` envelope.
-    *   Implementing a new backend `/user/profile-sync` endpoint to automatically create a `user_profile` for new Supabase-authenticated users.
-    *   Updating the frontend to call `authApi.syncProfile()` immediately after successful authentication.
-*   **Vercel Build Error Resolution**: Fixed deployment failures caused by Tailwind v4 incompatibility with a custom CSS utility class. The problematic `.transition-premium` utility was removed, and styles were applied directly to components, ensuring successful Vercel builds.
-*   **PDF Processing Engine Optimization**: 
-    *   **Output Format**: Coloring page conversions now output to **PNG** for improved quality and efficiency with line art.
-    *   **Enhanced Logging**: Added detailed error logging for coloring page conversion, KDP formatting, and PDF validation processes.
-    *   **New Endpoint**: Implemented a dedicated endpoint for **PDF validation**.
-    *   **Timeout Prevention**: Removed the `optimize=True` flag from `Image.save()` during coloring page conversion to reduce CPU usage and prevent timeouts for larger images.
-*   **KDP Coloring Book Formatting**: The `convert_to_coloring` endpoint now automatically resizes and pads uploaded images to the user's selected KDP trim size (including bleed), ensuring print-ready output while maintaining aspect ratio.
-*   **Frontend Trim Size Selection**: The dashboard UI now includes a "Trim Size" dropdown for the Image to Coloring Book tool, allowing users to select their target KDP dimensions.
-*   **Batch Processing Integration**: Added a new "Batch" tab to the Tools section, allowing users to upload multiple images for simultaneous conversion into a single, formatted PDF coloring book.
-
-## II. In-Progress & Planned Features
-
-### A. Real-time Analytics Integration
-*   **Status**: Started.
-*   **What's Done**: 
-    *   Created the `analytics_events` table in Supabase.
-    *   Updated backend endpoints to record success/failure and metadata for all PDF and batch operations.
-    *   Updated the `/user-metrics` endpoint to fetch real data from the `analytics_events` table.
-*   **What's Left**: 
-    *   The frontend dashboard still needs to be updated to display the actual data from the `/user-metrics` endpoint instead of mock data.
-    *   **Action Required**: Manually run the `supabase_seed_script.sql` (found in the `urgent` folder) in the Supabase SQL Editor to populate initial analytics data.
-
-### B. Intelligent "Bleed & Margin" Visualization
-*   **Status**: Planned.
-*   **Objective**: Add a live preview overlay in the dashboard that shows the KDP "Safe Zone" on uploaded files to help users avoid common margin-related rejections.
-
-### C. Advanced Batch Features
-*   **Status**: Planned.
-*   **Objective**: Enhance the Batch Creator with features like custom page ordering, automatic cover generation, and multi-user collaboration.
+**Legend**
+- **Shipped** — in `main` codebase (and/or configured in prod env)
+- **Partial** — coded, undeployed, on another branch, or incomplete
+- **Not started** — no product-ready implementation
 
 ---
-**Note to Developer**: Please refer to the `urgent` folder for the Supabase seeding script and instructions. Surgical modifications are preferred over full rewrites to maintain credit efficiency.
+
+## Shipped (on `main`)
+
+### Auth and session
+- Supabase email/password login, register, forgot-password, recovery callback
+- Backend `/user/profile-sync` creates `user_profiles` for new Auth users
+- Session bridge (`/sync-session`, `/validate-session`)
+- Login spinner fix: frontend unwraps `success_response` envelope after auth
+
+### Core KDP tools
+- KDP PDF convert (`/pdf/format-kdp`) with trim size + print/ebook target
+- Image → coloring page (`/pdf/convert-coloring`) — PNG, trim + bleed pad (legacy engine default)
+- KDP PDF validation (`/pdf/validate-kdp`)
+- Product Builder + template library generate (interior + paperback cover)
+- Batch coloring PDF: multi-image upload, drag reorder, optional title cover
+- Safe-zone overlay on previews (`KdpSafeZoneOverlay.jsx`)
+
+### Analytics
+- `analytics_events` table + backend record on PDF/batch success/failure
+- Live `/user-metrics` on Analytics tab (not mock data)
+- Frontend `trackEvent()` / `POST /api/analytics/events`
+
+### UI polish
+- OKLCH palette + dark mode, typography, card/button polish
+- Empty-state SVGs, `OnboardingTooltip` + `useOnboarding` (localStorage)
+- `PageTransition` + shimmer/pulse loading utilities
+- `ErrorBoundary` reports to Sentry when DSN is set
+
+### Monitoring (Sentry)
+- Flask: `sentry_sdk` + FlaskIntegration when `SENTRY_DSN` is set (`main.py`)
+- Dashboard: `@sentry/react` init + replay + logs when `VITE_SENTRY_DSN` is set (`monitoring.js`)
+- Sentry projects: `kdp-creator-api` (Python), `kdp-creator-dashboard` (React)
+- **Vercel env set** on `dashboard-backend` (`SENTRY_DSN`, `SENTRY_TRACES_SAMPLE_RATE`) and `dashboard-frontend` (`VITE_SENTRY_DSN`, `VITE_SENTRY_TRACES_SAMPLE_RATE`)
+- Sample rates default **0.1** (not 1.0) to protect quota
+
+### Infra already in use
+- Vercel dashboard + API proxy (`/api` → backend)
+- Supabase Auth + Postgres `user_profiles`
+- Rate limiting, `/api/health` `/ready` `/live`
+- Smokes: `scripts/pre-launch-check.sh`
+
+---
+
+## Partial
+
+| Item | What’s true | What’s missing |
+|------|-------------|----------------|
+| Sentry live traffic | Code + Vercel DSNs set | **Redeploy** both Vercel apps so frontend bakes `VITE_*`; confirm a test error in each Sentry project |
+| Membership / Stripe / free-upgrade lock | Implemented on `feat/coloring-engine-upgrade` | **Not merged to `main`**; prod `/checkout` / `/account` / `UPGRADE_DISABLED` absent until merge + deploy |
+| Coloring engine upgrade (enhanced line-art) | On `feat/coloring-engine-upgrade` | Not on `main`; default on main remains legacy |
+| JWT soft-verify | Prod/staging should refuse unsigned decode (on feat branch) | Confirm `SUPABASE_JWT_SECRET` on prod; feat-branch hardening may not be on `main` |
+| Onboarding | First-visit tooltips | Completes early; thin product tour |
+| Recent projects | localStorage | Not cloud projects |
+| Cross-subdomain SSO | Bridge shipped | Cookie-domain / shared storage still open (`SESSION_PERSISTENCE.md`) |
+| Launch ops | Health + analytics + Sentry env | Security audit, Stripe sandbox pay test, beta cohort, support desk — Manual |
+| Mobile / stores | Flutter app exists | Store submissions unchecked |
+
+Seed note: `urgent/supabase_seed_script.sql` still useful for empty analytics charts.
+
+---
+
+## Not started
+
+- Invites, roles, orgs, multi-seat / multi-user batch collab
+- Personal API keys
+- 2FA UI (backend `totp.py` may exist; no dashboard)
+- Amazon KDP OAuth / listing sync
+- Formal pen-test, load test, status page, help desk
+- Mixpanel / New Relic / full APM
+- Coloring non-goals (when upgrade merges): skimage parity, PDF→raster / Poppler, `format-kdp` rewrite
+
+---
+
+## Do next
+
+1. Redeploy `dashboard-backend` and `dashboard-frontend` on Vercel (Sentry DSNs already in project env)
+2. Trigger one test error in each Sentry project and confirm it lands
+3. Merge `feat/coloring-engine-upgrade` when ready for Stripe + membership + enhanced coloring
+4. After that merge: run Stripe SQL/env/webhook steps in `docs/MEMBER_READINESS.md`
+
+Surgical edits only. Do not rewrite working convert/auth paths unless that is the task.

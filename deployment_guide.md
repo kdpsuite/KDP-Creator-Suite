@@ -104,9 +104,10 @@ pnpm run build
 ```
 
 #### Deployment Options:
-- **Primary:** Vercel, Netlify
-- **Alternative:** AWS S3 + CloudFront, GitHub Pages
-- **Custom Domain:** kdp-creator-suite.com
+- **Primary (actual):** Vercel (`dashboard-frontend` + `dashboard-backend`)
+- **Not used for this product:** Netlify
+- **Alternative:** AWS S3 + CloudFront (not current)
+- **Custom Domain:** as configured in Vercel
 
 ### 3. Mobile App Deployment
 
@@ -208,16 +209,15 @@ CREATE TABLE subscription_history (
 
 ### 6. Monitoring & Analytics
 
-#### Application Monitoring:
-- **Error Tracking:** Sentry
-- **Performance:** New Relic or DataDog
-- **Uptime:** Pingdom or UptimeRobot
-- **Logs:** Papertrail or LogDNA
+#### Application Monitoring (current):
+- **Error Tracking:** Sentry — Flask `SENTRY_DSN` on `dashboard-backend`, React `VITE_SENTRY_DSN` on `dashboard-frontend` (projects `kdp-creator-api` / `kdp-creator-dashboard`). Redeploy after env changes so Vite bakes `VITE_*`.
+- **Health:** `GET /api/health`, `/ready`, `/live` + `scripts/pre-launch-check.sh`
+- **Product analytics:** `analytics_events` + dashboard `/user-metrics` (not Mixpanel yet)
 
-#### Business Analytics:
-- **User Analytics:** Mixpanel or Amplitude
-- **Revenue Tracking:** RevenueCat Dashboard
-- **A/B Testing:** Optimizely or LaunchDarkly
+#### Deferred / optional:
+- **Performance APM:** New Relic or DataDog (not wired)
+- **Uptime:** Pingdom or UptimeRobot (manual)
+- **Business analytics SaaS:** Mixpanel / Amplitude (deferred; use in-app analytics for now)
 
 ### 7. CI/CD Pipeline
 

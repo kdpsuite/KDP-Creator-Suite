@@ -67,14 +67,15 @@ This document describes all environment variables used by the KDP Creator Suite 
 
 **`SENTRY_DSN`** (Optional)
 - **Type:** String (Sentry DSN)
-- **Example:** `https://<key>@o<org>.ingest.sentry.io/<project>`
+- **Example:** `https://<key>@o<org>.ingest.us.sentry.io/<project>`
 - **Purpose:** Flask/API error monitoring
-- **Notes:** Create a **Python / Flask** Sentry project. Do not reuse the browser DSN.
+- **Notes:** Sentry project **`kdp-creator-api`** (Python). Do not reuse the browser DSN. **Set on Vercel `dashboard-backend`** (Production/Preview sensitive; Development non-sensitive).
 
 **`SENTRY_TRACES_SAMPLE_RATE`** (Optional)
 - **Type:** Float `0`–`1`
 - **Default:** `0.1`
 - **Purpose:** Fraction of API requests to trace
+- **Notes:** Prefer `0.1` in production; avoid `1.0` except short verification.
 
 ### Application Configuration
 
@@ -215,9 +216,9 @@ their dependencies import successfully. Do not set `ENABLE_2FA`,
 
 **`VITE_SENTRY_DSN`** (Optional)
 - **Type:** String (Sentry DSN)
-- **Example:** `https://<key>@o<org>.ingest.sentry.io/<project>`
+- **Example:** `https://<key>@o<org>.ingest.us.sentry.io/<project>`
 - **Purpose:** Dashboard browser error monitoring
-- **Notes:** Create a **Browser JavaScript / React** Sentry project. Safe to expose (public client DSN). Do not reuse the Flask DSN.
+- **Notes:** Sentry project **`kdp-creator-dashboard`** (React). Public client DSN. **Set on Vercel `dashboard-frontend`**. Requires a **redeploy** to bake into the Vite build.
 
 **`VITE_SENTRY_TRACES_SAMPLE_RATE`** (Optional)
 - **Type:** Float `0`–`1`
@@ -240,7 +241,8 @@ their dependencies import successfully. Do not set `ENABLE_2FA`,
    - `JWT_SECRET_KEY`
    - `STRIPE_API_KEY`
    - `STRIPE_WEBHOOK_SECRET`
-   - `SENTRY_DSN` (Python/Flask project)
+   - `SENTRY_DSN` (project `kdp-creator-api` — already set on Vercel as of 2026-08-10)
+   - `SENTRY_TRACES_SAMPLE_RATE` (optional, default `0.1`)
    - `ENVIRONMENT` (set to `production`)
    - `DEBUG` (set to `False`)
 
@@ -252,7 +254,8 @@ their dependencies import successfully. Do not set `ENABLE_2FA`,
    - `VITE_API_URL` (set to `/api`)
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_SENTRY_DSN` (Browser/React project)
+   - `VITE_SENTRY_DSN` (project `kdp-creator-dashboard` — already set on Vercel as of 2026-08-10; **redeploy to bake in**)
+   - `VITE_SENTRY_TRACES_SAMPLE_RATE` (optional, default `0.1`)
 
 ---
 

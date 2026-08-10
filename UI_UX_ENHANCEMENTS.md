@@ -1,5 +1,7 @@
 # Dashboard UI/UX Enhancements - Phase 1
 
+> **STATUS (2026-08-10):** Historical Phase 1 spec. Integration status lives in [`UI_UX_ENHANCEMENTS_SUMMARY.md`](UI_UX_ENHANCEMENTS_SUMMARY.md) and [`urgent/cursor_please_readme.md`](urgent/cursor_please_readme.md).
+
 This document outlines the quick-win UI/UX improvements applied to the KDP Creator Suite dashboard.
 
 ## Components Added

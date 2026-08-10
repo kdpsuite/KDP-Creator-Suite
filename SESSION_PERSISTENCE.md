@@ -1,8 +1,10 @@
 # Cross-Domain Session Persistence Guide
 
-> **STATUS (2026-07-22): PARTIALLY IMPLEMENTED.**
+> **STATUS (2026-08-10): PARTIALLY IMPLEMENTED.**
 > `sessionBridge.js`, `/sync-session`, `/validate-session`, and `tests/e2e/session-persistence.spec.js` are shipped.
 > Cross-subdomain localStorage still does not share tokens automatically — configure Supabase CORS for both domains and/or use cookie-domain (`.kdpsuite.com`) handoff for full cross-domain SSO.
+>
+> Canonical product status: [`urgent/cursor_please_readme.md`](urgent/cursor_please_readme.md).
 
 **Problem:** Users get logged out when navigating between `kdpsuite.com` and `dashboard.kdpsuite.com`.
 

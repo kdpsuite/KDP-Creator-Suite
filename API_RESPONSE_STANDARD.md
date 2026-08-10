@@ -341,7 +341,7 @@ export function useApi(url, method = 'GET') {
 ### Subscription Routes (`/api`)
 - [x] GET `/tiers` - List subscription tiers
 - [x] GET `/status` - Subscription status
-- [x] POST `/upgrade` - Upgrade tier
+- [x] POST `/upgrade` - Upgrade tier (**unsafe free flip on `main`**; locked/`checkout` on `feat/coloring-engine-upgrade` — see `docs/MEMBER_READINESS.md`)
 
 ### Analytics Routes (`/api`)
 - [x] GET `/user-metrics` - User analytics

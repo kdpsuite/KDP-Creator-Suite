@@ -1,5 +1,7 @@
 # Dashboard UI/UX Enhancements - Phase 3: Advanced Animations & Onboarding
 
+> **STATUS (2026-08-10):** Historical Phase 3 spec. Safe-zone, empty illustrations, and tooltips are shipped; onboarding remains thin. See [`UI_UX_ENHANCEMENTS_SUMMARY.md`](UI_UX_ENHANCEMENTS_SUMMARY.md) and [`urgent/cursor_please_readme.md`](urgent/cursor_please_readme.md).
+
 This phase focuses on adding custom illustrations for empty states, advanced page transitions, and contextual onboarding tooltips to guide new users through the dashboard.
 
 ## Phase 3 Objectives

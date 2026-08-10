@@ -1,5 +1,7 @@
 # Dashboard UI/UX Enhancements - Phase 2: Premium Polish
 
+> **STATUS (2026-08-10):** Historical Phase 2 spec. Integration status lives in [`UI_UX_ENHANCEMENTS_SUMMARY.md`](UI_UX_ENHANCEMENTS_SUMMARY.md) and [`urgent/cursor_please_readme.md`](urgent/cursor_please_readme.md).
+
 This phase focuses on refining the typography, color palette, and interactive elements to give the KDP Creator Suite dashboard a high-end, professional feel.
 
 ## Visual Refinements

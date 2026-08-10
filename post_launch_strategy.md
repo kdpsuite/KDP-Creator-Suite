@@ -74,7 +74,7 @@ This document outlines the comprehensive strategy for monitoring, analyzing, and
 
 #### Monitoring Tools Setup
 - **Business Analytics:** Mixpanel + Custom Dashboard
-- **Technical Monitoring:** New Relic + Sentry
+- **Technical Monitoring:** Sentry (wired on `main`; Vercel DSNs set — redeploy to confirm). New Relic deferred.
 - **User Feedback:** Intercom + App Store Reviews
 - **Revenue Tracking:** RevenueCat + Stripe Dashboard
 

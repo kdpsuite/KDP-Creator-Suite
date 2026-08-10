@@ -1,8 +1,9 @@
 # KDP Creator Suite - Development & Integration Summary
 
-> **STATUS (2026-07-13): OVERSTATED / MISLEADING.**
-> Phase 3 is not fully complete. There is no Amazon KDP API integration in this repo.
-> Dashboard tools previously had PDF path mismatches and mock analytics/settings; treat "COMPLETED" checkmarks below as historical marketing, not audit truth.
+> **STATUS (2026-08-10): HISTORICAL / OVERSTATED.**
+> Do not treat checkmarks below as current audit truth. Phase 3 “complete” claims and Amazon KDP API claims are wrong.
+> Canonical status: [`urgent/cursor_please_readme.md`](urgent/cursor_please_readme.md), [`docs/MEMBER_READINESS.md`](docs/MEMBER_READINESS.md).
+> Live stack today: Vercel + Supabase web dashboard + Flask API. Membership/Stripe lives on `feat/coloring-engine-upgrade`, not `main`.
 
 ## Phase 3: Development & Integration - COMPLETED ✅
 

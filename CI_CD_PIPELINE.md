@@ -14,9 +14,10 @@ This document describes the automated CI/CD pipeline that runs on every push and
 
 #### Lint and Type Check
 - **Node.js**: v22
-- **Tools**: ESLint, TypeScript
-- **Purpose**: Catch syntax errors, style violations, and type mismatches before tests run
-- **Failure**: Non-blocking (runs but doesn't fail the workflow)
+- **Tools**: ESLint (TypeScript type-check script may be soft/missing — dashboard is mostly JS)
+- **Purpose**: Catch syntax errors and style violations before tests run
+- **Failure**: Soft-fail today (`pnpm lint || true`); tighten when merge brings CI fixes from feature work
+- **Note:** Prefer [`urgent/cursor_please_readme.md`](urgent/cursor_please_readme.md) for product readiness, not this pipeline doc alone.
 
 #### Playwright E2E Tests
 - **Browsers**: Chromium
