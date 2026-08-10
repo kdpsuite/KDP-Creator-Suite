@@ -129,9 +129,15 @@ def health():
 
 @app.route('/api/debug-sentry')
 def debug_sentry():
-    """Raises so Sentry can capture. Enabled only when ALLOW_SENTRY_DEBUG=1."""
+    """Captures a test event then 500s. Enabled only when ALLOW_SENTRY_DEBUG=1."""
     if os.environ.get('ALLOW_SENTRY_DEBUG') != '1':
         return error_response('Not found', 'NOT_FOUND', status_code=404)
+    try:
+        import sentry_sdk
+        sentry_sdk.capture_message('kdp-sentry-verify-backend', level='error')
+        sentry_sdk.flush(timeout=2.0)
+    except Exception as sentry_probe_error:
+        print(f'[WARNING] Sentry probe flush failed: {sentry_probe_error}')
     raise RuntimeError('kdp-sentry-verify-backend')
 
 
