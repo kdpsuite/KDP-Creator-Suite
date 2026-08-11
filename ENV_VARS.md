@@ -66,15 +66,25 @@ Code accepts either name (`STRIPE_API_KEY` preferred; `STRIPE_SECRET_KEY` common
 - **Purpose:** Secret for verifying Stripe webhook signatures
 - **Notes:** Get from Stripe dashboard > Webhooks. Point endpoint to `POST /api/webhooks/stripe`.
 
-**`STRIPE_PRICE_PRO`** (Optional — required for Pro checkout)
+**`STRIPE_PRICE_PRO`** (Optional — overrides lookup)
 - **Type:** String (Stripe Price ID)
 - **Example:** `price_...`
-- **Purpose:** Recurring price for Pro tier Checkout Sessions
+- **Purpose:** Recurring Price for Pro Checkout. If unset, the API resolves lookup key `kdp_pro_monthly`.
 
-**`STRIPE_PRICE_STUDIO`** (Optional — required for Studio checkout)
+**`STRIPE_PRICE_STUDIO`** (Optional — overrides lookup)
 - **Type:** String (Stripe Price ID)
 - **Example:** `price_...`
-- **Purpose:** Recurring price for Studio tier Checkout Sessions
+- **Purpose:** Recurring Price for Studio Checkout. If unset, the API resolves lookup key `kdp_studio_monthly`.
+
+**Stripe catalog (required for Checkout to work)**
+- One Product per plan (Pro and Studio). Do not put both tiers on one Product.
+- Test-mode catalog is created: lookup keys `kdp_pro_monthly` ($19.99) and `kdp_studio_monthly` ($49.99).
+- Vercel currently has **live** `STRIPE_SECRET_KEY`. Test Price IDs will not work with a live key. Either:
+  - Use `sk_test_...` on Preview until go-live, or
+  - Recreate the same two Products in **live** mode with the same lookup keys.
+- Store the secret/restricted key as a Vercel **Sensitive** env var. Prefer a [restricted API key](https://docs.stripe.com/keys/restricted-api-keys) (`rk_`) over `sk_`.
+- Never enable `automatic_tax` until a Stripe Tax registration is active.
+- Webhook: `POST https://dashboard-backend-hazel.vercel.app/api/webhooks/stripe` — verify signatures with `STRIPE_WEBHOOK_SECRET`. Test and live endpoints have different secrets; do not mix them.
 
 **`FRONTEND_URL`** (Optional)
 - **Type:** String (HTTPS URL)

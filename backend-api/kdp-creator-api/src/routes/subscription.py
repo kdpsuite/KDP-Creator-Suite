@@ -66,6 +66,13 @@ SUBSCRIPTION_TIERS = {
 PUBLIC_TIERS = ('free', 'pro', 'studio')
 PAID_TIERS = ('pro', 'studio')
 
+# One Stripe Product per plan. Lookup keys work in both test and live if the
+# catalog is cloned with the same keys (Stripe catalog modeling best practice).
+PRICE_LOOKUP_KEYS = {
+    'pro': os.environ.get('STRIPE_LOOKUP_PRO', 'kdp_pro_monthly'),
+    'studio': os.environ.get('STRIPE_LOOKUP_STUDIO', 'kdp_studio_monthly'),
+}
+
 
 def _stripe_api_key():
     return os.environ.get('STRIPE_API_KEY') or os.environ.get('STRIPE_SECRET_KEY')
@@ -83,12 +90,33 @@ def _get_stripe():
     return stripe
 
 
-def _price_id_for_tier(tier):
+def _price_id_from_env(tier):
     env_map = {
         'pro': os.environ.get('STRIPE_PRICE_PRO'),
         'studio': os.environ.get('STRIPE_PRICE_STUDIO'),
     }
-    return env_map.get(tier)
+    return env_map.get(tier) or None
+
+
+def _price_id_from_lookup(tier):
+    stripe_client = _get_stripe()
+    lookup = PRICE_LOOKUP_KEYS.get(tier)
+    if not stripe_client or not lookup:
+        return None
+    try:
+        result = stripe_client.Price.list(lookup_keys=[lookup], active=True, limit=1)
+        data = result.get('data') if isinstance(result, dict) else getattr(result, 'data', None)
+        if not data:
+            return None
+        first = data[0]
+        return first.get('id') if isinstance(first, dict) else getattr(first, 'id', None)
+    except Exception as exc:
+        print(f'[subscription] lookup_key resolve failed for {tier}: {exc}')
+        return None
+
+
+def _price_id_for_tier(tier):
+    return _price_id_from_env(tier) or _price_id_from_lookup(tier)
 
 
 def _tier_for_price_id(price_id):
@@ -98,7 +126,14 @@ def _tier_for_price_id(price_id):
         os.environ.get('STRIPE_PRICE_PRO'): 'pro',
         os.environ.get('STRIPE_PRICE_STUDIO'): 'studio',
     }
-    return mapping.get(price_id)
+    mapped = mapping.get(price_id)
+    if mapped:
+        return mapped
+    for tier, lookup in PRICE_LOOKUP_KEYS.items():
+        resolved = _price_id_from_env(tier) or _price_id_from_lookup(tier)
+        if resolved == price_id:
+            return tier
+    return None
 
 
 def _frontend_url():
@@ -338,11 +373,16 @@ def create_checkout_session():
         session_params = {
             'mode': 'subscription',
             'line_items': [{'price': price_id, 'quantity': 1}],
-            'success_url': f'{_frontend_url()}/?checkout=success&tier={tier}',
+            'success_url': (
+                f'{_frontend_url()}/?checkout=success&tier={tier}'
+                '&session_id={CHECKOUT_SESSION_ID}'
+            ),
             'cancel_url': f'{_frontend_url()}/?checkout=canceled',
             'client_reference_id': str(user_id),
             'metadata': {'user_id': str(user_id), 'tier': tier},
             'subscription_data': {'metadata': {'user_id': str(user_id), 'tier': tier}},
+            'allow_promotion_codes': True,
+            'billing_address_collection': 'auto',
         }
         if customer_id:
             session_params['customer'] = customer_id
@@ -357,7 +397,7 @@ def create_checkout_session():
         })
     except Exception as exc:
         print(f'[subscription] checkout failed: {exc}')
-        return error_response(f'Failed to create checkout session: {exc}', 'CHECKOUT_ERROR', status_code=500)
+        return error_response('Failed to create checkout session.', 'CHECKOUT_ERROR', status_code=500)
 
 
 @subscription_bp.route('/billing-portal', methods=['POST'])
@@ -385,10 +425,11 @@ def create_billing_portal():
         return success_response({'portal_url': portal.url})
     except Exception as exc:
         print(f'[subscription] billing portal failed: {exc}')
-        return error_response(f'Failed to open billing portal: {exc}', 'PORTAL_ERROR', status_code=500)
+        return error_response('Failed to open billing portal.', 'PORTAL_ERROR', status_code=500)
 
 
 def _handle_checkout_completed(session):
+    session = _as_dict(session)
     user_id = session.get('client_reference_id') or (session.get('metadata') or {}).get('user_id')
     tier = (session.get('metadata') or {}).get('tier')
     customer_id = session.get('customer')
@@ -414,7 +455,37 @@ def _handle_checkout_completed(session):
     _set_tier_for_user(user_id, tier, stripe_customer_id=customer_id)
 
 
+def _as_dict(obj):
+    if obj is None:
+        return {}
+    if isinstance(obj, dict):
+        return obj
+    if hasattr(obj, 'to_dict'):
+        return obj.to_dict()
+    return dict(obj)
+
+
+def _handle_invoice_paid(invoice):
+    invoice = _as_dict(invoice)
+    sub_id = invoice.get('subscription')
+    if not sub_id:
+        parent = invoice.get('parent') or {}
+        sub_details = parent.get('subscription_details') or {}
+        sub_id = sub_details.get('subscription')
+    if not sub_id:
+        return
+    stripe_client = _get_stripe()
+    if not stripe_client:
+        return
+    try:
+        sub = stripe_client.Subscription.retrieve(sub_id)
+        _handle_subscription_updated(_as_dict(sub))
+    except Exception as exc:
+        print(f'[subscription] invoice.paid subscription retrieve failed: {exc}')
+
+
 def _handle_subscription_updated(subscription):
+    subscription = _as_dict(subscription)
     metadata = subscription.get('metadata') or {}
     user_id = metadata.get('user_id')
     tier = metadata.get('tier')
@@ -446,18 +517,20 @@ def stripe_webhook():
     if not stripe_client or not webhook_secret:
         return error_response('Stripe webhook not configured', 'WEBHOOK_NOT_CONFIGURED', status_code=503)
 
-    payload = request.get_data(as_text=True)
+    payload = request.get_data(cache=False)
     sig_header = request.headers.get('Stripe-Signature', '')
 
+    signature_error = getattr(stripe.error, 'SignatureVerificationError', Exception)
     try:
-        event = stripe_client.Webhook.construct_event(payload, sig_header, webhook_secret)
+        event = stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
     except ValueError:
         return error_response('Invalid payload', 'INVALID_PAYLOAD', status_code=400)
-    except stripe.error.SignatureVerificationError:
+    except signature_error:
         return error_response('Invalid signature', 'INVALID_SIGNATURE', status_code=400)
 
-    event_type = event['type']
-    data_object = event['data']['object']
+    event = _as_dict(event)
+    event_type = event.get('type')
+    data_object = (event.get('data') or {}).get('object') or {}
 
     if event_type == 'checkout.session.completed':
         _handle_checkout_completed(data_object)
@@ -468,6 +541,10 @@ def stripe_webhook():
         user_id = metadata.get('user_id')
         if user_id:
             _set_tier_for_user(user_id, 'free', stripe_customer_id=data_object.get('customer'))
+    elif event_type == 'invoice.paid':
+        _handle_invoice_paid(data_object)
+    elif event_type == 'invoice.payment_failed':
+        print(f'[subscription] invoice.payment_failed: {data_object.get("id")}')
     else:
         print(f'[subscription] ignored stripe event: {event_type}')
 
