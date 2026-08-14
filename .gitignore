@@ -25,6 +25,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+.cursor/settings.json
 
 # Misc
 *.log
