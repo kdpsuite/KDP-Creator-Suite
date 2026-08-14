@@ -119,6 +119,22 @@ def _price_id_for_tier(tier):
     return _price_id_from_env(tier) or _price_id_from_lookup(tier)
 
 
+def _usable_customer_id(stripe_client, customer_id):
+    """Return customer_id if it exists in the current Stripe mode; else None.
+
+    Profiles can hold a test-mode cus_ after Preview E2E; live keys then fail
+    Customer.retrieve / Checkout with that id.
+    """
+    if not customer_id or not stripe_client:
+        return None
+    try:
+        stripe_client.Customer.retrieve(customer_id)
+        return customer_id
+    except Exception as exc:
+        print(f'[subscription] ignoring unusable stripe customer {customer_id}: {exc}')
+        return None
+
+
 def _tier_for_price_id(price_id):
     if not price_id:
         return None
@@ -359,7 +375,10 @@ def create_checkout_session():
     profile = UserProfile.get_by_id(user_id) or {}
     email = getattr(request, 'user', None) and getattr(request.user, 'email', None)
     email = email or profile.get('email')
-    customer_id = profile.get('stripe_customer_id')
+    stored_customer_id = profile.get('stripe_customer_id')
+    customer_id = _usable_customer_id(stripe_client, stored_customer_id)
+    if stored_customer_id and not customer_id:
+        _update_profile(user_id, {'stripe_customer_id': None})
 
     try:
         if not customer_id and email:
@@ -409,7 +428,15 @@ def create_billing_portal():
 
     user_id = get_jwt_identity()
     profile = UserProfile.get_by_id(user_id) or {}
-    customer_id = profile.get('stripe_customer_id')
+    stored_customer_id = profile.get('stripe_customer_id')
+    customer_id = _usable_customer_id(stripe_client, stored_customer_id)
+    if stored_customer_id and not customer_id:
+        _update_profile(user_id, {'stripe_customer_id': None})
+        return error_response(
+            'Saved Stripe customer is invalid for this environment. Start Checkout again.',
+            'STALE_CUSTOMER',
+            status_code=400,
+        )
     if not customer_id:
         return error_response(
             'No Stripe customer on file. Complete a checkout first.',
