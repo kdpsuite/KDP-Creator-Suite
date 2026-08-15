@@ -25,7 +25,8 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
-.cursor/settings.json
+# Local Cursor state (settings, checkout URLs, debug logs) — never commit
+.cursor/
 
 # Misc
 *.log
