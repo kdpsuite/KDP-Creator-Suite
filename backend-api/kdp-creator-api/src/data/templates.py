@@ -122,7 +122,8 @@ STARTER_TEMPLATES: list[dict[str, Any]] = [
             "motif_set": "cottagecore",
             "art_pages": 20,
         },
-        "fields": SHARED_PRINT_FIELDS + [
+        "fields": SHARED_PRINT_FIELDS
+        + [
             {
                 "key": "single_sided",
                 "label": "Single-sided printing (art + backing)",
@@ -214,14 +215,22 @@ STARTER_TEMPLATES: list[dict[str, Any]] = [
             "mood_scale": "1-10",
             "tracker_frequency": "daily",
             "include_disclaimer": True,
-            "section_order": ["title", "disclaimer", "howto", "daily", "weekly", "notes"],
+            "section_order": [
+                "title",
+                "disclaimer",
+                "howto",
+                "daily",
+                "weekly",
+                "notes",
+            ],
             "custom_prompts": [
                 "What thought is looping today?",
                 "What evidence supports or challenges it?",
                 "What is one kind action I can take?",
             ],
         },
-        "fields": SHARED_PRINT_FIELDS + [
+        "fields": SHARED_PRINT_FIELDS
+        + [
             {
                 "key": "duration_days",
                 "label": "Journal duration (days)",
@@ -312,7 +321,8 @@ STARTER_TEMPLATES: list[dict[str, Any]] = [
             "include_pomodoro": True,
             "daily_pages_per_week": 0,
         },
-        "fields": SHARED_PRINT_FIELDS + [
+        "fields": SHARED_PRINT_FIELDS
+        + [
             {
                 "key": "dated_mode",
                 "label": "Dated planner",
@@ -379,7 +389,11 @@ STARTER_TEMPLATES: list[dict[str, Any]] = [
         "features": ["letter-tracing", "gamified-rewards", "large-print"],
         "tier_required": "pro",
         "tags": ["kids", "education", "phonics"],
-        "allowed_print_profiles": ["bw_white", "premium_color_white", "standard_color_white"],
+        "allowed_print_profiles": [
+            "bw_white",
+            "premium_color_white",
+            "standard_color_white",
+        ],
         "defaults": {
             "title": "Phonics Practice Workbook",
             "subtitle": "Letters, sounds, and tracing fun",
@@ -398,7 +412,8 @@ STARTER_TEMPLATES: list[dict[str, Any]] = [
             "include_progress": True,
             "activity_mix": "balanced",
         },
-        "fields": SHARED_PRINT_FIELDS + [
+        "fields": SHARED_PRINT_FIELDS
+        + [
             {
                 "key": "age_band",
                 "label": "Age band",
@@ -489,7 +504,8 @@ STARTER_TEMPLATES: list[dict[str, Any]] = [
             "include_summary": True,
             "columns": ["date", "sku", "item", "qty", "price", "fees", "notes"],
         },
-        "fields": SHARED_PRINT_FIELDS + [
+        "fields": SHARED_PRINT_FIELDS
+        + [
             {
                 "key": "large_print",
                 "label": "Large print mode",

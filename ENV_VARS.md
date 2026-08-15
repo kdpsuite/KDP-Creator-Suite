@@ -125,9 +125,9 @@ Code accepts either name (`STRIPE_API_KEY` preferred; `STRIPE_SECRET_KEY` common
 
 **`CORS_ORIGINS`** (Optional)
 - **Type:** String (comma-separated URLs)
-- **Example:** `https://dashboard.kdpsuite.com,https://kdpsuite.com,https://www.kdpsuite.com`
+- **Example:** `https://dashboard.kdpsuite.com,https://www.dashboard.kdpsuite.com,https://kdpsuite.com,https://www.kdpsuite.com`
 - **Purpose:** Allowed origins for CORS requests (credentials enabled)
-- **Notes:** Production default is the kdpsuite.com hosts above. `*` is rejected in production and remapped to localhost origins in development (flask-cors forbids `*` with credentials). Set explicitly on Preview if the frontend Vercel URL is not in the list.
+- **Notes:** Production default includes dashboard + www.dashboard + marketing hosts. `*` is rejected in production and remapped to localhost origins in development (flask-cors forbids `*` with credentials). Set explicitly on Preview if the frontend Vercel URL is not in the list.
 
 ### Logging Configuration
 

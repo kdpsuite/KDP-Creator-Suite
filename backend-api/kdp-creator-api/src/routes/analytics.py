@@ -1,104 +1,112 @@
-from flask import Blueprint, request
-from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
-from src.utils.responses import success_response, error_response
 from datetime import datetime, timedelta
-from src.utils.logger import PerformanceTimer
 
-analytics_bp = Blueprint('analytics', __name__)
+from flask import Blueprint, request
+
+from src.models.user import UserProfile, get_jwt_identity, jwt_required, supabase
+from src.utils.logger import PerformanceTimer
+from src.utils.responses import error_response, success_response
+
+analytics_bp = Blueprint("analytics", __name__)
 
 ALLOWED_EVENT_TYPES = {
-    'pdf_conversion_started',
-    'pdf_conversion_completed',
-    'pdf_conversion',
-    'pdf_coloring_conversion',
-    'kdp_formatting',
-    'kdp_validation',
-    'batch_processing_initiated',
-    'batch_process',
-    'batch_coloring_conversion',
-    'batch_coloring',
-    'user_registered',
-    'subscription_upgraded',
-    'support_ticket',
+    "pdf_conversion_started",
+    "pdf_conversion_completed",
+    "pdf_conversion",
+    "pdf_coloring_conversion",
+    "kdp_formatting",
+    "kdp_validation",
+    "batch_processing_initiated",
+    "batch_process",
+    "batch_coloring_conversion",
+    "batch_coloring",
+    "user_registered",
+    "subscription_upgraded",
+    "support_ticket",
 }
 
 CONVERSION_EVENT_TYPES = {
-    'pdf_conversion_completed',
-    'pdf_conversion',
-    'pdf_coloring_conversion',
-    'kdp_formatting',
-    'kdp_validation',
+    "pdf_conversion_completed",
+    "pdf_conversion",
+    "pdf_coloring_conversion",
+    "kdp_formatting",
+    "kdp_validation",
 }
 BATCH_EVENT_TYPES = {
-    'batch_processing_initiated',
-    'batch_process',
-    'batch_coloring_conversion',
-    'batch_coloring',
+    "batch_processing_initiated",
+    "batch_process",
+    "batch_coloring_conversion",
+    "batch_coloring",
 }
 
 
-@analytics_bp.route('/analytics/events', methods=['POST'])
+@analytics_bp.route("/analytics/events", methods=["POST"])
 @jwt_required()
 def record_event():
     user_id = get_jwt_identity()
     payload = request.get_json(silent=True) or {}
-    event_type = payload.get('event_type')
-    event_data = payload.get('event_data') or {}
+    event_type = payload.get("event_type")
+    event_data = payload.get("event_data") or {}
 
     if not event_type or event_type not in ALLOWED_EVENT_TYPES:
         return error_response(
-            'Invalid or missing event_type',
-            'INVALID_EVENT_TYPE',
+            "Invalid or missing event_type",
+            "INVALID_EVENT_TYPE",
             status_code=400,
         )
 
     try:
-        supabase.table('analytics_events').insert({
-            'user_id': user_id,
-            'event_type': event_type,
-            'event_data': event_data,
-        }).execute()
-        return success_response({'recorded': True}, status_code=201)
+        supabase.table("analytics_events").insert(
+            {
+                "user_id": user_id,
+                "event_type": event_type,
+                "event_data": event_data,
+            }
+        ).execute()
+        return success_response({"recorded": True}, status_code=201)
     except Exception as e:
         return error_response(
-            f'Failed to record event: {str(e)}',
-            'DATABASE_ERROR',
+            f"Failed to record event: {str(e)}",
+            "DATABASE_ERROR",
             status_code=500,
         )
 
 
-@analytics_bp.route('/user-metrics', methods=['GET'])
+@analytics_bp.route("/user-metrics", methods=["GET"])
 @jwt_required()
 def get_user_metrics():
     user_id = get_jwt_identity()
     profile = UserProfile.get_by_id(user_id)
     if not profile:
         from src.routes.subscription import SUBSCRIPTION_TIERS
-        tier_info = SUBSCRIPTION_TIERS['free']
-        return success_response({
-            'user_id': user_id,
-            'metrics': {
-                'total_conversions': 0,
-                'total_batch_operations': 0,
-                'subscription_tier': 'free',
-                'storage_used_mb': 0,
-                'last_active': datetime.now().isoformat(),
-                'daily_activity': [],
-                'file_types': {},
-                'usage_quota': {
-                    'conversions_used': 0,
-                    'conversions_limit': tier_info['monthly_conversions'],
-                    'batch_used': 0,
-                    'batch_limit': tier_info['batch_processing_limit'],
+
+        tier_info = SUBSCRIPTION_TIERS["free"]
+        return success_response(
+            {
+                "user_id": user_id,
+                "metrics": {
+                    "total_conversions": 0,
+                    "total_batch_operations": 0,
+                    "subscription_tier": "free",
+                    "storage_used_mb": 0,
+                    "last_active": datetime.now().isoformat(),
+                    "daily_activity": [],
+                    "file_types": {},
+                    "usage_quota": {
+                        "conversions_used": 0,
+                        "conversions_limit": tier_info["monthly_conversions"],
+                        "batch_used": 0,
+                        "batch_limit": tier_info["batch_processing_limit"],
+                    },
                 },
-            },
-        })
+            }
+        )
 
     from src.routes.subscription import SUBSCRIPTION_TIERS
-    tier = profile.get('subscription_tier', 'free')
-    tier_info = SUBSCRIPTION_TIERS.get(tier, SUBSCRIPTION_TIERS['free'])
-    max_conversions = tier_info['monthly_conversions']
-    max_batch = tier_info['batch_processing_limit']
+
+    tier = profile.get("subscription_tier", "free")
+    tier_info = SUBSCRIPTION_TIERS.get(tier, SUBSCRIPTION_TIERS["free"])
+    max_conversions = tier_info["monthly_conversions"]
+    max_batch = tier_info["batch_processing_limit"]
 
     with PerformanceTimer("fetch_user_analytics"):
         today = datetime.now().date()
@@ -106,104 +114,113 @@ def get_user_metrics():
 
         events = []
         try:
-            res = supabase.table('analytics_events').select(
-                'event_type, created_at, event_data'
-            ).eq('user_id', str(user_id)).gte(
-                'created_at', thirty_days_ago.isoformat()
-            ).order('created_at', desc=False).execute()
+            res = (
+                supabase.table("analytics_events")
+                .select("event_type, created_at, event_data")
+                .eq("user_id", str(user_id))
+                .gte("created_at", thirty_days_ago.isoformat())
+                .order("created_at", desc=False)
+                .execute()
+            )
             events = res.data or []
         except Exception as analytics_error:
             print(f"Failed to fetch analytics events for {user_id}: {analytics_error}")
             events = []
 
         daily_activity_map = {
-            (today - timedelta(days=i)).strftime('%Y-%m-%d'): {
-                'conversions': 0,
-                'batch_ops': 0,
+            (today - timedelta(days=i)).strftime("%Y-%m-%d"): {
+                "conversions": 0,
+                "batch_ops": 0,
             }
             for i in range(30)
         }
 
         file_types = {}
         for event in events:
-            created_at = event.get('created_at')
+            created_at = event.get("created_at")
             if not created_at:
                 continue
             try:
-                event_date = datetime.fromisoformat(
-                    created_at.replace('Z', '+00:00')
-                ).strftime('%Y-%m-%d')
+                event_date = datetime.fromisoformat(created_at.replace("Z", "+00:00")).strftime("%Y-%m-%d")
             except ValueError:
                 continue
 
-            event_type = event.get('event_type') or ''
+            event_type = event.get("event_type") or ""
             if event_date in daily_activity_map:
                 if event_type in CONVERSION_EVENT_TYPES:
-                    daily_activity_map[event_date]['conversions'] += 1
+                    daily_activity_map[event_date]["conversions"] += 1
                 elif event_type in BATCH_EVENT_TYPES:
-                    daily_activity_map[event_date]['batch_ops'] += 1
+                    daily_activity_map[event_date]["batch_ops"] += 1
 
-            event_data = event.get('event_data') or {}
-            fmt = event_data.get('format')
+            event_data = event.get("event_data") or {}
+            fmt = event_data.get("format")
             if fmt:
                 file_types[fmt] = file_types.get(fmt, 0) + 1
 
         daily_activity = [
-            {'date': date, 'conversions': data['conversions'], 'batch_ops': data['batch_ops']}
+            {
+                "date": date,
+                "conversions": data["conversions"],
+                "batch_ops": data["batch_ops"],
+            }
             for date, data in daily_activity_map.items()
         ]
-        daily_activity.sort(key=lambda x: x['date'])
+        daily_activity.sort(key=lambda x: x["date"])
 
-        conversions = sum(d['conversions'] for d in daily_activity)
-        batch_ops = sum(d['batch_ops'] for d in daily_activity)
+        conversions = sum(d["conversions"] for d in daily_activity)
+        batch_ops = sum(d["batch_ops"] for d in daily_activity)
 
-        profile_conversions = profile.get('conversions_this_month', conversions)
-        profile_batch = profile.get('batch_operations_this_month', batch_ops)
+        profile_conversions = profile.get("conversions_this_month", conversions)
+        profile_batch = profile.get("batch_operations_this_month", batch_ops)
 
-    return success_response({
-        'user_id': user_id,
-        'metrics': {
-            'total_conversions': max(conversions, profile_conversions or 0),
-            'total_batch_operations': max(batch_ops, profile_batch or 0),
-            'subscription_tier': tier,
-            'storage_used_mb': profile.get('storage_used_mb', 0) or 0,
-            'last_active': profile.get('updated_at', datetime.now().isoformat()),
-            'daily_activity': daily_activity,
-            'file_types': file_types,
-            'usage_quota': {
-                'conversions_used': max(conversions, profile_conversions or 0),
-                'conversions_limit': max_conversions,
-                'batch_used': max(batch_ops, profile_batch or 0),
-                'batch_limit': max_batch,
+    return success_response(
+        {
+            "user_id": user_id,
+            "metrics": {
+                "total_conversions": max(conversions, profile_conversions or 0),
+                "total_batch_operations": max(batch_ops, profile_batch or 0),
+                "subscription_tier": tier,
+                "storage_used_mb": profile.get("storage_used_mb", 0) or 0,
+                "last_active": profile.get("updated_at", datetime.now().isoformat()),
+                "daily_activity": daily_activity,
+                "file_types": file_types,
+                "usage_quota": {
+                    "conversions_used": max(conversions, profile_conversions or 0),
+                    "conversions_limit": max_conversions,
+                    "batch_used": max(batch_ops, profile_batch or 0),
+                    "batch_limit": max_batch,
+                },
             },
-        },
-    })
+        }
+    )
 
 
-@analytics_bp.route('/business-metrics', methods=['GET'])
+@analytics_bp.route("/business-metrics", methods=["GET"])
 @jwt_required()
 def get_business_metrics():
     try:
-        res = supabase.table('user_profiles').select('subscription_tier').execute()
+        res = supabase.table("user_profiles").select("subscription_tier").execute()
         profiles = res.data or []
 
         total_users = len(profiles)
         users_by_tier = {
-            'free': sum(1 for p in profiles if p.get('subscription_tier') == 'free'),
-            'pro': sum(1 for p in profiles if p.get('subscription_tier') == 'pro'),
-            'studio': sum(1 for p in profiles if p.get('subscription_tier') == 'studio'),
+            "free": sum(1 for p in profiles if p.get("subscription_tier") == "free"),
+            "pro": sum(1 for p in profiles if p.get("subscription_tier") == "pro"),
+            "studio": sum(1 for p in profiles if p.get("subscription_tier") == "studio"),
         }
 
-        return success_response({
-            'metrics': {
-                'total_users': total_users,
-                'subscription_distribution': users_by_tier,
-                'total_revenue': (users_by_tier['pro'] * 19.99) + (users_by_tier['studio'] * 49.99),
+        return success_response(
+            {
+                "metrics": {
+                    "total_users": total_users,
+                    "subscription_distribution": users_by_tier,
+                    "total_revenue": (users_by_tier["pro"] * 19.99) + (users_by_tier["studio"] * 49.99),
+                }
             }
-        })
+        )
     except Exception as e:
         return error_response(
-            f'Failed to fetch business metrics: {str(e)}',
-            'DATABASE_ERROR',
+            f"Failed to fetch business metrics: {str(e)}",
+            "DATABASE_ERROR",
             status_code=500,
         )

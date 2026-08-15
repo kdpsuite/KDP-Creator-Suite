@@ -129,18 +129,12 @@ class KdpSpecError(ValueError):
 
 
 def list_trim_sizes() -> list[dict[str, Any]]:
-    return [
-        {"key": key, "width": dims["width"], "height": dims["height"]}
-        for key, dims in KDP_TRIM_SIZES.items()
-    ]
+    return [{"key": key, "width": dims["width"], "height": dims["height"]} for key, dims in KDP_TRIM_SIZES.items()]
 
 
 def get_trim(trim_size: str) -> TrimSize:
     if trim_size not in KDP_TRIM_SIZES:
-        raise KdpSpecError(
-            f"Unsupported trim size '{trim_size}'. "
-            f"Supported: {', '.join(KDP_TRIM_SIZES)}"
-        )
+        raise KdpSpecError(f"Unsupported trim size '{trim_size}'. " f"Supported: {', '.join(KDP_TRIM_SIZES)}")
     dims = KDP_TRIM_SIZES[trim_size]
     return TrimSize(key=trim_size, width=dims["width"], height=dims["height"])
 
@@ -177,14 +171,10 @@ def validate_page_count(page_count: int, trim_size: str, print_profile: str) -> 
     max_pages = MAX_PAGES[trim_size][print_profile]
 
     if page_count < min_pages:
-        raise KdpSpecError(
-            f"Page count {page_count} is below KDP minimum {min_pages} "
-            f"for profile {print_profile}"
-        )
+        raise KdpSpecError(f"Page count {page_count} is below KDP minimum {min_pages} " f"for profile {print_profile}")
     if page_count > max_pages:
         raise KdpSpecError(
-            f"Page count {page_count} exceeds KDP maximum {max_pages} "
-            f"for {trim_size} / {print_profile}"
+            f"Page count {page_count} exceeds KDP maximum {max_pages} " f"for {trim_size} / {print_profile}"
         )
     return page_count
 
@@ -368,11 +358,14 @@ def pts_to_inches(value: float) -> float:
     return value / 72.0
 
 
-def dimensions_match(actual_w_in: float, actual_h_in: float, expected_w_in: float, expected_h_in: float, tolerance: float = 0.05) -> bool:
-    return (
-        abs(actual_w_in - expected_w_in) < tolerance
-        and abs(actual_h_in - expected_h_in) < tolerance
-    )
+def dimensions_match(
+    actual_w_in: float,
+    actual_h_in: float,
+    expected_w_in: float,
+    expected_h_in: float,
+    tolerance: float = 0.05,
+) -> bool:
+    return abs(actual_w_in - expected_w_in) < tolerance and abs(actual_h_in - expected_h_in) < tolerance
 
 
 def profile_label(print_profile: str) -> str:
@@ -388,9 +381,7 @@ def profile_label(print_profile: str) -> str:
 def specs_summary() -> dict[str, Any]:
     return {
         "trim_sizes": list_trim_sizes(),
-        "print_profiles": [
-            {"key": key, "label": profile_label(key)} for key in PRINT_PROFILES
-        ],
+        "print_profiles": [{"key": key, "label": profile_label(key)} for key in PRINT_PROFILES],
         "bleed_in": BLEED_IN,
         "min_page_count": MIN_PAGE_COUNT,
         "standard_color_min_page_count": STANDARD_COLOR_MIN_PAGES,

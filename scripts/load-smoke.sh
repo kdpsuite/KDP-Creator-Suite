@@ -23,6 +23,8 @@ PROBES=(
   "/api/pdf/batch-coloring|POST|401,422,429|0"
   "/api/batch/submit|POST|401,422,429|0"
   "/api/support/ticket|POST|401,422,429|0"
+  "/api/billing-portal|POST|401,422,429|0"
+  "/api/checkout|POST|401,422,429|0"
 )
 
 if [ -n "$JWT" ]; then
@@ -32,6 +34,7 @@ if [ -n "$JWT" ]; then
     "/api/pdf/convert-coloring|POST|400,401,422,429|1"
     "/api/batch/submit|POST|400,401,422,429|1"
     "/api/user-metrics|GET|200,401,422|1"
+    "/api/billing-portal|POST|200,400,401,422,429,500|1"
   )
 fi
 

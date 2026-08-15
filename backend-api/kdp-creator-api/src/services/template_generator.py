@@ -46,8 +46,9 @@ def _ensure_fonts() -> None:
         return
     _FONT_REGISTERED = True
     try:
-        import reportlab
         from pathlib import Path
+
+        import reportlab
 
         fonts_dir = Path(reportlab.__file__).resolve().parent / "fonts"
         candidates = [
@@ -181,7 +182,15 @@ class PageBuilder:
         self.canvas.setLineWidth(0.8)
         self.canvas.line(left, top - 10, right, top - 10)
 
-    def draw_paragraph(self, text: str, x: float, y: float, max_width: float, font_size: int = 10, leading: float = 14) -> float:
+    def draw_paragraph(
+        self,
+        text: str,
+        x: float,
+        y: float,
+        max_width: float,
+        font_size: int = 10,
+        leading: float = 14,
+    ) -> float:
         self.canvas.setFillColor(black)
         self.canvas.setFont(FONT_REGULAR, font_size)
         words = text.split()
@@ -218,7 +227,15 @@ class PageBuilder:
                 x += spacing
             y -= spacing
 
-    def draw_table(self, left: float, right: float, top: float, bottom: float, columns: list[str], row_height: float):
+    def draw_table(
+        self,
+        left: float,
+        right: float,
+        top: float,
+        bottom: float,
+        columns: list[str],
+        row_height: float,
+    ):
         self.canvas.setStrokeColor(HexColor("#64748b"))
         self.canvas.setLineWidth(0.7)
         col_count = max(len(columns), 1)
@@ -238,7 +255,15 @@ class PageBuilder:
                 self.canvas.line(left + i * col_w, y, left + i * col_w, y - row_height)
             y -= row_height
 
-    def draw_coloring_frame(self, left: float, right: float, top: float, bottom: float, motif: str, index: int):
+    def draw_coloring_frame(
+        self,
+        left: float,
+        right: float,
+        top: float,
+        bottom: float,
+        motif: str,
+        index: int,
+    ):
         self.canvas.setStrokeColor(black)
         self.canvas.setLineWidth(1.5)
         self.canvas.rect(left, bottom, right - left, top - bottom, fill=0, stroke=1)
@@ -338,7 +363,9 @@ def _copyright_page(builder: PageBuilder, options: dict[str, Any], target_pages:
     return True
 
 
-def generate_coloring_interior(builder: PageBuilder, options: dict[str, Any], accent: Color, target_pages: int) -> bytes:
+def generate_coloring_interior(
+    builder: PageBuilder, options: dict[str, Any], accent: Color, target_pages: int
+) -> bytes:
     _title_page(builder, options, accent, target_pages)
     if _as_bool(options.get("include_copyright"), True):
         _copyright_page(builder, options, target_pages)
@@ -573,7 +600,14 @@ def generate_phonics_interior(builder: PageBuilder, options: dict[str, Any], acc
                 for i in range(4):
                     builder.canvas.setStrokeColor(black)
                     builder.canvas.circle(left + 30, top - 50 - i * 55, 18, fill=0, stroke=1)
-                    builder.canvas.rect(left + 70, top - 65 - i * 55, right - left - 80, 30, fill=0, stroke=1)
+                    builder.canvas.rect(
+                        left + 70,
+                        top - 65 - i * 55,
+                        right - left - 80,
+                        30,
+                        fill=0,
+                        stroke=1,
+                    )
 
     if _as_bool(options.get("include_progress"), True):
         progress_box = builder.new_page(target_pages)
@@ -603,7 +637,15 @@ def generate_phonics_interior(builder: PageBuilder, options: dict[str, Any], acc
 
 def generate_log_interior(builder: PageBuilder, options: dict[str, Any], accent: Color, target_pages: int) -> bytes:
     _title_page(builder, options, accent, target_pages)
-    columns = _as_str_list(options.get("columns")) or ["date", "sku", "item", "qty", "price", "fees", "notes"]
+    columns = _as_str_list(options.get("columns")) or [
+        "date",
+        "sku",
+        "item",
+        "qty",
+        "price",
+        "fees",
+        "notes",
+    ]
     large = _as_bool(options.get("large_print"), True)
     density = str(options.get("row_density") or "comfortable")
     row_h = 22 if large or density == "comfortable" else 16
@@ -722,7 +764,10 @@ def generate_cover_pdf(options: dict[str, Any], page_count: int, print_profile: 
     barcode_h = BARCODE_H_IN * 72.0
     barcode_x = back_x + safe + BARCODE_SAFE_FROM_SPINE_IN * 72.0
     # Keep away from spine: for back cover, spine is on the right of back panel
-    barcode_x = min(barcode_x, back_x + trim_w_pt - safe - barcode_w - BARCODE_SAFE_FROM_SPINE_IN * 72.0)
+    barcode_x = min(
+        barcode_x,
+        back_x + trim_w_pt - safe - barcode_w - BARCODE_SAFE_FROM_SPINE_IN * 72.0,
+    )
     barcode_y = panel_bottom + BARCODE_SAFE_FROM_BOTTOM_IN * 72.0
     c.setStrokeColor(white)
     c.setFillColor(HexColor("#334155"))
@@ -809,7 +854,10 @@ def build_compliance_report(
         errors.append("Cover PDF must be exactly one page.")
     else:
         cpage = cover["pages"][0]
-        if abs(cpage["width_in"] - cover_meta["width_in"]) > 0.05 or abs(cpage["height_in"] - cover_meta["height_in"]) > 0.05:
+        if (
+            abs(cpage["width_in"] - cover_meta["width_in"]) > 0.05
+            or abs(cpage["height_in"] - cover_meta["height_in"]) > 0.05
+        ):
             errors.append("Cover dimensions do not match calculated wrap size.")
 
     if cover_meta.get("spine_text_included") and interior["num_pages"] < SPINE_TEXT_MIN_PAGES:
@@ -855,9 +903,7 @@ def generate_product(template: dict[str, Any], options: dict[str, Any] | None = 
         "premium_color_white",
     ]
     if print_profile not in allowed:
-        raise KdpSpecError(
-            f"Print profile '{print_profile}' is not allowed for template '{template['id']}'"
-        )
+        raise KdpSpecError(f"Print profile '{print_profile}' is not allowed for template '{template['id']}'")
 
     with_bleed = _as_bool(opts.get("with_bleed"), bool(template.get("bleed")))
     requested_pages = _as_int(opts.get("page_count"), int(template.get("page_count") or 24))

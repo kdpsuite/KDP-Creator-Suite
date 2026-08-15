@@ -1,20 +1,16 @@
-import io
-import uuid
 import base64
+import io
 import json
-from flask import Blueprint, request, current_app
-from pypdf import PdfReader, PdfWriter, Transformation
-from PIL import Image
-from reportlab.pdfgen import canvas
-from reportlab.lib.utils import ImageReader
-from reportlab.lib.colors import grey
+import uuid
 
-from src.models.user import jwt_required, get_jwt_identity
-from src.storage import upload_file
-from src.utils.responses import success_response, error_response
-from src.models.user import supabase
-from src.utils.rate_limit import rate_limit_pdf_processing
-from src.utils.logger import PerformanceTimer
+from flask import Blueprint, current_app, request
+from PIL import Image
+from pypdf import PdfReader, PdfWriter, Transformation
+from reportlab.lib.colors import grey
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
+
+from src.models.user import get_jwt_identity, jwt_required, supabase
 from src.routes.subscription import (
     enforce_batch_quota,
     enforce_conversion_quota,
@@ -23,16 +19,20 @@ from src.routes.subscription import (
 )
 from src.services.coloring import ColoringParamError, coloring_bitmap, parse_coloring_form
 from src.services.kdp_specs import (
+    MIN_PAGE_COUNT,
     PRINT_DPI,
+    STANDARD_COLOR_MIN_PAGES,
     KdpSpecError,
     get_trim,
     interior_page_size,
     interior_page_size_pts,
-    MIN_PAGE_COUNT,
-    STANDARD_COLOR_MIN_PAGES,
 )
+from src.storage import upload_file
+from src.utils.logger import PerformanceTimer
+from src.utils.rate_limit import rate_limit_pdf_processing
+from src.utils.responses import error_response, success_response
 
-pdf_bp = Blueprint('pdf', __name__)
+pdf_bp = Blueprint("pdf", __name__)
 
 PREVIEW_DPI = 72
 PREVIEW_QUALITY = 70
@@ -43,39 +43,39 @@ def record_pdf_analytics(user_id, event_type, event_data):
     if not supabase:
         return
     try:
-        supabase.table("analytics_events").insert({
-            "user_id": user_id,
-            "event_type": event_type,
-            "event_data": event_data,
-        }).execute()
+        supabase.table("analytics_events").insert(
+            {
+                "user_id": user_id,
+                "event_type": event_type,
+                "event_data": event_data,
+            }
+        ).execute()
     except Exception as analytics_error:
-        current_app.logger.warning(
-            f"Failed to record analytics event {event_type}: {analytics_error}"
-        )
+        current_app.logger.warning(f"Failed to record analytics event {event_type}: {analytics_error}")
 
 
 def get_kdp_dimensions(trim_size, target_format, with_bleed=None):
     """Return interior page size in PDF points using shared KDP specs."""
-    wants_print = 'print' in (target_format or '')
+    wants_print = "print" in (target_format or "")
     if with_bleed is None:
         with_bleed = wants_print
     try:
         return interior_page_size_pts(trim_size, with_bleed=with_bleed)
     except KdpSpecError:
         # Fall back to 6x9 rather than silently jumping to letter
-        return interior_page_size_pts('6x9', with_bleed=with_bleed)
+        return interior_page_size_pts("6x9", with_bleed=with_bleed)
 
 
 def generate_title_page_pdf(title, trim_size, with_bleed=True):
     """Create a simple title page PDF prepended to batch output."""
-    target_w, target_h = get_kdp_dimensions(trim_size, 'print', with_bleed=with_bleed)
+    target_w, target_h = get_kdp_dimensions(trim_size, "print", with_bleed=with_bleed)
     buffer = io.BytesIO()
     c = canvas.Canvas(buffer, pagesize=(target_w, target_h))
     c.setFillColor(grey)
-    c.setFont('Helvetica-Bold', min(36, target_w / 12))
+    c.setFont("Helvetica-Bold", min(36, target_w / 12))
     c.drawCentredString(target_w / 2, target_h / 2 + 20, title[:80])
-    c.setFont('Helvetica', 14)
-    c.drawCentredString(target_w / 2, target_h / 2 - 30, 'KDP Creator Suite')
+    c.setFont("Helvetica", 14)
+    c.drawCentredString(target_w / 2, target_h / 2 - 30, "KDP Creator Suite")
     c.showPage()
     c.save()
     buffer.seek(0)
@@ -84,7 +84,7 @@ def generate_title_page_pdf(title, trim_size, with_bleed=True):
 
 def _png_bytes_to_pdf_page(png_bytes, trim_size, with_bleed=True):
     """Place PNG on a correctly sized KDP page without stretching."""
-    target_w, target_h = get_kdp_dimensions(trim_size, 'print', with_bleed=with_bleed)
+    target_w, target_h = get_kdp_dimensions(trim_size, "print", with_bleed=with_bleed)
     img = Image.open(io.BytesIO(png_bytes))
     img_w_pt = img.width * 72 / PRINT_DPI
     img_h_pt = img.height * 72 / PRINT_DPI
@@ -104,12 +104,13 @@ def _png_bytes_to_pdf_page(png_bytes, trim_size, with_bleed=True):
     return PdfReader(temp_pdf_buffer).pages[0]
 
 
-def generate_optimized_preview(content_bytes, content_type='pdf'):
+def generate_optimized_preview(content_bytes, content_type="pdf"):
     """Generate a low-res preview. Safe if pdf2image/poppler are unavailable."""
     try:
-        if content_type == 'pdf':
+        if content_type == "pdf":
             try:
                 from pdf2image import convert_from_bytes
+
                 images = convert_from_bytes(content_bytes, first_page=1, last_page=1, dpi=PREVIEW_DPI)
                 if not images:
                     return None
@@ -122,8 +123,8 @@ def generate_optimized_preview(content_bytes, content_type='pdf'):
 
         preview_img.thumbnail((600, 600), Image.Resampling.LANCZOS)
         output = io.BytesIO()
-        preview_img.convert('RGB').save(output, format='JPEG', quality=PREVIEW_QUALITY, optimize=True)
-        return base64.b64encode(output.getvalue()).decode('utf-8')
+        preview_img.convert("RGB").save(output, format="JPEG", quality=PREVIEW_QUALITY, optimize=True)
+        return base64.b64encode(output.getvalue()).decode("utf-8")
     except Exception as e:
         current_app.logger.error(f"Optimized preview failed: {str(e)}")
         return None
@@ -153,7 +154,7 @@ def _coloring_bitmap(img_bytes, trim_size, with_bleed=True, **coloring_opts):
     return coloring_bitmap(img_bytes, trim_size, with_bleed=with_bleed, **coloring_opts)
 
 
-@pdf_bp.route('/pdf/convert-coloring', methods=['POST'])
+@pdf_bp.route("/pdf/convert-coloring", methods=["POST"])
 @rate_limit_pdf_processing
 @jwt_required()
 def convert_to_coloring():
@@ -161,8 +162,8 @@ def convert_to_coloring():
     quota_error = enforce_conversion_quota(user_id)
     if quota_error:
         return quota_error
-    if 'file' not in request.files:
-        return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
+    if "file" not in request.files:
+        return error_response("No file uploaded", "MISSING_FILE", status_code=400)
 
     file = request.files["file"]
     trim_size = request.form.get("trim_size", "8.5x11")
@@ -172,7 +173,7 @@ def convert_to_coloring():
         get_trim(trim_size)
         coloring_opts = parse_coloring_form(request.form)
     except KdpSpecError as exc:
-        return error_response(str(exc), 'INVALID_TRIM', status_code=400)
+        return error_response(str(exc), "INVALID_TRIM", status_code=400)
     except ColoringParamError as exc:
         return error_response(str(exc), exc.code, status_code=400)
 
@@ -184,7 +185,7 @@ def convert_to_coloring():
                 with_bleed=with_bleed,
                 **coloring_opts,
             )
-            preview = generate_optimized_preview(png_bytes, 'image')
+            preview = generate_optimized_preview(png_bytes, "image")
 
             # Prefer single-page PDF for KDP interior upload readiness
             as_pdf = request.form.get("output_format", "pdf").lower() != "png"
@@ -195,13 +196,13 @@ def convert_to_coloring():
                 writer.write(pdf_buffer)
                 output_bytes = pdf_buffer.getvalue()
                 filename = f"coloring_{uuid.uuid4().hex[:8]}.pdf"
-                file_format = 'PDF'
+                file_format = "PDF"
             else:
                 output_bytes = png_bytes
                 filename = f"coloring_{uuid.uuid4().hex[:8]}.png"
-                file_format = 'PNG'
+                file_format = "PNG"
 
-            storage_info = upload_file(output_bytes, str(user_id), filename, 'coloring_page')
+            storage_info = upload_file(output_bytes, str(user_id), filename, "coloring_page")
 
             record_pdf_analytics(
                 user_id,
@@ -215,14 +216,16 @@ def convert_to_coloring():
                 },
             )
             record_conversion_usage(user_id)
-            return success_response({
-                'download_url': storage_info['signed_url'],
-                'preview': preview,
-                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2),
-                'format': file_format,
-                'with_bleed': with_bleed,
-                'trim_size': trim_size,
-            })
+            return success_response(
+                {
+                    "download_url": storage_info["signed_url"],
+                    "preview": preview,
+                    "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2),
+                    "format": file_format,
+                    "with_bleed": with_bleed,
+                    "trim_size": trim_size,
+                }
+            )
         except ColoringParamError as exc:
             return error_response(str(exc), exc.code, status_code=400)
         except Exception as e:
@@ -235,7 +238,7 @@ def convert_to_coloring():
             return error_response("Conversion failed", "CONVERSION_ERROR", status_code=500)
 
 
-@pdf_bp.route('/pdf/format-kdp', methods=['POST'])
+@pdf_bp.route("/pdf/format-kdp", methods=["POST"])
 @rate_limit_pdf_processing
 @jwt_required()
 def format_kdp():
@@ -243,18 +246,18 @@ def format_kdp():
     quota_error = enforce_conversion_quota(user_id)
     if quota_error:
         return quota_error
-    if 'file' not in request.files:
-        return error_response('No file uploaded', 'MISSING_FILE', status_code=400)
+    if "file" not in request.files:
+        return error_response("No file uploaded", "MISSING_FILE", status_code=400)
 
-    file = request.files['file']
-    trim_size = request.form.get('trim_size', '8.5x11')
-    target_format = request.form.get('target_format', 'kdp-print')
-    with_bleed = 'print' in target_format and target_format != 'kdp-ebook'
+    file = request.files["file"]
+    trim_size = request.form.get("trim_size", "8.5x11")
+    target_format = request.form.get("target_format", "kdp-print")
+    with_bleed = "print" in target_format and target_format != "kdp-ebook"
 
     try:
         get_trim(trim_size)
     except KdpSpecError as exc:
-        return error_response(str(exc), 'INVALID_TRIM', status_code=400)
+        return error_response(str(exc), "INVALID_TRIM", status_code=400)
 
     with PerformanceTimer("kdp_formatting"):
         try:
@@ -262,22 +265,22 @@ def format_kdp():
             reader = PdfReader(io.BytesIO(pdf_bytes))
             writer = PdfWriter()
 
-            if target_format == 'kdp-ebook':
+            if target_format == "kdp-ebook":
                 # Pass through pages without print bleed sizing
                 for page in reader.pages:
                     writer.add_page(page)
             else:
-                target_w, target_h = get_kdp_dimensions(trim_size, 'print', with_bleed=with_bleed)
+                target_w, target_h = get_kdp_dimensions(trim_size, "print", with_bleed=with_bleed)
                 for page in reader.pages:
                     writer.add_page(_fit_page_to_target(page, target_w, target_h))
 
             # Pad to even page count for print interiors
-            if with_bleed or target_format == 'kdp-print':
+            if with_bleed or target_format == "kdp-print":
                 while len(writer.pages) % 2 != 0:
-                    target_w, target_h = get_kdp_dimensions(trim_size, 'print', with_bleed=with_bleed)
+                    target_w, target_h = get_kdp_dimensions(trim_size, "print", with_bleed=with_bleed)
                     writer.add_blank_page(width=target_w, height=target_h)
                 if len(writer.pages) < MIN_PAGE_COUNT:
-                    target_w, target_h = get_kdp_dimensions(trim_size, 'print', with_bleed=with_bleed)
+                    target_w, target_h = get_kdp_dimensions(trim_size, "print", with_bleed=with_bleed)
                     while len(writer.pages) < MIN_PAGE_COUNT:
                         writer.add_blank_page(width=target_w, height=target_h)
 
@@ -286,23 +289,30 @@ def format_kdp():
             output_bytes = output_buffer.getvalue()
 
             filename = f"kdp_{uuid.uuid4().hex[:8]}.pdf"
-            storage_info = upload_file(output_bytes, str(user_id), filename, 'kdp_formatted_pdf')
+            storage_info = upload_file(output_bytes, str(user_id), filename, "kdp_formatted_pdf")
 
             record_pdf_analytics(
                 user_id,
                 "kdp_formatting",
-                {"status": "success", "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2), "format": "PDF", "target_format": target_format},
+                {
+                    "status": "success",
+                    "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2),
+                    "format": "PDF",
+                    "target_format": target_format,
+                },
             )
             record_conversion_usage(user_id)
-            return success_response({
-                'download_url': storage_info['signed_url'],
-                'preview': generate_optimized_preview(output_bytes, 'pdf'),
-                'file_size_mb': round(len(output_bytes) / (1024 * 1024), 2),
-                'format': 'PDF',
-                'page_count': len(writer.pages),
-                'with_bleed': with_bleed,
-                'trim_size': trim_size,
-            })
+            return success_response(
+                {
+                    "download_url": storage_info["signed_url"],
+                    "preview": generate_optimized_preview(output_bytes, "pdf"),
+                    "file_size_mb": round(len(output_bytes) / (1024 * 1024), 2),
+                    "format": "PDF",
+                    "page_count": len(writer.pages),
+                    "with_bleed": with_bleed,
+                    "trim_size": trim_size,
+                }
+            )
         except Exception as e:
             current_app.logger.error(f"KDP formatting failed: {str(e)}")
             record_pdf_analytics(
@@ -326,14 +336,18 @@ def batch_convert_coloring():
 
     trim_size = request.form.get("trim_size", "8.5x11")
     cover_title = request.form.get("cover_title", "").strip()
-    generate_cover = request.form.get("generate_cover", "false").lower() in ("1", "true", "yes")
+    generate_cover = request.form.get("generate_cover", "false").lower() in (
+        "1",
+        "true",
+        "yes",
+    )
     with_bleed = request.form.get("with_bleed", "true").lower() in ("1", "true", "yes")
 
     try:
         get_trim(trim_size)
         coloring_opts = parse_coloring_form(request.form)
     except KdpSpecError as exc:
-        return error_response(str(exc), 'INVALID_TRIM', status_code=400)
+        return error_response(str(exc), "INVALID_TRIM", status_code=400)
     except ColoringParamError as exc:
         return error_response(str(exc), exc.code, status_code=400)
 
@@ -373,7 +387,7 @@ def batch_convert_coloring():
             for png_bytes in output_pngs:
                 pdf_writer.add_page(_png_bytes_to_pdf_page(png_bytes, trim_size, with_bleed=with_bleed))
 
-            target_w, target_h = get_kdp_dimensions(trim_size, 'print', with_bleed=with_bleed)
+            target_w, target_h = get_kdp_dimensions(trim_size, "print", with_bleed=with_bleed)
             while len(pdf_writer.pages) < MIN_PAGE_COUNT or len(pdf_writer.pages) % 2 != 0:
                 pdf_writer.add_blank_page(width=target_w, height=target_h)
 
@@ -382,7 +396,7 @@ def batch_convert_coloring():
             final_pdf_bytes = final_pdf_buffer.getvalue()
 
             filename = f"batch_coloring_{uuid.uuid4().hex[:8]}.pdf"
-            storage_info = upload_file(final_pdf_bytes, str(user_id), filename, 'batch_coloring_pdf')
+            storage_info = upload_file(final_pdf_bytes, str(user_id), filename, "batch_coloring_pdf")
 
             record_pdf_analytics(
                 user_id,
@@ -398,14 +412,16 @@ def batch_convert_coloring():
                 },
             )
             record_batch_usage(user_id)
-            return success_response({
-                'download_url': storage_info['signed_url'],
-                'preview': generate_optimized_preview(output_pngs[0], 'image') if output_pngs else None,
-                'file_size_mb': round(len(final_pdf_bytes) / (1024 * 1024), 2),
-                'format': 'PDF',
-                'page_count': len(pdf_writer.pages),
-                'with_bleed': with_bleed,
-            })
+            return success_response(
+                {
+                    "download_url": storage_info["signed_url"],
+                    "preview": (generate_optimized_preview(output_pngs[0], "image") if output_pngs else None),
+                    "file_size_mb": round(len(final_pdf_bytes) / (1024 * 1024), 2),
+                    "format": "PDF",
+                    "page_count": len(pdf_writer.pages),
+                    "with_bleed": with_bleed,
+                }
+            )
         except ColoringParamError as exc:
             return error_response(str(exc), exc.code, status_code=400)
         except Exception as e:
@@ -413,7 +429,12 @@ def batch_convert_coloring():
             record_pdf_analytics(
                 user_id,
                 "batch_coloring_conversion",
-                {"status": "failed", "error": str(e), "file_count": len(file_keys), "trim_size": trim_size},
+                {
+                    "status": "failed",
+                    "error": str(e),
+                    "file_count": len(file_keys),
+                    "trim_size": trim_size,
+                },
             )
             return error_response("Batch conversion failed", "BATCH_CONVERSION_ERROR", status_code=500)
 
@@ -429,13 +450,13 @@ def validate_kdp():
     file = request.files["file"]
     trim_size = request.form.get("trim_size", "8.5x11")
     target_format = request.form.get("target_format", "print")
-    with_bleed = 'print' in target_format
+    with_bleed = "print" in target_format
     print_profile = request.form.get("print_profile", "bw_white")
 
     try:
         get_trim(trim_size)
     except KdpSpecError as exc:
-        return error_response(str(exc), 'INVALID_TRIM', status_code=400)
+        return error_response(str(exc), "INVALID_TRIM", status_code=400)
 
     with PerformanceTimer("kdp_validation"):
         try:
@@ -455,9 +476,7 @@ def validate_kdp():
             if num_pages < MIN_PAGE_COUNT:
                 errors.append(f"Page count {num_pages} is below KDP paperback minimum of {MIN_PAGE_COUNT}.")
             if print_profile == "standard_color_white" and num_pages < STANDARD_COLOR_MIN_PAGES:
-                errors.append(
-                    f"Standard color requires at least {STANDARD_COLOR_MIN_PAGES} pages (got {num_pages})."
-                )
+                errors.append(f"Standard color requires at least {STANDARD_COLOR_MIN_PAGES} pages (got {num_pages}).")
 
             mismatched = 0
             for idx, page in enumerate(reader.pages, start=1):
@@ -490,22 +509,29 @@ def validate_kdp():
             record_pdf_analytics(
                 user_id,
                 "kdp_validation",
-                {"status": "success", "is_valid": is_valid, "num_pages": num_pages, "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}"},
+                {
+                    "status": "success",
+                    "is_valid": is_valid,
+                    "num_pages": num_pages,
+                    "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}",
+                },
             )
-            return success_response({
-                "is_valid": is_valid,
-                "num_pages": num_pages,
-                "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}",
-                "expected_dimensions_inches": f"{expected.width:.2f}x{expected.height:.2f}",
-                "errors": errors,
-                "warnings": warnings + errors,
-                "with_bleed": with_bleed,
-                "trim_size": trim_size,
-                "message": (
-                    "PDF validation complete. Always confirm with Amazon KDP Print Previewer "
-                    "and a physical proof before publishing."
-                ),
-            })
+            return success_response(
+                {
+                    "is_valid": is_valid,
+                    "num_pages": num_pages,
+                    "pdf_dimensions_inches": f"{pdf_width:.2f}x{pdf_height:.2f}",
+                    "expected_dimensions_inches": f"{expected.width:.2f}x{expected.height:.2f}",
+                    "errors": errors,
+                    "warnings": warnings + errors,
+                    "with_bleed": with_bleed,
+                    "trim_size": trim_size,
+                    "message": (
+                        "PDF validation complete. Always confirm with Amazon KDP Print Previewer "
+                        "and a physical proof before publishing."
+                    ),
+                }
+            )
         except Exception as e:
             current_app.logger.error(f"KDP validation failed: {str(e)}")
             record_pdf_analytics(

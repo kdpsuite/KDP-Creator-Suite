@@ -2,19 +2,19 @@
 Authentication sync route for bridging Supabase Auth with Flask backend.
 """
 
+import os
 from datetime import datetime
 
+import jwt as pyjwt
 from flask import Blueprint, request
 from flask_jwt_extended import create_access_token
 
-from src.models.user import User, UserProfile, db, get_supabase_user, jwt_required, get_jwt_identity
-from src.utils.responses import success_response, error_response
-import os
-import jwt as pyjwt
+from src.models.user import User, UserProfile, db, get_jwt_identity, get_supabase_user, jwt_required
+from src.utils.responses import error_response, success_response
 
-auth_sync_bp = Blueprint('auth_sync', __name__)
+auth_sync_bp = Blueprint("auth_sync", __name__)
 
-SUPABASE_JWT_SECRET = os.environ.get('SUPABASE_JWT_SECRET', None)
+SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", None)
 
 
 def verify_supabase_token(token: str) -> dict:
@@ -24,17 +24,17 @@ def verify_supabase_token(token: str) -> dict:
             return pyjwt.decode(
                 token,
                 SUPABASE_JWT_SECRET,
-                algorithms=['HS256'],
-                audience='authenticated',
+                algorithms=["HS256"],
+                audience="authenticated",
             )
-        env = (os.environ.get('ENVIRONMENT') or 'development').lower()
-        if env in ('production', 'prod', 'staging'):
-            print('Token verification failed: SUPABASE_JWT_SECRET is required in production')
+        env = (os.environ.get("ENVIRONMENT") or "development").lower()
+        if env in ("production", "prod", "staging"):
+            print("Token verification failed: SUPABASE_JWT_SECRET is required in production")
             return None
-        print('[WARNING] SUPABASE_JWT_SECRET unset — decoding JWT without signature verify (dev only)')
-        return pyjwt.decode(token, options={'verify_signature': False})
+        print("[WARNING] SUPABASE_JWT_SECRET unset — decoding JWT without signature verify (dev only)")
+        return pyjwt.decode(token, options={"verify_signature": False})
     except Exception as token_error:
-        print(f'Token verification failed: {token_error}')
+        print(f"Token verification failed: {token_error}")
         return None
 
 
@@ -45,63 +45,64 @@ def _upsert_user_profile(user) -> dict:
     if profile:
         return profile
 
-    email = user.email or ''
-    metadata = getattr(user, 'user_metadata', None) or {}
-    username = metadata.get('username', email.split('@')[0] if email else 'user')
+    email = user.email or ""
+    metadata = getattr(user, "user_metadata", None) or {}
+    username = metadata.get("username", email.split("@")[0] if email else "user")
 
     new_profile = {
-        'id': user_id,
-        'email': email,
-        'username': username,
-        'subscription_tier': 'free',
-        'conversions_this_month': 0,
-        'batch_operations_this_month': 0,
-        'last_usage_reset': datetime.utcnow().isoformat(),
-        'created_at': datetime.utcnow().isoformat(),
-        'updated_at': datetime.utcnow().isoformat(),
+        "id": user_id,
+        "email": email,
+        "username": username,
+        "subscription_tier": "free",
+        "conversions_this_month": 0,
+        "batch_operations_this_month": 0,
+        "last_usage_reset": datetime.utcnow().isoformat(),
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
     }
 
     from src.models.user import supabase
+
     if not supabase:
         return new_profile
 
-    res = supabase.table('user_profiles').insert(new_profile).execute()
+    res = supabase.table("user_profiles").insert(new_profile).execute()
     return res.data[0] if res.data else new_profile
 
 
-@auth_sync_bp.route('/sync-session', methods=['POST'])
+@auth_sync_bp.route("/sync-session", methods=["POST"])
 def sync_session():
     """Sync a Supabase session across domains after frontend login."""
     data = request.get_json() or {}
-    supabase_token = data.get('supabase_token')
+    supabase_token = data.get("supabase_token")
 
     if not supabase_token:
-        return error_response('Missing supabase_token', 'VALIDATION_ERROR', status_code=400)
+        return error_response("Missing supabase_token", "VALIDATION_ERROR", status_code=400)
 
     user = get_supabase_user(supabase_token)
     if not user:
-        return error_response('Invalid token', 'AUTH_INVALID', status_code=401)
+        return error_response("Invalid token", "AUTH_INVALID", status_code=401)
 
     try:
         profile = _upsert_user_profile(user)
         return success_response(
             {
-                'user_id': str(user.id),
-                'email': user.email,
-                'valid': True,
-                'profile': UserProfile.to_dict(profile),
+                "user_id": str(user.id),
+                "email": user.email,
+                "valid": True,
+                "profile": UserProfile.to_dict(profile),
             },
-            'Session synced successfully',
+            "Session synced successfully",
         )
     except Exception as sync_error:
         return error_response(
-            f'Session sync failed: {sync_error}',
-            'INTERNAL_ERROR',
+            f"Session sync failed: {sync_error}",
+            "INTERNAL_ERROR",
             status_code=500,
         )
 
 
-@auth_sync_bp.route('/validate-session', methods=['GET'])
+@auth_sync_bp.route("/validate-session", methods=["GET"])
 @jwt_required()
 def validate_session():
     """Validate the current Supabase-backed session."""
@@ -109,54 +110,54 @@ def validate_session():
     profile = UserProfile.get_by_id(user_id)
 
     if not profile:
-        return error_response('User not found', 'NOT_FOUND', status_code=404)
+        return error_response("User not found", "NOT_FOUND", status_code=404)
 
     return success_response(
         {
-            'user_id': user_id,
-            'valid': True,
-            'email': profile.get('email'),
+            "user_id": user_id,
+            "valid": True,
+            "email": profile.get("email"),
         },
-        'Session is valid',
+        "Session is valid",
     )
 
 
-@auth_sync_bp.route('/sync-supabase-user', methods=['POST'])
+@auth_sync_bp.route("/sync-supabase-user", methods=["POST"])
 def sync_supabase_user():
     """Sync a Supabase-authenticated user into the legacy Flask database."""
     data = request.get_json()
 
     if not data:
-        return error_response('Request body is required', 'VALIDATION_ERROR', status_code=400)
+        return error_response("Request body is required", "VALIDATION_ERROR", status_code=400)
 
-    supabase_token = data.get('supabase_token')
-    email = data.get('email')
-    username = data.get('username')
+    supabase_token = data.get("supabase_token")
+    email = data.get("email")
+    username = data.get("username")
 
     if not supabase_token or not email:
         return error_response(
-            'supabase_token and email are required',
-            'VALIDATION_ERROR',
+            "supabase_token and email are required",
+            "VALIDATION_ERROR",
             status_code=400,
         )
 
     token_payload = verify_supabase_token(supabase_token)
     if not token_payload:
-        return error_response('Invalid Supabase token', 'AUTH_INVALID', status_code=401)
+        return error_response("Invalid Supabase token", "AUTH_INVALID", status_code=401)
 
-    supabase_uuid = token_payload.get('sub')
+    supabase_uuid = token_payload.get("sub")
     if not supabase_uuid:
-        return error_response('Invalid token payload', 'AUTH_INVALID', status_code=401)
+        return error_response("Invalid token payload", "AUTH_INVALID", status_code=401)
 
     existing_user = User.query.filter_by(supabase_uuid=supabase_uuid).first()
     if existing_user:
         access_token = create_access_token(identity=str(existing_user.id))
         return success_response(
             {
-                'user': existing_user.to_dict(),
-                'access_token': access_token,
+                "user": existing_user.to_dict(),
+                "access_token": access_token,
             },
-            'User already synced',
+            "User already synced",
         )
 
     existing_email = User.query.filter_by(email=email).first()
@@ -166,19 +167,19 @@ def sync_supabase_user():
         access_token = create_access_token(identity=str(existing_email.id))
         return success_response(
             {
-                'user': existing_email.to_dict(),
-                'access_token': access_token,
+                "user": existing_email.to_dict(),
+                "access_token": access_token,
             },
-            'User linked to existing account',
+            "User linked to existing account",
         )
 
     if not username:
-        username = email.split('@')[0]
+        username = email.split("@")[0]
 
     base_username = username
     counter = 1
     while User.query.filter_by(username=username).first():
-        username = f'{base_username}_{counter}'
+        username = f"{base_username}_{counter}"
         counter += 1
 
     new_user = User(
@@ -194,37 +195,37 @@ def sync_supabase_user():
     access_token = create_access_token(identity=str(new_user.id))
     return success_response(
         {
-            'user': new_user.to_dict(),
-            'access_token': access_token,
+            "user": new_user.to_dict(),
+            "access_token": access_token,
         },
-        'User synced successfully',
+        "User synced successfully",
         status_code=201,
     )
 
 
-@auth_sync_bp.route('/validate-supabase-token', methods=['POST'])
+@auth_sync_bp.route("/validate-supabase-token", methods=["POST"])
 def validate_supabase_token():
     """Validate a Supabase JWT token and return user info if valid."""
     data = request.get_json()
 
-    if not data or not data.get('supabase_token'):
-        return error_response('supabase_token is required', 'VALIDATION_ERROR', status_code=400)
+    if not data or not data.get("supabase_token"):
+        return error_response("supabase_token is required", "VALIDATION_ERROR", status_code=400)
 
-    token_payload = verify_supabase_token(data['supabase_token'])
+    token_payload = verify_supabase_token(data["supabase_token"])
     if not token_payload:
-        return error_response('Invalid token', 'AUTH_INVALID', status_code=401)
+        return error_response("Invalid token", "AUTH_INVALID", status_code=401)
 
-    supabase_uuid = token_payload.get('sub')
-    email = token_payload.get('email')
+    supabase_uuid = token_payload.get("sub")
+    email = token_payload.get("email")
     user = User.query.filter_by(supabase_uuid=supabase_uuid).first()
 
     return success_response(
         {
-            'valid': True,
-            'supabase_uuid': supabase_uuid,
-            'email': email,
-            'synced': user is not None,
-            'user': user.to_dict() if user else None,
+            "valid": True,
+            "supabase_uuid": supabase_uuid,
+            "email": email,
+            "synced": user is not None,
+            "user": user.to_dict() if user else None,
         },
-        'Token validated',
+        "Token validated",
     )

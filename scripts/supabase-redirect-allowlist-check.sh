@@ -10,6 +10,7 @@
 #   https://kdpsuite.com
 #   https://www.kdpsuite.com
 #   https://dashboard.kdpsuite.com
+#   https://www.dashboard.kdpsuite.com  (Vercel alias)
 #   http://localhost:5173  (dev)
 #   http://localhost:3000  (dev)
 #
@@ -23,6 +24,7 @@ REQUIRED=(
   "https://kdpsuite.com"
   "https://www.kdpsuite.com"
   "https://dashboard.kdpsuite.com"
+  "https://www.dashboard.kdpsuite.com"
   "http://localhost:5173"
   "http://localhost:3000"
 )

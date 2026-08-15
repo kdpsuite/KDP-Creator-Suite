@@ -33,11 +33,11 @@ jobs:
 
       - name: Run Black (code formatter check)
         working-directory: backend-api/kdp-creator-api
-        run: black --check src/ || true
+        run: black --check --line-length 120 src/
 
       - name: Run isort (import sorter check)
         working-directory: backend-api/kdp-creator-api
-        run: isort --check-only src/ || true
+        run: isort --check-only src/
 
       - name: Run Flake8 (F/E701 blocking)
         working-directory: backend-api/kdp-creator-api

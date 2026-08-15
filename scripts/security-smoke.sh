@@ -8,6 +8,7 @@ set -euo pipefail
 
 API_BASE="${1:-https://dashboard-backend-hazel.vercel.app}"
 ORIGIN="${CHECK_ORIGIN:-https://dashboard.kdpsuite.com}"
+WWW_ORIGIN="${CHECK_WWW_ORIGIN:-https://www.dashboard.kdpsuite.com}"
 PASS=0
 FAIL=0
 
@@ -36,6 +37,7 @@ expect_auth_reject() {
 echo "KDP Creator Suite — Security smoke"
 echo "API base: $API_BASE"
 echo "Probe Origin: $ORIGIN"
+echo "Probe www Origin: $WWW_ORIGIN"
 echo ""
 
 echo "Health:"
@@ -57,6 +59,7 @@ expect_auth_reject POST /api/pdf/format-kdp
 expect_auth_reject POST /api/pdf/batch-coloring
 expect_auth_reject POST /api/batch/submit
 expect_auth_reject POST /api/checkout
+expect_auth_reject POST /api/billing-portal
 expect_auth_reject POST /api/support/ticket
 
 code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
@@ -94,6 +97,16 @@ elif [ -n "$acao" ]; then
   pass "Access-Control-Allow-Origin is restricted ($acao)"
 else
   fail "No Access-Control-Allow-Origin header observed"
+fi
+
+www_headers=$(curl -sS -D - -o /dev/null --max-time 15 -H "Origin: $WWW_ORIGIN" "$API_BASE/api/health" || true)
+www_acao=$(echo "$www_headers" | tr -d '\r' | awk -F': ' 'tolower($1)=="access-control-allow-origin"{print $2; exit}')
+if [ "$www_acao" = "$WWW_ORIGIN" ]; then
+  pass "www dashboard Origin allowed ($www_acao)"
+elif [ -z "$www_acao" ]; then
+  fail "www dashboard Origin missing ACAO (add https://www.dashboard.kdpsuite.com to CORS_ORIGINS)"
+else
+  fail "www dashboard Origin unexpected ACAO ($www_acao)"
 fi
 
 bad_origin_headers=$(curl -sS -D - -o /dev/null --max-time 15 \

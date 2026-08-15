@@ -410,7 +410,7 @@ VITE_SUPABASE_URL=https://[your-project].supabase.co
 VITE_SUPABASE_ANON_KEY=[your-anon-key]
 
 # CORS Configuration
-CORS_ORIGINS=https://kdpsuite.com,https://dashboard.kdpsuite.com,https://www.kdpsuite.com
+CORS_ORIGINS=https://kdpsuite.com,https://www.kdpsuite.com,https://dashboard.kdpsuite.com,https://www.dashboard.kdpsuite.com
 ```
 
 ---

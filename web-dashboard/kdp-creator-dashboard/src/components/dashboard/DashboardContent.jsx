@@ -136,6 +136,7 @@ export default function DashboardContent({ user, handleLogout }) {
   const [ticketBody, setTicketBody] = useState('')
   const [ticketSubmitting, setTicketSubmitting] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
+  const [portalLoading, setPortalLoading] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
   const [previewMeta, setPreviewMeta] = useState({ trimSize: '6x9', withBleed: true, pageCount: 24 })
@@ -248,6 +249,7 @@ export default function DashboardContent({ user, handleLogout }) {
 
   const handleBillingPortal = async () => {
     try {
+      setPortalLoading(true)
       const res = await subscriptionApi.openBillingPortal()
       const data = unwrapOk(res)
       if (!data?.portal_url) {
@@ -256,6 +258,7 @@ export default function DashboardContent({ user, handleLogout }) {
       window.location.assign(data.portal_url)
     } catch (error) {
       toast.error(apiErrorMessage(error, 'Unable to open billing portal'))
+      setPortalLoading(false)
     }
   }
 
@@ -820,9 +823,10 @@ export default function DashboardContent({ user, handleLogout }) {
                     size="sm"
                     variant="ghost"
                     className="mt-3 px-0"
+                    disabled={portalLoading}
                     onClick={handleBillingPortal}
                   >
-                    Manage billing
+                    {portalLoading ? 'Opening billing…' : 'Manage billing'}
                   </Button>
                 )}
               </CardContent>
@@ -1884,8 +1888,12 @@ export default function DashboardContent({ user, handleLogout }) {
                   </p>
                 </div>
                 {subscription?.billing?.has_customer && (
-                  <Button variant="outline" onClick={handleBillingPortal}>
-                    Manage billing
+                  <Button
+                    variant="outline"
+                    disabled={portalLoading}
+                    onClick={handleBillingPortal}
+                  >
+                    {portalLoading ? 'Opening billing…' : 'Manage billing'}
                   </Button>
                 )}
               </CardContent>
