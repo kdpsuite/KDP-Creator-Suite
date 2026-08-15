@@ -24,8 +24,8 @@ import { Badge } from '@/components/ui/badge.jsx'
 import { Progress } from '@/components/ui/progress.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { toast } from 'sonner'
-import { subscriptionApi, analyticsApi, pdfApi, templateApi, accountApi, getUploadErrorMessage } from '@/lib/api'
-import { STATUS_URL, SUPPORT_EMAIL } from '@/lib/monitoring'
+import { subscriptionApi, analyticsApi, pdfApi, templateApi, accountApi, supportApi, getUploadErrorMessage } from '@/lib/api'
+import { STATUS_URL, SUPPORT_EMAIL, HELP_URL } from '@/lib/monitoring'
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics'
 import { BatchFileQueue } from '@/components/batch/BatchFileQueue'
 import {
@@ -131,6 +131,10 @@ export default function DashboardContent({ user, handleLogout }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
   const [isDeletingAccount, setIsDeletingAccount] = useState(false)
+  const [ticketCategory, setTicketCategory] = useState('other')
+  const [ticketSubject, setTicketSubject] = useState('')
+  const [ticketBody, setTicketBody] = useState('')
+  const [ticketSubmitting, setTicketSubmitting] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
@@ -269,6 +273,29 @@ export default function DashboardContent({ user, handleLogout }) {
       toast.error(apiErrorMessage(error, 'Account deletion failed'))
     } finally {
       setIsDeletingAccount(false)
+    }
+  }
+
+  const handleSupportTicket = async () => {
+    if (!ticketSubject.trim() || !ticketBody.trim()) {
+      toast.error('Subject and message are required')
+      return
+    }
+    try {
+      setTicketSubmitting(true)
+      await supportApi.createTicket({
+        category: ticketCategory,
+        subject: ticketSubject.trim(),
+        body: ticketBody.trim(),
+      })
+      toast.success('Ticket recorded — we aim to reply within 1–2 business days')
+      setTicketSubject('')
+      setTicketBody('')
+      setTicketCategory('other')
+    } catch (error) {
+      toast.error(apiErrorMessage(error, 'Could not submit ticket'))
+    } finally {
+      setTicketSubmitting(false)
     }
   }
 
@@ -1783,6 +1810,12 @@ export default function DashboardContent({ user, handleLogout }) {
                   <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
                     <li>Include your account email and what you tried (convert, batch, billing).</li>
                     <li>
+                      Help center:{' '}
+                      <a className="underline" href={HELP_URL} target="_blank" rel="noreferrer">
+                        FAQ &amp; contact
+                      </a>
+                    </li>
+                    <li>
                       System status:{' '}
                       <a className="underline" href={STATUS_URL} target="_blank" rel="noreferrer">
                         public status page
@@ -1790,6 +1823,58 @@ export default function DashboardContent({ user, handleLogout }) {
                     </li>
                     <li>Paid members: use Manage billing below for invoices and plan changes when available.</li>
                   </ul>
+                </div>
+                <div className="space-y-3 border-t border-border/60 pt-4">
+                  <label className="text-sm font-medium">Support ticket</label>
+                  <p className="text-sm text-muted-foreground">
+                    Logged-in intake — stored on your account for follow-up (not a third-party desk).
+                  </p>
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground" htmlFor="ticket-category">
+                      Category
+                    </label>
+                    <select
+                      id="ticket-category"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={ticketCategory}
+                      onChange={(e) => setTicketCategory(e.target.value)}
+                    >
+                      <option value="convert">Convert / PDF</option>
+                      <option value="batch">Batch</option>
+                      <option value="billing">Billing</option>
+                      <option value="account">Account / login</option>
+                      <option value="bug">Bug</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <FormField
+                    label="Subject"
+                    name="ticket-subject"
+                    value={ticketSubject}
+                    onChange={(e) => setTicketSubject(e.target.value)}
+                    placeholder="Short summary"
+                  />
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium" htmlFor="ticket-body">
+                      Message
+                    </label>
+                    <textarea
+                      id="ticket-body"
+                      className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={ticketBody}
+                      onChange={(e) => setTicketBody(e.target.value)}
+                      placeholder="What happened, what you expected, steps to reproduce"
+                      maxLength={4000}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={ticketSubmitting}
+                    onClick={handleSupportTicket}
+                  >
+                    {ticketSubmitting ? 'Submitting…' : 'Submit ticket'}
+                  </Button>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">API access</label>

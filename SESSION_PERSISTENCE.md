@@ -1,8 +1,11 @@
 # Cross-Domain Session Persistence Guide
 
-> **STATUS (2026-08-10): PARTIALLY IMPLEMENTED.**
-> `sessionBridge.js`, `/sync-session`, `/validate-session`, and `tests/e2e/session-persistence.spec.js` are shipped.
-> Cross-subdomain localStorage still does not share tokens automatically — configure Supabase CORS for both domains and/or use cookie-domain (`.kdpsuite.com`) handoff for full cross-domain SSO.
+> **STATUS (2026-08-14): MOSTLY IMPLEMENTED.**
+> `sessionBridge.js` dual-writes tokens to `Domain=.kdpsuite.com` cookies and restores via
+> `setSession` when localStorage is empty. `/sync-session`, `/validate-session`, and
+> `tests/e2e/session-persistence.spec.js` are shipped.
+> **Ops remaining:** confirm Supabase Auth Site URL + Additional Redirect URLs include both
+> marketing and dashboard hosts — run `./scripts/supabase-redirect-allowlist-check.sh`.
 >
 > Canonical product status: [`urgent/cursor_please_readme.md`](urgent/cursor_please_readme.md).
 
@@ -10,7 +13,28 @@
 
 **Root Cause:** Supabase session tokens are stored in localStorage, which is domain-specific. When the user moves to a different subdomain, the session is lost.
 
-**Solution:** Implement cross-domain session sharing using Supabase's session storage capabilities and proper CORS configuration.
+**Solution:** Cookie-domain handoff (`.kdpsuite.com`) plus Supabase redirect allowlist for both hosts.
+
+---
+
+## Required Supabase Auth URLs
+
+Add these under **Authentication → URL Configuration**:
+
+| Role | URL |
+|------|-----|
+| Site URL (recommended) | `https://dashboard.kdpsuite.com` |
+| Additional redirect | `https://kdpsuite.com` |
+| Additional redirect | `https://www.kdpsuite.com` |
+| Additional redirect | `https://dashboard.kdpsuite.com` |
+| Dev | `http://localhost:5173`, `http://localhost:3000` |
+
+Verify with:
+
+```bash
+./scripts/supabase-redirect-allowlist-check.sh
+# optional: SUPABASE_ACCESS_TOKEN=… ./scripts/supabase-redirect-allowlist-check.sh
+```
 
 ---
 

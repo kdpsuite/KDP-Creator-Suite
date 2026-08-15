@@ -66,6 +66,7 @@ from src.routes.totp import totp_bp
 from src.routes.batch import batch_bp
 from src.routes.auth_sync import auth_sync_bp
 from src.routes.templates import templates_bp
+from src.routes.support import support_bp
 from src.utils.responses import success_response, error_response
 
 _DEFAULT_PROD_ORIGINS = (
@@ -147,6 +148,7 @@ app.register_blueprint(totp_bp, url_prefix='/api')
 app.register_blueprint(batch_bp, url_prefix='/api')
 app.register_blueprint(auth_sync_bp, url_prefix='/api')
 app.register_blueprint(templates_bp, url_prefix='/api')
+app.register_blueprint(support_bp, url_prefix='/api')
 
 # Database configuration
 database_url = os.environ.get('DATABASE_URL')

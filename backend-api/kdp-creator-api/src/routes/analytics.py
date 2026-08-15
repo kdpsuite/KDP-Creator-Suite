@@ -19,6 +19,7 @@ ALLOWED_EVENT_TYPES = {
     'batch_coloring',
     'user_registered',
     'subscription_upgraded',
+    'support_ticket',
 }
 
 CONVERSION_EVENT_TYPES = {

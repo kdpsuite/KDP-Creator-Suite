@@ -9,7 +9,11 @@
       "destination": "/status.html"
     },
     {
-      "source": "/((?!api/|status(?:\\.html)?$|favicon\\.ico|assets/).*)",
+      "source": "/help",
+      "destination": "/help.html"
+    },
+    {
+      "source": "/((?!api/|status(?:\\.html)?$|help(?:\\.html)?$|favicon\\.ico|assets/).*)",
       "destination": "/index.html"
     }
   ]

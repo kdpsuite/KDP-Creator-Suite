@@ -57,6 +57,7 @@ expect_auth_reject POST /api/pdf/format-kdp
 expect_auth_reject POST /api/pdf/batch-coloring
 expect_auth_reject POST /api/batch/submit
 expect_auth_reject POST /api/checkout
+expect_auth_reject POST /api/support/ticket
 
 code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
   -H "Authorization: Bearer not.a.jwt" "$API_BASE/api/status" || echo 000)

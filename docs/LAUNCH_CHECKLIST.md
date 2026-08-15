@@ -9,7 +9,7 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Item | Status | Notes |
 |------|--------|-------|
 | Security audit | Partial | CORS + headers + expanded `security-smoke` + `security-audit-checklist.sh`; formal pen-test still pending |
-| Performance testing | Partial | `load-smoke.sh` covers health + convert/batch auth-gate concurrency; authenticated convert load still manual |
+| Performance testing | Partial | `load-smoke.sh` health + unauth gates; set `LOAD_SMOKE_JWT` for authenticated convert/batch/status probes |
 | Beta user testing | Manual | Recruit beta cohort; no code dependency |
 | Payment processing testing | Manual | Stripe sandbox verification — Checkout coded on `main`; needs Stripe env + webhook |
 | App store submissions | Manual | iOS/Android store listings |
@@ -23,7 +23,8 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Liveness probe | Done | `GET /api/health/live` |
 | Pre-launch smoke script | Done | `scripts/pre-launch-check.sh` |
 | Security smoke script | Done | `scripts/security-smoke.sh` |
-| Load smoke script | Done | `scripts/load-smoke.sh` |
+| Load smoke script | Done | `scripts/load-smoke.sh` (+ optional `LOAD_SMOKE_JWT`) |
+| Support ticket intake | Done | `POST /api/support/ticket` + public `/help` |
 | Production CORS allowlist | Done | `CORS_ORIGINS` / defaults in `src/main.py` |
 | Env var startup validation | Done | `backend-api/kdp-creator-api/src/main.py` |
 | Rate limiting | Done | `src/utils/rate_limit.py` |
@@ -43,14 +44,14 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Configure monitoring | Done | Sentry verified on FE+BE |
 | Launch marketing campaigns | Manual | Out of scope for code |
 | Monitor system performance | Partial | `/api/health/*` + analytics + Sentry |
-| Customer support readiness | Partial | Settings support + mailto + public `/status` page; full help desk still pending |
+| Customer support readiness | Partial | Public `/help` FAQ + Settings ticket form → `POST /api/support/ticket`; mailto SLA; no SaaS desk |
 
 ## Post-Launch (Week +1)
 
 | Item | Status | Notes |
 |------|--------|-------|
 | Analyze user feedback | Manual | Use analytics dashboard + support tickets |
-| Monitor conversion rates | Partial | `analytics_events` table + frontend `trackEvent()` |
+| Monitor conversion rates | Partial | `conversion-funnel-query.sql` + `conversion-funnel-review.sh` monthly cadence |
 | Track technical metrics | Partial | Health endpoints + Sentry; full APM deferred |
 | Plan first update | Manual | Product planning |
 

@@ -70,3 +70,13 @@ SELECT
       AND coalesce(subscription_tier, 'free') <> 'free'
   ) AS new_paid_profiles_30d
 FROM user_profiles;
+
+-- 6) Support tickets last 30 days (in-app help desk)
+SELECT
+  coalesce(event_data->>'category', 'unknown') AS category,
+  count(*) AS tickets
+FROM analytics_events
+WHERE event_type = 'support_ticket'
+  AND created_at >= now() - interval '30 days'
+GROUP BY 1
+ORDER BY tickets DESC;

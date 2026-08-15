@@ -11,6 +11,12 @@ export const STATUS_URL =
     ? `${window.location.origin}/status`
     : 'https://dashboard.kdpsuite.com/status')
 
+export const HELP_URL =
+  import.meta.env.VITE_HELP_URL ||
+  (typeof window !== 'undefined'
+    ? `${window.location.origin}/help`
+    : 'https://dashboard.kdpsuite.com/help')
+
 let sentryReady = false
 
 export function initMonitoring() {

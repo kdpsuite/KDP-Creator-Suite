@@ -226,6 +226,11 @@ export const accountApi = {
   deleteUser: (userId) => api.delete(`/users/${userId}`),
 };
 
+export const supportApi = {
+  createTicket: ({ category, subject, body }) =>
+    api.post('/support/ticket', { category, subject, body }),
+};
+
 export const analyticsApi = {
   getUserMetrics: () => api.get('/user-metrics'),
   trackEvent: (eventType, eventData = {}) =>

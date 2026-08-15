@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>KDP Creator Suite — Help</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --text: #e8eef4;
+      --muted: #8b9aab;
+      --accent: #4a9fd4;
+      --line: #2a3542;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #1c3a4f 0%, transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, #24301f 0%, transparent 50%),
+        var(--bg);
+      color: var(--text);
+    }
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+    }
+    h1 {
+      font-family: "IBM Plex Serif", Georgia, serif;
+      font-weight: 600;
+      font-size: 1.75rem;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin: 28px 0 12px;
+      font-weight: 600;
+    }
+    .sub { color: var(--muted); margin: 0 0 28px; font-size: 0.95rem; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      padding: 16px 18px;
+      margin-bottom: 12px;
+    }
+    .panel dt {
+      font-weight: 600;
+      margin: 0 0 4px;
+    }
+    .panel dd {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+    .panel dd:last-child { margin-bottom: 0; }
+    a { color: var(--accent); }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 20px;
+      margin-top: 8px;
+      font-size: 0.92rem;
+    }
+    .note {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 20px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Help &amp; support</h1>
+    <p class="sub">
+      FAQ and how to reach us. Logged-in members can also open a ticket from Dashboard → Settings.
+    </p>
+
+    <h2>Quick links</h2>
+    <div class="panel links">
+      <a href="/status">System status</a>
+      <a href="/">Open dashboard</a>
+      <a href="mailto:support@kdpsuite.com?subject=KDP%20Creator%20Suite%20support">Email support@kdpsuite.com</a>
+    </div>
+
+    <h2>FAQ</h2>
+    <dl class="panel">
+      <dt>I got logged out between kdpsuite.com and the dashboard</dt>
+      <dd>
+        Sign in once on the dashboard. Sessions are shared via <code>.kdpsuite.com</code> cookies when both hosts are on the allowlist. If it still fails, clear site data for both hosts and sign in again.
+      </dd>
+      <dt>Convert or batch fails / quota errors</dt>
+      <dd>
+        Free tier has monthly limits. Check Settings for usage, or email support with your account email and the error message.
+      </dd>
+      <dt>Billing / invoices</dt>
+      <dd>
+        Paid members: Settings → Manage billing when a Stripe customer exists. For unpaid Checkout or portal issues, email support with the Checkout session id if you have it.
+      </dd>
+      <dt>How fast do you reply?</dt>
+      <dd>Typical reply within 1–2 business days. Include account email and what you tried.</dd>
+    </dl>
+
+    <h2>Open a ticket (signed in)</h2>
+    <div class="panel">
+      <p style="margin:0;color:var(--muted);font-size:0.92rem;line-height:1.45">
+        Use <strong>Dashboard → Settings → Support ticket</strong> while signed in.
+        Tickets are stored against your account for follow-up. You can also email
+        <a href="mailto:support@kdpsuite.com">support@kdpsuite.com</a>.
+      </p>
+    </div>
+
+    <p class="note">
+      This is the in-product help desk for launch. No third-party ticket SaaS yet.
+      Status probes: <a href="/status">/status</a>.
+    </p>
+  </main>
+</body>
+</html>
