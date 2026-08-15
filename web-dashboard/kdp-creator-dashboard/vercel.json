@@ -5,7 +5,11 @@
       "destination": "https://dashboard-backend-hazel.vercel.app/api/:path*"
     },
     {
-      "source": "/(.*)",
+      "source": "/status",
+      "destination": "/status.html"
+    },
+    {
+      "source": "/((?!api/|status(?:\\.html)?$|favicon\\.ico|assets/).*)",
       "destination": "/index.html"
     }
   ]

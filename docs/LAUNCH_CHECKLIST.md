@@ -8,8 +8,8 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Security audit | Partial | CORS allowlist + security headers + `scripts/security-smoke.sh` shipped; formal pen-test still pending |
-| Performance testing | Partial | `scripts/load-smoke.sh` concurrent health smoke; deeper convert/batch load still manual |
+| Security audit | Partial | CORS + headers + expanded `security-smoke` + `security-audit-checklist.sh`; formal pen-test still pending |
+| Performance testing | Partial | `load-smoke.sh` covers health + convert/batch auth-gate concurrency; authenticated convert load still manual |
 | Beta user testing | Manual | Recruit beta cohort; no code dependency |
 | Payment processing testing | Manual | Stripe sandbox verification — Checkout coded on `main`; needs Stripe env + webhook |
 | App store submissions | Manual | iOS/Android store listings |
@@ -43,7 +43,7 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Configure monitoring | Done | Sentry verified on FE+BE |
 | Launch marketing campaigns | Manual | Out of scope for code |
 | Monitor system performance | Partial | `/api/health/*` + analytics + Sentry |
-| Customer support readiness | Partial | Settings support + mailto + API health status link; full help desk / status page still pending |
+| Customer support readiness | Partial | Settings support + mailto + public `/status` page; full help desk still pending |
 
 ## Post-Launch (Week +1)
 

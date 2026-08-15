@@ -7,7 +7,9 @@ export const SUPPORT_EMAIL =
 
 export const STATUS_URL =
   import.meta.env.VITE_STATUS_URL ||
-  'https://dashboard-backend-hazel.vercel.app/api/health'
+  (typeof window !== 'undefined'
+    ? `${window.location.origin}/status`
+    : 'https://dashboard.kdpsuite.com/status')
 
 let sentryReady = false
 

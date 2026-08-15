@@ -1,8 +1,7 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, request
 from src.models.user import supabase, UserProfile, BatchJob, jwt_required, get_jwt_identity
 from src.utils.responses import success_response, error_response
 from src.utils.rate_limit import rate_limit_batch_processing
-from src.utils.logger import PerformanceTimer
 from src.routes.subscription import enforce_batch_quota, record_batch_usage
 from datetime import datetime
 import threading
@@ -74,7 +73,8 @@ def _process_batch_job_optimized(job_id):
         supabase.table('batch_jobs').update({'status': 'processing'}).eq('id', job_id).execute()
 
         res = supabase.table('batch_jobs').select('total_files').eq('id', job_id).single().execute()
-        if not res.data: return
+        if not res.data:
+            return
         total_files = res.data['total_files']
 
         # Optimization: Update DB every 10% or every 10 files, whichever is smaller

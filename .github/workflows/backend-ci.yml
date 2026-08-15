@@ -39,9 +39,13 @@ jobs:
         working-directory: backend-api/kdp-creator-api
         run: isort --check-only src/ || true
 
-      - name: Run Flake8
+      - name: Run Flake8 (F/E701 blocking)
         working-directory: backend-api/kdp-creator-api
-        run: flake8 src/ --max-line-length=120 --extend-ignore=E203,W503 || true
+        run: flake8 src/ --select=F401,F541,E701 --max-line-length=120
+
+      - name: Run Flake8 (style soft-fail)
+        working-directory: backend-api/kdp-creator-api
+        run: flake8 src/ --max-line-length=120 --extend-ignore=E203,W503,F401,F541,E701 || true
 
       - name: Run Pylint
         working-directory: backend-api/kdp-creator-api

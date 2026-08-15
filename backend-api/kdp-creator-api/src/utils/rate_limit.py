@@ -11,7 +11,6 @@ Uses in-memory storage (suitable for single-instance deployments).
 For multi-instance deployments, use Redis.
 """
 
-import os
 import time
 from functools import wraps
 from flask import request

@@ -1,5 +1,4 @@
 import os
-import jwt
 from functools import wraps
 from flask import request
 from src.utils.responses import error_response
@@ -12,7 +11,7 @@ bcrypt = Bcrypt()
 # Initialize Supabase client (resilient - won't crash if env vars missing)
 supabase = None
 try:
-    from supabase import create_client, Client
+    from supabase import create_client
     url = os.environ.get("SUPABASE_URL")
     key = (
         os.environ.get("SUPABASE_SERVICE_ROLE_KEY")

@@ -1,11 +1,10 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request
 from src.models.user import supabase, UserProfile, jwt_required, get_jwt_identity
 from src.utils.validation import validate_json, log_request, sanitize_email
 from src.utils.responses import success_response, error_response
-from src.utils.logger import logger, log_info, log_warning, log_error_msg, PerformanceTimer
+from src.utils.logger import log_info, log_warning, log_error_msg, PerformanceTimer
 from src.utils.rate_limit import rate_limit_password_reset
-from datetime import datetime, timedelta
-import secrets
+from datetime import datetime
 from marshmallow import Schema, fields
 
 user_bp = Blueprint('user', __name__)
@@ -72,7 +71,7 @@ def get_users():
 def update_user(user_id):
     current_user_id = get_jwt_identity()
     if str(user_id) != current_user_id:
-        log_warning(f'Unauthorized update attempt', user_id=user_id, current_user_id=current_user_id)
+        log_warning('Unauthorized update attempt', user_id=user_id, current_user_id=current_user_id)
         return error_response('Unauthorized to update this user', 'UNAUTHORIZED', status_code=403)
         
     data = request.validated_data
@@ -100,10 +99,10 @@ def update_user(user_id):
             if not res.data:
                 return error_response('User not found', 'USER_NOT_FOUND', status_code=404)
             
-            log_info(f'User updated', user_id=user_id, fields=list(update_data.keys()))
+            log_info('User updated', user_id=user_id, fields=list(update_data.keys()))
             return success_response(UserProfile.to_dict(res.data[0]), 'User updated successfully')
     except Exception as e:
-        log_error_msg(f'Failed to update user', user_id=user_id, error=str(e))
+        log_error_msg('Failed to update user', user_id=user_id, error=str(e))
         return error_response(f'Failed to update user: {str(e)}', 'DATABASE_ERROR', status_code=500)
 
 @user_bp.route('/users/<user_id>', methods=['DELETE'])
@@ -112,7 +111,7 @@ def update_user(user_id):
 def delete_user(user_id):
     current_user_id = get_jwt_identity()
     if str(user_id) != current_user_id:
-        log_warning(f'Unauthorized delete attempt', user_id=user_id, current_user_id=current_user_id)
+        log_warning('Unauthorized delete attempt', user_id=user_id, current_user_id=current_user_id)
         return error_response('Unauthorized to delete this user', 'UNAUTHORIZED', status_code=403)
 
     try:
@@ -126,10 +125,10 @@ def delete_user(user_id):
                     user_id=user_id,
                     error=str(auth_delete_error),
                 )
-            log_info(f'User deleted', user_id=user_id)
+            log_info('User deleted', user_id=user_id)
             return success_response(message='User deleted successfully')
     except Exception as e:
-        log_error_msg(f'Failed to delete user', user_id=user_id, error=str(e))
+        log_error_msg('Failed to delete user', user_id=user_id, error=str(e))
         return error_response(f'Failed to delete user: {str(e)}', 'DATABASE_ERROR', status_code=500)
 
 

@@ -47,6 +47,7 @@ import { FormField } from '@/components/FormField'
 import { Tooltip } from '@/components/Tooltip'
 import { PageTransition } from '@/components/animations/PageTransition'
 import { OnboardingTooltip } from '@/components/onboarding/OnboardingTooltip'
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour'
 import { KdpSafeZoneOverlay } from '@/components/KdpSafeZoneOverlay'
 import { TemplateCustomizer } from '@/components/templates/TemplateCustomizer'
 import { useOnboarding } from '@/hooks/useOnboarding'
@@ -611,7 +612,22 @@ export default function DashboardContent({ user, handleLogout }) {
     }
   }, [loadDashboardData])
 
-  const { shouldShowTooltip, dismissTooltip } = useOnboarding()
+  const {
+    shouldShowTooltip,
+    dismissTooltip,
+    isFirstVisit,
+    tourStep,
+    tourTotal,
+    currentTour,
+    nextTourStep,
+    skipTour,
+  } = useOnboarding()
+
+  useEffect(() => {
+    if (currentTour?.tab) {
+      setActiveTab(currentTour.tab)
+    }
+  }, [currentTour?.tab])
 
   if (loading) {
     return (
@@ -701,6 +717,17 @@ export default function DashboardContent({ user, handleLogout }) {
           </Button>
         </div>
       </div>
+
+      {isFirstVisit && currentTour ? (
+        <OnboardingTour
+          step={tourStep}
+          total={tourTotal}
+          title={currentTour.title}
+          body={currentTour.body}
+          onNext={nextTourStep}
+          onSkip={skipTour}
+        />
+      ) : null}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="glass p-1 rounded-xl">
@@ -848,11 +875,14 @@ export default function DashboardContent({ user, handleLogout }) {
 
           <div className="mt-8">
             <h2 className="text-2xl font-bold mb-4">Recent Projects</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Saved in this browser only — not synced to the cloud yet.
+            </p>
             {templates.length === 0 ? (
               <EmptyState
                 icon={EmptyProjectsIllustration}
                 title="No projects yet"
-                description="Create your first KDP project to start optimizing your publishing workflow."
+                description="Create a local KDP project draft in this browser to start your publishing workflow."
                 action={() => setActiveTab('tools')}
                 actionLabel="Create Project"
               />
@@ -1753,9 +1783,9 @@ export default function DashboardContent({ user, handleLogout }) {
                   <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
                     <li>Include your account email and what you tried (convert, batch, billing).</li>
                     <li>
-                      API status:{' '}
+                      System status:{' '}
                       <a className="underline" href={STATUS_URL} target="_blank" rel="noreferrer">
-                        live health check
+                        public status page
                       </a>
                     </li>
                     <li>Paid members: use Manage billing below for invoices and plan changes when available.</li>

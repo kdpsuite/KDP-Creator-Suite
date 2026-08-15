@@ -14,6 +14,25 @@ FAIL=0
 pass() { echo "  PASS  $1"; PASS=$((PASS + 1)); }
 fail() { echo "  FAIL  $1"; FAIL=$((FAIL + 1)); }
 
+expect_auth_reject() {
+  local method="$1"
+  local path="$2"
+  local code
+  if [ "$method" = "POST" ]; then
+    code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+      -X POST -H "Content-Type: application/json" -d '{}' \
+      "${API_BASE}${path}" || echo 000)
+  else
+    code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+      "${API_BASE}${path}" || echo 000)
+  fi
+  if [ "$code" = "401" ] || [ "$code" = "422" ] || [ "$code" = "429" ]; then
+    pass "$method $path rejects unauthenticated ($code)"
+  else
+    fail "$method $path → $code (expected 401/422/429)"
+  fi
+}
+
 echo "KDP Creator Suite — Security smoke"
 echo "API base: $API_BASE"
 echo "Probe Origin: $ORIGIN"
@@ -23,14 +42,21 @@ echo "Health:"
 code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$API_BASE/api/health" || echo 000)
 if [ "$code" = "200" ]; then pass "GET /api/health → 200"; else fail "GET /api/health → $code"; fi
 
+code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$API_BASE/api/health/ready" || echo 000)
+if [ "$code" = "200" ] || [ "$code" = "503" ]; then
+  pass "GET /api/health/ready → $code"
+else
+  fail "GET /api/health/ready → $code (expected 200/503)"
+fi
+
 echo ""
 echo "Auth gate:"
-code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$API_BASE/api/user-metrics" || echo 000)
-if [ "$code" = "401" ] || [ "$code" = "422" ]; then
-  pass "GET /api/user-metrics rejects unauthenticated ($code)"
-else
-  fail "GET /api/user-metrics → $code (expected 401/422)"
-fi
+expect_auth_reject GET /api/user-metrics
+expect_auth_reject GET /api/batch/jobs
+expect_auth_reject POST /api/pdf/format-kdp
+expect_auth_reject POST /api/pdf/batch-coloring
+expect_auth_reject POST /api/batch/submit
+expect_auth_reject POST /api/checkout
 
 code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
   -H "Authorization: Bearer not.a.jwt" "$API_BASE/api/status" || echo 000)

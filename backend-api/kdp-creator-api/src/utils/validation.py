@@ -11,7 +11,7 @@ import os
 import logging
 from functools import wraps
 from flask import request, jsonify
-from marshmallow import Schema, ValidationError
+from marshmallow import ValidationError
 
 logger = logging.getLogger(__name__)
 
