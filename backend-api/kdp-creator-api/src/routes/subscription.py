@@ -400,9 +400,25 @@ def create_checkout_session():
             'client_reference_id': str(user_id),
             'metadata': {'user_id': str(user_id), 'tier': tier},
             'subscription_data': {'metadata': {'user_id': str(user_id), 'tier': tier}},
-            'allow_promotion_codes': True,
             'billing_address_collection': 'auto',
         }
+        # Stripe forbids combining allow_promotion_codes with discounts[].
+        promo_code = (data.get('promotion_code') or '').strip()
+        if promo_code:
+            promos = stripe_client.PromotionCode.list(
+                code=promo_code, active=True, limit=1
+            )
+            if not promos.data:
+                return error_response(
+                    'Promotion code is invalid or inactive.',
+                    'INVALID_PROMO',
+                    status_code=400,
+                )
+            session_params['discounts'] = [
+                {'promotion_code': promos.data[0].id},
+            ]
+        else:
+            session_params['allow_promotion_codes'] = True
         if customer_id:
             session_params['customer'] = customer_id
         elif email:
