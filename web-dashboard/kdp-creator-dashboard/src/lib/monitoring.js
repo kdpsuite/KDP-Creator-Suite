@@ -5,6 +5,10 @@ import { trackEvent } from './analytics'
 export const SUPPORT_EMAIL =
   import.meta.env.VITE_SUPPORT_EMAIL || 'support@kdpsuite.com'
 
+export const STATUS_URL =
+  import.meta.env.VITE_STATUS_URL ||
+  'https://dashboard-backend-hazel.vercel.app/api/health'
+
 let sentryReady = false
 
 export function initMonitoring() {

@@ -65,9 +65,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install bandit safety
 
-      - name: Run Bandit (security linter)
+      - name: Run Bandit (high severity blocking)
         working-directory: backend-api/kdp-creator-api
-        run: bandit -r src/ -ll || true
+        run: bandit -r src/ -lll
 
       - name: Check dependencies for vulnerabilities
         working-directory: backend-api/kdp-creator-api

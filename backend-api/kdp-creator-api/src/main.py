@@ -7,6 +7,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+_ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development').strip().lower()
+_IS_PRODUCTION = _ENVIRONMENT == 'production'
+
 _sentry_dsn = os.environ.get('SENTRY_DSN')
 if _sentry_dsn:
     try:
@@ -33,7 +36,6 @@ if _sentry_dsn:
 # ============================================================================
 # Environment Variable Validation
 # ============================================================================
-# Check for required environment variables at startup
 REQUIRED_ENV_VARS = [
     'SUPABASE_URL',
     'JWT_SECRET_KEY',
@@ -41,8 +43,11 @@ REQUIRED_ENV_VARS = [
 
 missing_vars = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
 if missing_vars:
-    print(f"[WARNING] Missing required environment variables: {', '.join(missing_vars)}")
-    print(f"[WARNING] Please check your Vercel environment settings.")
+    msg = f"Missing required environment variables: {', '.join(missing_vars)}"
+    if _IS_PRODUCTION:
+        raise RuntimeError(msg)
+    print(f"[WARNING] {msg}")
+    print("[WARNING] Please check your Vercel environment settings.")
 
 # Log startup information
 print(f"[STARTUP] Environment: {os.environ.get('ENVIRONMENT', 'development')}")
@@ -63,35 +68,71 @@ from src.routes.auth_sync import auth_sync_bp
 from src.routes.templates import templates_bp
 from src.utils.responses import success_response, error_response
 
-_sentry_dsn = os.environ.get('SENTRY_DSN')
-if _sentry_dsn:
-    try:
-        import sentry_sdk
-        from sentry_sdk.integrations.flask import FlaskIntegration
-        sentry_sdk.init(
-            dsn=_sentry_dsn,
-            integrations=[FlaskIntegration()],
-            traces_sample_rate=float(os.environ.get('SENTRY_TRACES_SAMPLE_RATE', '0.1')),
-            environment=os.environ.get('ENVIRONMENT', 'development'),
-        )
-        print('[STARTUP] Sentry enabled')
-    except Exception as sentry_error:
-        print(f'[WARNING] Sentry init failed: {sentry_error}')
+_DEFAULT_PROD_ORIGINS = (
+    'https://dashboard.kdpsuite.com,'
+    'https://kdpsuite.com,'
+    'https://www.kdpsuite.com'
+)
+_DEFAULT_DEV_ORIGINS = (
+    'http://localhost:3000,'
+    'http://localhost:5173,'
+    'http://127.0.0.1:3000,'
+    'http://127.0.0.1:5173'
+)
+
+
+def _parse_cors_origins():
+    raw = os.environ.get('CORS_ORIGINS', '').strip()
+    if not raw:
+        raw = _DEFAULT_PROD_ORIGINS if _IS_PRODUCTION else _DEFAULT_DEV_ORIGINS
+    # flask-cors forbids origins='*' with supports_credentials=True
+    if raw == '*':
+        if _IS_PRODUCTION:
+            raise RuntimeError('CORS_ORIGINS=* is not allowed when ENVIRONMENT=production')
+        raw = _DEFAULT_DEV_ORIGINS
+    origins = [origin.strip() for origin in raw.split(',') if origin.strip()]
+    if not origins:
+        raise RuntimeError('CORS_ORIGINS resolved empty; set comma-separated frontend origins')
+    return origins
+
+
+_CORS_ORIGINS = _parse_cors_origins()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'kdp-creator-suite-secret-key-2024')
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'kdp-jwt-secret-key-2024')
+
+_secret_key = os.environ.get('SECRET_KEY')
+_jwt_secret = os.environ.get('JWT_SECRET_KEY')
+if _IS_PRODUCTION:
+    if not _secret_key:
+        raise RuntimeError('SECRET_KEY is required when ENVIRONMENT=production')
+    if not _jwt_secret:
+        raise RuntimeError('JWT_SECRET_KEY is required when ENVIRONMENT=production')
+else:
+    _secret_key = _secret_key or 'kdp-creator-suite-dev-secret'
+    _jwt_secret = _jwt_secret or 'kdp-jwt-dev-secret'
+
+app.config['SECRET_KEY'] = _secret_key
+app.config['JWT_SECRET_KEY'] = _jwt_secret
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600 * 24  # 24 hours
 
-# Enable CORS for all routes
-CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+CORS(
+    app,
+    resources={r"/api/*": {"origins": _CORS_ORIGINS}},
+    supports_credentials=True,
+    allow_headers=['Content-Type', 'Authorization'],
+    methods=['GET', 'PUT', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+)
+print(f"[STARTUP] CORS origins: {_CORS_ORIGINS}")
+
 
 @app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+def security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
     return response
+
 
 # Register blueprints
 app.register_blueprint(user_bp, url_prefix='/api')
@@ -204,4 +245,8 @@ def root():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=os.environ.get('DEBUG', 'False').lower() in ('1', 'true', 'yes'),
+    )

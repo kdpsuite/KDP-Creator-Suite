@@ -8,8 +8,8 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Security audit | Manual | JWT auth, rate limiting, CORS configured; formal audit pending |
-| Performance testing | Manual | Load tests not automated; use `scripts/pre-launch-check.sh` for smoke |
+| Security audit | Partial | CORS allowlist + security headers + `scripts/security-smoke.sh` shipped; formal pen-test still pending |
+| Performance testing | Partial | `scripts/load-smoke.sh` concurrent health smoke; deeper convert/batch load still manual |
 | Beta user testing | Manual | Recruit beta cohort; no code dependency |
 | Payment processing testing | Manual | Stripe sandbox verification — Checkout coded on `main`; needs Stripe env + webhook |
 | App store submissions | Manual | iOS/Android store listings |
@@ -22,6 +22,9 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Readiness probe | Done | `GET /api/health/ready` |
 | Liveness probe | Done | `GET /api/health/live` |
 | Pre-launch smoke script | Done | `scripts/pre-launch-check.sh` |
+| Security smoke script | Done | `scripts/security-smoke.sh` |
+| Load smoke script | Done | `scripts/load-smoke.sh` |
+| Production CORS allowlist | Done | `CORS_ORIGINS` / defaults in `src/main.py` |
 | Env var startup validation | Done | `backend-api/kdp-creator-api/src/main.py` |
 | Rate limiting | Done | `src/utils/rate_limit.py` |
 | Analytics event recording | Done | `POST /api/analytics/events` |
@@ -40,7 +43,7 @@ Tracks deployment_guide.md §10 items. **Coded** = implemented in repo; **Manual
 | Configure monitoring | Done | Sentry verified on FE+BE |
 | Launch marketing campaigns | Manual | Out of scope for code |
 | Monitor system performance | Partial | `/api/health/*` + analytics + Sentry |
-| Customer support readiness | Manual | Help desk, docs, status page |
+| Customer support readiness | Partial | Settings support + mailto + API health status link; full help desk / status page still pending |
 
 ## Post-Launch (Week +1)
 

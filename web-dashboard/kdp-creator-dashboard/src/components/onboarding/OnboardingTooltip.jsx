@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { Tooltip } from '../Tooltip'
 
@@ -10,14 +10,20 @@ export function OnboardingTooltip({
   position = 'top',
   shouldShow = true
 }) {
-  const [isVisible, setIsVisible] = useState(shouldShow)
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    if (shouldShow) {
+      setDismissed(false)
+    }
+  }, [shouldShow])
 
   const handleDismiss = () => {
-    setIsVisible(false)
+    setDismissed(true)
     onDismiss?.(tooltipId)
   }
 
-  if (!isVisible) {
+  if (dismissed || !shouldShow) {
     return children
   }
 

@@ -121,7 +121,7 @@ export class ErrorBoundary extends React.Component {
             {/* Support Link */}
             <p className="mt-6 text-center text-xs text-gray-500">
               Still having issues?{' '}
-              <a href="mailto:support@kdpsuite.com" className="text-blue-600 hover:underline">
+              <a href="mailto:support@kdpsuite.com?subject=KDP%20Creator%20Suite%20error" className="text-blue-600 hover:underline">
                 Contact Support
               </a>
             </p>

@@ -25,7 +25,7 @@ import { Progress } from '@/components/ui/progress.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { toast } from 'sonner'
 import { subscriptionApi, analyticsApi, pdfApi, templateApi, accountApi, getUploadErrorMessage } from '@/lib/api'
-import { SUPPORT_EMAIL } from '@/lib/monitoring'
+import { STATUS_URL, SUPPORT_EMAIL } from '@/lib/monitoring'
 import { trackEvent, AnalyticsEvents } from '@/lib/analytics'
 import { BatchFileQueue } from '@/components/batch/BatchFileQueue'
 import {
@@ -1744,9 +1744,22 @@ export default function DashboardContent({ user, handleLogout }) {
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Support</label>
                   <p className="text-sm text-muted-foreground">
-                    Need help with billing, quotas, or account access? Email{' '}
-                    <a className="underline" href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.
+                    Billing, quotas, or account access:{' '}
+                    <a className="underline" href={`mailto:${SUPPORT_EMAIL}?subject=KDP%20Creator%20Suite%20support`}>
+                      {SUPPORT_EMAIL}
+                    </a>
+                    . Typical reply within 1–2 business days.
                   </p>
+                  <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                    <li>Include your account email and what you tried (convert, batch, billing).</li>
+                    <li>
+                      API status:{' '}
+                      <a className="underline" href={STATUS_URL} target="_blank" rel="noreferrer">
+                        live health check
+                      </a>
+                    </li>
+                    <li>Paid members: use Manage billing below for invoices and plan changes when available.</li>
+                  </ul>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">API access</label>
