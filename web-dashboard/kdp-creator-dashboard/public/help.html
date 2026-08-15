@@ -94,15 +94,24 @@
     <dl class="panel">
       <dt>I got logged out between kdpsuite.com and the dashboard</dt>
       <dd>
-        Sign in once on the dashboard. Sessions are shared via <code>.kdpsuite.com</code> cookies when both hosts are on the allowlist. If it still fails, clear site data for both hosts and sign in again.
+        Sign in once on <a href="https://dashboard.kdpsuite.com">dashboard.kdpsuite.com</a>
+        (canonical host — <code>www.dashboard</code> redirects there). Sessions use
+        <code>.kdpsuite.com</code> cookies when Auth redirect URLs include both marketing and dashboard hosts.
+        If it still fails, clear site data for both hosts and sign in again.
       </dd>
       <dt>Convert or batch fails / quota errors</dt>
       <dd>
-        Free tier has monthly limits. Check Settings for usage, or email support with your account email and the error message.
+        Free tier has monthly limits. Check Settings for usage, or open a support ticket / email with your account email and the error message.
       </dd>
-      <dt>Billing / invoices</dt>
+      <dt>Billing / invoices / cancel</dt>
       <dd>
-        Paid members: Settings → Manage billing when a Stripe customer exists. For unpaid Checkout or portal issues, email support with the Checkout session id if you have it.
+        After a paid Checkout (or any Stripe customer on file), use
+        <strong>Settings → Manage billing</strong> for invoices, payment method, and cancel at period end.
+        That opens Stripe’s Customer Portal. For Checkout failures, email support with the session id if you have it.
+      </dd>
+      <dt>Upgrade to Pro / Studio</dt>
+      <dd>
+        Free accounts: use Upgrade / Choose plan in the dashboard. Checkout runs on Stripe; promotion codes are supported when enabled on the session.
       </dd>
       <dt>How fast do you reply?</dt>
       <dd>Typical reply within 1–2 business days. Include account email and what you tried.</dd>
