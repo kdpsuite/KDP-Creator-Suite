@@ -560,6 +560,32 @@ def _handle_subscription_updated(subscription):
         _set_tier_for_user(user_id, tier, stripe_customer_id=customer_id)
 
 
+def _claim_stripe_event(event_id, event_type):
+    """Insert Stripe event id; return True if this is the first claim.
+
+    Requires public.stripe_webhook_events (service role). On table/DB errors,
+    fail open so webhooks still process (logged) — do not drop payments.
+    """
+    if not event_id or not supabase:
+        return True
+    try:
+        supabase.table("stripe_webhook_events").insert(
+            {
+                "event_id": event_id,
+                "event_type": event_type or "unknown",
+            }
+        ).execute()
+        return True
+    except Exception as exc:
+        msg = str(exc).lower()
+        # PostgREST unique_violation / duplicate
+        if "duplicate" in msg or "23505" in msg or "unique" in msg:
+            print(f"[subscription] duplicate stripe event skipped: {event_id}")
+            return False
+        print(f"[subscription] stripe idempotency claim failed (continuing): {exc}")
+        return True
+
+
 @subscription_bp.route("/webhooks/stripe", methods=["POST"])
 def stripe_webhook():
     stripe_client = _get_stripe()
@@ -579,8 +605,12 @@ def stripe_webhook():
         return error_response("Invalid signature", "INVALID_SIGNATURE", status_code=400)
 
     event = _as_dict(event)
+    event_id = event.get("id")
     event_type = event.get("type")
     data_object = (event.get("data") or {}).get("object") or {}
+
+    if not _claim_stripe_event(event_id, event_type):
+        return success_response({"received": True, "duplicate": True})
 
     if event_type == "checkout.session.completed":
         _handle_checkout_completed(data_object)
