@@ -1,0 +1,38 @@
+name: Production smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 14 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/security-smoke.sh"
+      - ".github/workflows/prod-smoke.yml"
+      - "backend-api/**"
+      - "web-dashboard/kdp-creator-dashboard/vercel.json"
+
+jobs:
+  security-smoke:
+    runs-on: ubuntu-latest
+    name: Production security smoke
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: API security smoke
+        run: ./scripts/security-smoke.sh https://dashboard-backend-hazel.vercel.app
+
+      - name: Canonical www.dashboard redirect
+        run: |
+          loc=$(curl -sSI --max-time 20 "https://www.dashboard.kdpsuite.com/help" \
+            | tr -d '\r' | awk 'tolower($1)=="location:"{print $2; exit}')
+          echo "location=${loc}"
+          echo "${loc}" | grep -q '^https://dashboard.kdpsuite.com/help'
+
+      - name: Frontend security headers
+        run: |
+          headers=$(curl -sSI --max-time 20 "https://dashboard.kdpsuite.com/help" | tr -d '\r')
+          echo "$headers" | grep -qi '^x-frame-options: DENY'
+          echo "$headers" | grep -qi '^x-content-type-options: nosniff'
+          echo "$headers" | grep -qi '^referrer-policy: strict-origin-when-cross-origin'

@@ -38,9 +38,12 @@ for u in "${REQUIRED[@]}"; do
 done
 echo ""
 echo "Also confirm:"
-echo "  [ ] Site URL is https://dashboard.kdpsuite.com (or marketing primary)"
+echo "  [ ] Site URL is https://dashboard.kdpsuite.com (canonical; www.dashboard 308s there)"
 echo "  [ ] Wildcard not required — explicit hosts above"
 echo "  [ ] sessionBridge dual-writes Domain=.kdpsuite.com cookies on both hosts"
+echo "  [ ] Auth → Attack Protection: leaked password protection enabled"
+echo ""
+echo "Dashboard: https://supabase.com/dashboard/project/${PROJECT_REF}/auth/url-configuration"
 echo ""
 
 if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then

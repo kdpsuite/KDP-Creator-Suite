@@ -26,6 +26,9 @@ echo "  [ ] Confirm CORS_ORIGINS allowlist includes dashboard + www.dashboard + 
 echo "  [ ] Confirm www.dashboard.kdpsuite.com → 308 dashboard.kdpsuite.com (./scripts/vercel-canonical-dashboard-domain.sh)"
 echo "  [ ] After Preview API deploy: ./scripts/stripe-staging-alias-after-preview.sh"
 echo "  [ ] Confirm dashboard.kdpsuite.com sends X-Frame-Options / nosniff / Referrer-Policy"
+echo "  [ ] GitHub Actions: Production smoke workflow (prod-smoke.yml)"
+echo "  [ ] Supabase Auth: leaked password protection ON (HaveIBeenPwned)"
+echo "  [ ] Supabase Auth URL Configuration includes dashboard.kdpsuite.com"
 echo ""
 
 echo "== Manual / external (before public paid launch) =="
