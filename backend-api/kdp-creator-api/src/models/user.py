@@ -4,11 +4,27 @@ from functools import wraps
 from flask import request
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
+from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from src.utils.responses import error_response
 
 db = SQLAlchemy()
 bcrypt = Bcrypt()
+
+MFA_HEADER = "X-MFA-Token"
+MFA_SALT = "kdp-mfa-session"
+_MFA_EXEMPT_PATHS = frozenset(
+    {
+        "/api/2fa/validate",
+        "/api/2fa/setup",
+        "/api/2fa/verify",
+        "/api/2fa/disable",
+        "/api/me",
+        "/api/user/profile-sync",
+        "/api/logout",
+        "/api/validate-session",
+    }
+)
 
 # Initialize Supabase client (resilient - won't crash if env vars missing)
 supabase = None
@@ -41,6 +57,82 @@ def get_supabase_user(token):
         return None
 
 
+def _mfa_max_age():
+    try:
+        return int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRES", "86400"))
+    except ValueError:
+        return 86400
+
+
+def _mfa_serializer():
+    secret = os.environ.get("JWT_SECRET_KEY") or os.environ.get("SECRET_KEY")
+    if not secret:
+        secret = "kdp-jwt-dev-secret"
+    return URLSafeTimedSerializer(str(secret), salt=MFA_SALT)
+
+
+def issue_mfa_token(user_id):
+    return _mfa_serializer().dumps({"uid": str(user_id)})
+
+
+def verify_mfa_token(user_id, token):
+    if not token or not user_id:
+        return False
+    try:
+        data = _mfa_serializer().loads(token, max_age=_mfa_max_age())
+        return str(data.get("uid")) == str(user_id)
+    except (BadSignature, SignatureExpired, TypeError, ValueError):
+        return False
+
+
+def _request_path():
+    return (request.path or "").rstrip("/") or "/"
+
+
+def _mfa_header_token():
+    return request.headers.get(MFA_HEADER) or request.headers.get("X-Mfa-Token")
+
+
+def _enforce_mfa_if_required(user):
+    if _request_path() in _MFA_EXEMPT_PATHS:
+        return None
+    profile = UserProfile.get_by_id(str(user.id))
+    if not profile or not profile.get("totp_enabled"):
+        return None
+    if verify_mfa_token(str(user.id), _mfa_header_token()):
+        return None
+    return error_response(
+        "Multi-factor authentication required",
+        "MFA_REQUIRED",
+        status_code=403,
+    )
+
+
+def admin_emails():
+    raw = os.environ.get("ADMIN_EMAILS", "")
+    return {item.strip().lower() for item in raw.split(",") if item.strip()}
+
+
+def user_is_admin(user, profile=None):
+    """Deny by default. Allow only ADMIN_EMAILS or an explicit admin role."""
+    user_email = ""
+    if user is not None:
+        user_email = (getattr(user, "email", None) or "").strip().lower()
+    if not user_email and profile:
+        user_email = (profile.get("email") or "").strip().lower()
+    if user_email and user_email in admin_emails():
+        return True
+
+    role = None
+    if profile:
+        role = profile.get("role")
+    if user is not None:
+        app_metadata = getattr(user, "app_metadata", None) or {}
+        user_metadata = getattr(user, "user_metadata", None) or {}
+        role = role or app_metadata.get("role") or user_metadata.get("role")
+    return isinstance(role, str) and role.strip().lower() == "admin"
+
+
 def jwt_required():
     """Decorator to require Supabase JWT token"""
 
@@ -54,13 +146,29 @@ def jwt_required():
             user = get_supabase_user(token)
             if not user:
                 return error_response("Invalid or expired token", "AUTH_INVALID", status_code=401)
-            # Attach user to request context
             request.user = user
+            mfa_error = _enforce_mfa_if_required(user)
+            if mfa_error is not None:
+                return mfa_error
             return f(*args, **kwargs)
 
         return decorated_function
 
     return decorator
+
+
+def admin_required(f):
+    """Fail closed: authenticated is not enough. Must be an admin."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user_id = get_jwt_identity()
+        profile = UserProfile.get_by_id(user_id) if user_id else None
+        if not user_is_admin(getattr(request, "user", None), profile):
+            return error_response("Forbidden", "FORBIDDEN", status_code=403)
+        return f(*args, **kwargs)
+
+    return decorated_function
 
 
 def get_jwt_identity():
@@ -88,6 +196,7 @@ class UserProfile:
             "id": profile.get("id"),
             "username": profile.get("username"),
             "email": profile.get("email"),
+            "role": profile.get("role") or "user",
             "subscription_tier": profile.get("subscription_tier", "free"),
             "totp_enabled": profile.get("totp_enabled", False),
             "usage": {

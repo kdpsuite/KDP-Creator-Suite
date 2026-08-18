@@ -25,6 +25,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'user_profiles' AND column_name = 'totp_enabled') THEN
         ALTER TABLE public.user_profiles ADD COLUMN totp_enabled BOOLEAN DEFAULT FALSE;
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'user_profiles' AND column_name = 'role') THEN
+        ALTER TABLE public.user_profiles ADD COLUMN role TEXT DEFAULT 'user';
+    END IF;
 END $$;
 
 -- Add subscription/usage columns if they don't exist

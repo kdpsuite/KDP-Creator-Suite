@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, Key } from 'lucide-react'
 import { Button } from '@/components/ui/button.jsx'
-import { authApi, supabase } from '@/lib/api'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import { FormField } from '@/components/FormField'
+import {
+  authApi,
+  clearMfaToken,
+  getMfaToken,
+  setMfaToken,
+  supabase,
+  totpApi,
+} from '@/lib/api'
 import { sessionBridge } from '@/lib/sessionBridge'
 import UpdatePasswordPage from '@/pages/UpdatePasswordPage.jsx'
 import DashboardContent from '@/components/dashboard/DashboardContent.jsx'
@@ -15,6 +24,8 @@ const SESSION_CHECK_TIMEOUT = 10000
 
 const isBootstrapFailure = (err) => {
   const status = err?.response?.status
+  const code = err?.response?.data?.error?.code
+  if (code === 'MFA_REQUIRED') return false
   return (
     !err?.response ||
     status === 401 ||
@@ -22,8 +33,76 @@ const isBootstrapFailure = (err) => {
   )
 }
 
+function MfaChallenge({ email, onVerified, onCancel }) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError('')
+    setIsSubmitting(true)
+    try {
+      const response = await totpApi.validate(code.trim())
+      const mfaToken = response?.data?.data?.mfa_token
+      if (!mfaToken) {
+        setError('Verification succeeded but no session token was returned')
+        return
+      }
+      setMfaToken(mfaToken)
+      onVerified()
+    } catch (err) {
+      const status = err?.response?.status
+      const message = err?.response?.data?.error?.message || err?.message || 'Invalid code'
+      if (status === 429) {
+        setError(message)
+      } else {
+        setError(message)
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">Two-factor authentication</CardTitle>
+          <CardDescription>
+            Enter the 6-digit code for {email || 'your account'} to finish signing in.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <FormField
+              label="Authenticator code"
+              name="totp-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))}
+              placeholder="123456"
+              required
+            />
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Key className="mr-2 h-4 w-4" />}
+              Verify
+            </Button>
+            <Button type="button" variant="ghost" className="w-full" onClick={onCancel}>
+              Cancel and log out
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [mfaRequired, setMfaRequired] = useState(false)
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -44,6 +123,8 @@ function App() {
         if (session) {
           setIsAuthenticated(true)
         } else {
+          clearMfaToken()
+          setMfaRequired(false)
           setIsAuthenticated(false)
           setUser(null)
           setLoading(false)
@@ -64,6 +145,8 @@ function App() {
         setError(null)
       } else if (event === 'SIGNED_OUT') {
         fetchUserDataIdRef.current += 1
+        clearMfaToken()
+        setMfaRequired(false)
         sessionBridge.clearSession()
         setIsAuthenticated(false)
         setUser(null)
@@ -72,9 +155,15 @@ function App() {
       }
     })
 
+    const onMfaRequired = () => {
+      setMfaRequired(true)
+    }
+    window.addEventListener('kdp_mfa_required', onMfaRequired)
+
     return () => {
       active = false
       subscription.unsubscribe()
+      window.removeEventListener('kdp_mfa_required', onMfaRequired)
       if (bridgeSubscription) {
         bridgeSubscription.unsubscribe()
       }
@@ -110,6 +199,7 @@ function App() {
 
       if (!session) {
         setIsAuthenticated(false)
+        setMfaRequired(false)
         setUser(null)
         return
       }
@@ -131,6 +221,26 @@ function App() {
 
       if (fetchId !== fetchUserDataIdRef.current) return
 
+      let totpEnabled = false
+      try {
+        const meResp = await authApi.getMe()
+        totpEnabled = Boolean(meResp?.data?.data?.totp_enabled)
+      } catch (meErr) {
+        if (isBootstrapFailure(meErr)) {
+          throw meErr
+        }
+        console.warn('Profile fetch failed; continuing without MFA status', meErr)
+      }
+
+      if (fetchId !== fetchUserDataIdRef.current) return
+
+      if (totpEnabled && !getMfaToken()) {
+        setUser(sessionUser)
+        setMfaRequired(true)
+        return
+      }
+
+      setMfaRequired(false)
       setUser(sessionUser)
     } catch (err) {
       if (fetchId !== fetchUserDataIdRef.current) return
@@ -146,6 +256,8 @@ function App() {
         } catch {
           // ignore sign-out failures during bootstrap recovery
         }
+        clearMfaToken()
+        setMfaRequired(false)
         setIsAuthenticated(false)
         setUser(null)
         setError(null)
@@ -161,6 +273,8 @@ function App() {
 
   const handleLogout = async () => {
     fetchUserDataIdRef.current += 1
+    clearMfaToken()
+    setMfaRequired(false)
     sessionBridge.clearSession()
     try {
       await authApi.logout()
@@ -200,6 +314,16 @@ function App() {
           </Button>
         </div>
       </div>
+    )
+  }
+
+  if (mfaRequired) {
+    return (
+      <MfaChallenge
+        email={user?.email}
+        onVerified={() => setMfaRequired(false)}
+        onCancel={handleLogout}
+      />
     )
   }
 

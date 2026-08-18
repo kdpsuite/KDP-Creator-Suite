@@ -18,6 +18,7 @@ function normalizeApiBaseUrl(rawUrl) {
 const API_BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL);
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const MFA_TOKEN_KEY = 'kdp_mfa_token';
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   throw new Error(
@@ -43,6 +44,27 @@ const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000,
 });
+
+export function getMfaToken() {
+  try {
+    return sessionStorage.getItem(MFA_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setMfaToken(token) {
+  if (!token) return;
+  sessionStorage.setItem(MFA_TOKEN_KEY, token);
+}
+
+export function clearMfaToken() {
+  try {
+    sessionStorage.removeItem(MFA_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 function clearContentType(headers) {
   if (!headers) return;
@@ -98,6 +120,13 @@ api.interceptors.request.use(
       delete config.headers.Authorization;
     }
 
+    const mfaToken = getMfaToken();
+    if (mfaToken) {
+      config.headers['X-MFA-Token'] = mfaToken;
+    } else if (config.headers) {
+      delete config.headers['X-MFA-Token'];
+    }
+
     const isFormData = typeof FormData !== 'undefined' && config.data instanceof FormData;
     if (isFormData) {
       // Let the browser set multipart/form-data with boundary (Axios docs)
@@ -125,6 +154,14 @@ api.interceptors.response.use(
     const config = error.config;
 
     if (!config) {
+      return Promise.reject(error);
+    }
+
+    if (error.response && error.response.status === 403 && error.response.data?.error?.code === 'MFA_REQUIRED') {
+      clearMfaToken();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('kdp_mfa_required'));
+      }
       return Promise.reject(error);
     }
 
@@ -204,6 +241,10 @@ export const authApi = {
   }),
   resetPassword: (newPassword) => supabase.auth.updateUser({ password: newPassword }),
   syncProfile: () => api.post('/user/profile-sync'),
+};
+
+export const totpApi = {
+  validate: (code) => api.post('/2fa/validate', { code }),
 };
 
 export const sessionApi = {

@@ -159,3 +159,27 @@ def test_analytics_events_missing_auth(client):
     assert response.status_code == 401
     assert_error_envelope(payload, 401)
     assert payload['error']['code'] == 'AUTH_MISSING'
+
+
+def test_list_users_requires_auth(client):
+    response = client.get('/api/users')
+    payload = response.get_json()
+    assert response.status_code == 401
+    assert_error_envelope(payload, 401)
+    assert payload['error']['code'] == 'AUTH_MISSING'
+
+
+def test_business_metrics_requires_auth(client):
+    response = client.get('/api/business-metrics')
+    payload = response.get_json()
+    assert response.status_code == 401
+    assert_error_envelope(payload, 401)
+    assert payload['error']['code'] == 'AUTH_MISSING'
+
+
+def test_2fa_validate_requires_auth(client):
+    response = client.post('/api/2fa/validate', json={'code': '000000'})
+    payload = response.get_json()
+    assert response.status_code == 401
+    assert_error_envelope(payload, 401)
+    assert payload['error']['code'] == 'AUTH_MISSING'

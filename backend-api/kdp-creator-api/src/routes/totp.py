@@ -1,7 +1,8 @@
 import pyotp
 from flask import Blueprint, request
 
-from src.models.user import UserProfile, get_jwt_identity, jwt_required, supabase
+from src.models.user import UserProfile, get_jwt_identity, issue_mfa_token, jwt_required, supabase
+from src.utils.rate_limit import rate_limit_totp_validate
 from src.utils.responses import error_response, success_response
 
 totp_bp = Blueprint("totp", __name__)
@@ -55,7 +56,10 @@ def verify_2fa():
     totp = pyotp.TOTP(secret)
     if totp.verify(code, valid_window=1):
         supabase.table("user_profiles").update({"totp_enabled": True}).eq("id", user_id).execute()
-        return success_response(message="2FA has been enabled successfully")
+        return success_response(
+            {"mfa_token": issue_mfa_token(user_id)},
+            "2FA has been enabled successfully",
+        )
 
     return error_response("Invalid verification code", "VALIDATION_ERROR", status_code=400)
 
@@ -90,21 +94,28 @@ def disable_2fa():
 
 
 @totp_bp.route("/2fa/validate", methods=["POST"])
+@jwt_required()
+@rate_limit_totp_validate
 def validate_2fa_login():
-    """Validate 2FA code during login (called after password auth succeeds)."""
-    data = request.get_json() or {}
-    user_id = data.get("user_id")
-    code = data.get("code")
-
-    if not user_id or not code:
-        return error_response("User ID and code are required", "VALIDATION_ERROR", status_code=400)
-
+    """Validate TOTP for the authenticated user after password login."""
+    user_id = get_jwt_identity()
     profile = UserProfile.get_by_id(user_id)
     if not profile or not profile.get("totp_enabled"):
         return error_response("Invalid request", "VALIDATION_ERROR", status_code=400)
 
+    data = request.get_json() or {}
+    code = data.get("code")
+    if not code:
+        return error_response("Verification code is required", "VALIDATION_ERROR", status_code=400)
+
     totp = pyotp.TOTP(profile.get("totp_secret"))
     if totp.verify(code, valid_window=1):
-        return success_response({"valid": True}, "2FA code validated")
+        return success_response(
+            {
+                "valid": True,
+                "mfa_token": issue_mfa_token(user_id),
+            },
+            "2FA code validated",
+        )
 
     return error_response("Invalid 2FA code", "AUTH_INVALID", status_code=401)

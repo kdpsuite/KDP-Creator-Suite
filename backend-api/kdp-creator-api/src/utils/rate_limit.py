@@ -179,6 +179,9 @@ LOGIN_LIMIT = (5, 300)
 # Password reset: 3 per hour per email
 PASSWORD_RESET_LIMIT = (3, 3600)
 
+# TOTP validate: 5 per 5 minutes per authenticated user
+TOTP_VALIDATE_LIMIT = (5, 300)
+
 # File upload: 10 per hour per user
 FILE_UPLOAD_LIMIT = (10, 3600)
 
@@ -227,6 +230,29 @@ def rate_limit_password_reset(f):
                 status_code=429,
             )
 
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
+def rate_limit_totp_validate(f):
+    """Rate limit TOTP checks after password auth (per user id)."""
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = getattr(request, "user", None)
+        user_id = getattr(user, "id", None) or request.remote_addr
+        allowed, remaining, reset_time = _rate_limiter.is_allowed(
+            f"totp_validate:{user_id}", TOTP_VALIDATE_LIMIT[0], TOTP_VALIDATE_LIMIT[1]
+        )
+        if not allowed:
+            reset_seconds = int(reset_time - time.time())
+            return error_response(
+                f"Too many 2FA attempts. Try again in {reset_seconds} seconds.",
+                error_code="RATE_LIMIT_EXCEEDED",
+                details={"retry_after": reset_seconds},
+                status_code=429,
+            )
         return f(*args, **kwargs)
 
     return decorated_function

@@ -3,7 +3,7 @@ from datetime import datetime
 from flask import Blueprint, request
 from marshmallow import Schema, fields
 
-from src.models.user import UserProfile, get_jwt_identity, jwt_required, supabase
+from src.models.user import UserProfile, admin_required, get_jwt_identity, jwt_required, supabase
 from src.utils.logger import PerformanceTimer, log_error_msg, log_info, log_warning
 from src.utils.rate_limit import rate_limit_password_reset
 from src.utils.responses import error_response, success_response
@@ -72,13 +72,14 @@ def logout():
 
 @user_bp.route("/users", methods=["GET"])
 @jwt_required()
+@admin_required
 def get_users():
-    # Admin only check could be added here
     try:
         res = supabase.table("user_profiles").select("*").execute()
-        return success_response([UserProfile.to_dict(u) for u in res.data])
-    except Exception as e:
-        return error_response(f"Failed to fetch users: {str(e)}", "DATABASE_ERROR", status_code=500)
+        return success_response([UserProfile.to_dict(u) for u in (res.data or [])])
+    except Exception:
+        log_error_msg("Failed to fetch users")
+        return error_response("Failed to fetch users", "DATABASE_ERROR", status_code=500)
 
 
 @user_bp.route("/users/<user_id>", methods=["PUT"])

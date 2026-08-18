@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, request
 
-from src.models.user import UserProfile, get_jwt_identity, jwt_required, supabase
+from src.models.user import UserProfile, admin_required, get_jwt_identity, jwt_required, supabase
 from src.utils.logger import PerformanceTimer
 from src.utils.responses import error_response, success_response
 
@@ -197,6 +197,7 @@ def get_user_metrics():
 
 @analytics_bp.route("/business-metrics", methods=["GET"])
 @jwt_required()
+@admin_required
 def get_business_metrics():
     try:
         res = supabase.table("user_profiles").select("subscription_tier").execute()
@@ -218,9 +219,9 @@ def get_business_metrics():
                 }
             }
         )
-    except Exception as e:
+    except Exception:
         return error_response(
-            f"Failed to fetch business metrics: {str(e)}",
+            "Failed to fetch business metrics",
             "DATABASE_ERROR",
             status_code=500,
         )
