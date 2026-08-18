@@ -67,15 +67,15 @@ jobs:
       - name: Install security tools
         run: |
           python -m pip install --upgrade pip
-          pip install bandit safety
+          pip install bandit pip-audit
 
       - name: Run Bandit (high severity blocking)
         working-directory: backend-api/kdp-creator-api
         run: bandit -r src/ -lll
 
-      - name: Check dependencies for vulnerabilities
+      - name: Audit Python dependencies
         working-directory: backend-api/kdp-creator-api
-        run: safety check --file requirements.txt || true
+        run: pip-audit -r requirements.txt
 
   build:
     runs-on: ubuntu-latest
@@ -95,7 +95,7 @@ jobs:
         working-directory: backend-api/kdp-creator-api
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install --require-hashes -r requirements.txt
 
       - name: Verify imports
         working-directory: backend-api/kdp-creator-api
