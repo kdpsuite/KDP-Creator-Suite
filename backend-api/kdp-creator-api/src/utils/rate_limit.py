@@ -13,10 +13,12 @@ For multi-instance deployments, use Redis.
 
 import time
 from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import request
 
+from src.models.user import supabase
 from src.utils.logger import log_warning
 from src.utils.responses import error_response
 
@@ -89,7 +91,47 @@ class RateLimiter:
 
 
 # Global rate limiter instance
-_rate_limiter = RateLimiter()
+class CompositeRateLimiter:
+    """Postgres-backed limiter with in-memory fallback if the shared table is missing."""
+
+    def __init__(self):
+        self.memory = RateLimiter()
+        self._warned_fallback = False
+
+    def is_allowed(self, key, max_requests, window_seconds):
+        if supabase is None:
+            return self.memory.is_allowed(key, max_requests, window_seconds)
+        try:
+            return self._shared_is_allowed(supabase, str(key), max_requests, window_seconds)
+        except Exception as store_error:
+            if not self._warned_fallback:
+                log_warning(
+                    "Shared rate-limit store unavailable; using in-memory limiter",
+                    error=str(store_error),
+                )
+                self._warned_fallback = True
+            return self.memory.is_allowed(key, max_requests, window_seconds)
+
+    def _shared_is_allowed(self, client, key, max_requests, window_seconds):
+        now = datetime.now(timezone.utc)
+        cutoff = (now - timedelta(seconds=window_seconds)).isoformat()
+        client.table("rate_limit_events").insert({"key": key, "created_at": now.isoformat()}).execute()
+        res = (
+            client.table("rate_limit_events")
+            .select("id", count="exact")
+            .eq("key", key)
+            .gte("created_at", cutoff)
+            .execute()
+        )
+        count = res.count if getattr(res, "count", None) is not None else len(res.data or [])
+        reset_time = time.time() + window_seconds
+        if count > max_requests:
+            return False, 0, reset_time
+        remaining = max(0, max_requests - count)
+        return True, remaining, reset_time
+
+
+_rate_limiter = CompositeRateLimiter()
 
 
 # ============================================================================
@@ -304,7 +346,7 @@ def get_rate_limit_status(key, max_requests, window_seconds):
 
 def reset_rate_limit(key):
     """Reset rate limit for a specific key (admin only)"""
-    if key in _rate_limiter.requests:
-        del _rate_limiter.requests[key]
+    if key in _rate_limiter.memory.requests:
+        del _rate_limiter.memory.requests[key]
         return True
     return False

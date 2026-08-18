@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from flask import Blueprint, request
 
-from src.models.user import UserProfile, admin_required, get_jwt_identity, jwt_required, supabase
+from src.models.user import UserProfile, admin_required, data_client, get_jwt_identity, jwt_required, supabase
 from src.utils.logger import PerformanceTimer
 from src.utils.responses import error_response, success_response
 
@@ -55,7 +55,7 @@ def record_event():
         )
 
     try:
-        supabase.table("analytics_events").insert(
+        data_client().table("analytics_events").insert(
             {
                 "user_id": user_id,
                 "event_type": event_type,
@@ -65,7 +65,7 @@ def record_event():
         return success_response({"recorded": True}, status_code=201)
     except Exception as e:
         return error_response(
-            f"Failed to record event: {str(e)}",
+            "Failed to record event",
             "DATABASE_ERROR",
             status_code=500,
         )
@@ -115,7 +115,8 @@ def get_user_metrics():
         events = []
         try:
             res = (
-                supabase.table("analytics_events")
+                data_client()
+                .table("analytics_events")
                 .select("event_type, created_at, event_data")
                 .eq("user_id", str(user_id))
                 .gte("created_at", thirty_days_ago.isoformat())

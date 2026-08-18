@@ -3,7 +3,17 @@ from datetime import datetime
 from flask import Blueprint, request
 from marshmallow import Schema, fields
 
-from src.models.user import UserProfile, admin_required, get_jwt_identity, jwt_required, supabase
+from src.models.user import (
+    UserProfile,
+    admin_required,
+    bearer_token,
+    data_client,
+    get_jwt_identity,
+    jwt_required,
+    revoke_supabase_session,
+    supabase,
+)
+from src.utils.auth_cookies import with_cleared_refresh_cookie
 from src.utils.logger import PerformanceTimer, log_error_msg, log_info, log_warning
 from src.utils.rate_limit import rate_limit_password_reset
 from src.utils.responses import error_response, success_response
@@ -66,8 +76,14 @@ def get_current_user():
 @jwt_required()
 @log_request
 def logout():
-    # Supabase handles logout on client side
-    return success_response(message="Logged out successfully")
+    token = bearer_token()
+    try:
+        if token:
+            revoke_supabase_session(token, "global")
+    except Exception:
+        log_error_msg("Failed to revoke Supabase session")
+        return error_response("Logout failed", "LOGOUT_FAILED", status_code=500)
+    return with_cleared_refresh_cookie(success_response(message="Logged out successfully"))
 
 
 @user_bp.route("/users", methods=["GET"])
@@ -121,7 +137,7 @@ def update_user(user_id):
 
     try:
         with PerformanceTimer(f"update_user:{user_id}"):
-            res = supabase.table("user_profiles").update(update_data).eq("id", user_id).execute()
+            res = data_client().table("user_profiles").update(update_data).eq("id", user_id).execute()
             if not res.data:
                 return error_response("User not found", "USER_NOT_FOUND", status_code=404)
 
@@ -129,7 +145,7 @@ def update_user(user_id):
             return success_response(UserProfile.to_dict(res.data[0]), "User updated successfully")
     except Exception as e:
         log_error_msg("Failed to update user", user_id=user_id, error=str(e))
-        return error_response(f"Failed to update user: {str(e)}", "DATABASE_ERROR", status_code=500)
+        return error_response("Failed to update user", "DATABASE_ERROR", status_code=500)
 
 
 @user_bp.route("/users/<user_id>", methods=["DELETE"])
@@ -147,7 +163,7 @@ def delete_user(user_id):
 
     try:
         with PerformanceTimer(f"delete_user:{user_id}"):
-            supabase.table("user_profiles").delete().eq("id", user_id).execute()
+            data_client().table("user_profiles").delete().eq("id", user_id).execute()
             try:
                 supabase.auth.admin.delete_user(user_id)
             except Exception as auth_delete_error:
@@ -160,7 +176,7 @@ def delete_user(user_id):
             return success_response(message="User deleted successfully")
     except Exception as e:
         log_error_msg("Failed to delete user", user_id=user_id, error=str(e))
-        return error_response(f"Failed to delete user: {str(e)}", "DATABASE_ERROR", status_code=500)
+        return error_response("Failed to delete user", "DATABASE_ERROR", status_code=500)
 
 
 @user_bp.route("/account", methods=["DELETE"])
@@ -226,7 +242,7 @@ def sync_user_profile():
                 "created_at": datetime.utcnow().isoformat(),
                 "updated_at": datetime.utcnow().isoformat(),
             }
-            res = supabase.table("user_profiles").insert(new_profile_data).execute()
+            res = data_client().table("user_profiles").insert(new_profile_data).execute()
             if not res.data:
                 return error_response(
                     "Failed to create user profile",
@@ -236,7 +252,7 @@ def sync_user_profile():
             profile = res.data[0]
         except Exception as e:
             return error_response(
-                f"Error creating user profile: {str(e)}",
+                "Error creating user profile",
                 "PROFILE_CREATION_ERROR",
                 status_code=500,
             )

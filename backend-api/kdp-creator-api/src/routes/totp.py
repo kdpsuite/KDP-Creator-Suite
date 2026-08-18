@@ -1,7 +1,7 @@
 import pyotp
 from flask import Blueprint, request
 
-from src.models.user import UserProfile, get_jwt_identity, issue_mfa_token, jwt_required, supabase
+from src.models.user import UserProfile, data_client, get_jwt_identity, issue_mfa_token, jwt_required
 from src.utils.rate_limit import rate_limit_totp_validate
 from src.utils.responses import error_response, success_response
 
@@ -19,7 +19,7 @@ def setup_2fa():
         return error_response("2FA is already enabled", "ALREADY_EXISTS", status_code=400)
 
     secret = pyotp.random_base32()
-    supabase.table("user_profiles").update({"totp_secret": secret}).eq("id", user_id).execute()
+    data_client().table("user_profiles").update({"totp_secret": secret}).eq("id", user_id).execute()
 
     totp = pyotp.TOTP(secret)
     provisioning_uri = totp.provisioning_uri(
@@ -55,7 +55,7 @@ def verify_2fa():
 
     totp = pyotp.TOTP(secret)
     if totp.verify(code, valid_window=1):
-        supabase.table("user_profiles").update({"totp_enabled": True}).eq("id", user_id).execute()
+        data_client().table("user_profiles").update({"totp_enabled": True}).eq("id", user_id).execute()
         return success_response(
             {"mfa_token": issue_mfa_token(user_id)},
             "2FA has been enabled successfully",
@@ -82,7 +82,7 @@ def disable_2fa():
 
     totp = pyotp.TOTP(profile.get("totp_secret"))
     if totp.verify(code, valid_window=1):
-        supabase.table("user_profiles").update(
+        data_client().table("user_profiles").update(
             {
                 "totp_enabled": False,
                 "totp_secret": None,

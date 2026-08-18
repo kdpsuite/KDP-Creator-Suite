@@ -10,7 +10,7 @@ from reportlab.lib.colors import grey
 from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
-from src.models.user import get_jwt_identity, jwt_required, supabase
+from src.models.user import data_client, get_jwt_identity, jwt_required
 from src.routes.subscription import (
     enforce_batch_quota,
     enforce_conversion_quota,
@@ -40,10 +40,11 @@ PREVIEW_QUALITY = 70
 
 def record_pdf_analytics(user_id, event_type, event_data):
     """Best-effort analytics insert; never fail the conversion response."""
-    if not supabase:
+    client = data_client()
+    if not client:
         return
     try:
-        supabase.table("analytics_events").insert(
+        client.table("analytics_events").insert(
             {
                 "user_id": user_id,
                 "event_type": event_type,

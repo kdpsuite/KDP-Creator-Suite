@@ -4,7 +4,7 @@ from datetime import datetime
 
 from flask import Blueprint, request
 
-from src.models.user import BatchJob, UserProfile, get_jwt_identity, jwt_required, supabase
+from src.models.user import BatchJob, UserProfile, data_client, get_jwt_identity, jwt_required, supabase
 from src.routes.subscription import enforce_batch_quota, record_batch_usage
 from src.utils.rate_limit import rate_limit_batch_processing
 from src.utils.responses import error_response, success_response
@@ -18,7 +18,8 @@ def get_batch_jobs():
     user_id = get_jwt_identity()
     try:
         res = (
-            supabase.table("batch_jobs")
+            data_client()
+            .table("batch_jobs")
             .select("*")
             .eq("user_id", user_id)
             .order("created_at", desc=True)
@@ -27,7 +28,7 @@ def get_batch_jobs():
         )
         return success_response({"jobs": [BatchJob.to_dict(j) for j in res.data]})
     except Exception as e:
-        return error_response(f"Failed to fetch batch jobs: {str(e)}", "DATABASE_ERROR", status_code=500)
+        return error_response("Failed to fetch batch jobs", "DATABASE_ERROR", status_code=500)
 
 
 @batch_bp.route("/batch/submit", methods=["POST"])
@@ -58,7 +59,7 @@ def submit_batch_job():
     }
 
     try:
-        res = supabase.table("batch_jobs").insert(job_data).execute()
+        res = data_client().table("batch_jobs").insert(job_data).execute()
         if not res.data:
             return error_response("Failed to create job", "DATABASE_ERROR", status_code=500)
 
@@ -70,7 +71,7 @@ def submit_batch_job():
 
         return success_response({"job": BatchJob.to_dict(job)}, status_code=201)
     except Exception as e:
-        return error_response(f"Batch submission failed: {str(e)}", "BATCH_ERROR", status_code=500)
+        return error_response("Batch submission failed", "BATCH_ERROR", status_code=500)
 
 
 def _process_batch_job_optimized(job_id):

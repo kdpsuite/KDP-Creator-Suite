@@ -2,7 +2,7 @@
 
 from flask import Blueprint, request
 
-from src.models.user import get_jwt_identity, jwt_required, supabase
+from src.models.user import data_client, get_jwt_identity, jwt_required
 from src.utils.rate_limit import rate_limit
 from src.utils.responses import error_response, success_response
 
@@ -61,7 +61,7 @@ def create_support_ticket():
     }
 
     try:
-        supabase.table("analytics_events").insert(
+        data_client().table("analytics_events").insert(
             {
                 "user_id": user_id,
                 "event_type": "support_ticket",
@@ -70,7 +70,7 @@ def create_support_ticket():
         ).execute()
     except Exception as exc:
         return error_response(
-            f"Failed to record ticket: {exc}",
+            "Failed to record ticket",
             "DATABASE_ERROR",
             status_code=500,
         )

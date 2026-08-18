@@ -2,6 +2,8 @@ import os
 import uuid
 from datetime import datetime
 
+from src.models.user import user_scoped_client
+
 # Initialize Supabase client (prefer service role for storage uploads; same chain as models/user.py)
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = (
@@ -26,6 +28,13 @@ BUCKET_NAME = "kdp-created-files"
 SIGNED_URL_EXPIRY = 3600  # 1 hour in seconds
 
 
+def _storage_client():
+    scoped = user_scoped_client()
+    if scoped is not None:
+        return scoped
+    return supabase
+
+
 def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) -> dict:
     """
     Upload a file to Supabase Storage.
@@ -39,7 +48,8 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
     Returns:
         dict with 'path', 'url', and 'signed_url' keys
     """
-    if not supabase:
+    client = _storage_client()
+    if not client:
         raise Exception(
             "Supabase is not configured. Please set SUPABASE_URL and "
             "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) environment variables."
@@ -52,7 +62,7 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
         file_path = f"{user_id}/{file_type}/{timestamp}_{unique_id}_{filename}"
 
         # Upload to Supabase Storage (must use "content-type" — wrong key defaults to text/plain)
-        supabase.storage.from_(BUCKET_NAME).upload(
+        client.storage.from_(BUCKET_NAME).upload(
             file_path,
             file_bytes,
             {
@@ -62,7 +72,7 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
         )
 
         # Generate signed URL (valid for 1 hour)
-        signed_url = supabase.storage.from_(BUCKET_NAME).create_signed_url(file_path, SIGNED_URL_EXPIRY)
+        signed_url = client.storage.from_(BUCKET_NAME).create_signed_url(file_path, SIGNED_URL_EXPIRY)
 
         return {
             "path": file_path,
@@ -84,11 +94,12 @@ def delete_file(file_path: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    if not supabase:
+    client = _storage_client()
+    if not client:
         return False
 
     try:
-        supabase.storage.from_(BUCKET_NAME).remove([file_path])
+        client.storage.from_(BUCKET_NAME).remove([file_path])
         return True
     except Exception as e:
         print(f"Failed to delete file {file_path}: {str(e)}")

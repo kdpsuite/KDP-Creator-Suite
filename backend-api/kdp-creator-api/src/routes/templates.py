@@ -53,16 +53,16 @@ def generate_template_product(template_id):
         result = generate_product(template, options)
     except KdpSpecError as exc:
         return error_response(str(exc), "KDP_SPEC_ERROR", status_code=400)
-    except Exception as exc:
-        return error_response(f"Generation failed: {exc}", "GENERATION_ERROR", status_code=500)
+    except Exception:
+        return error_response("Generation failed", "GENERATION_ERROR", status_code=500)
 
     try:
         interior_name = f"interior_{template_id}_{uuid.uuid4().hex[:8]}.pdf"
         cover_name = f"cover_{template_id}_{uuid.uuid4().hex[:8]}.pdf"
         interior_info = upload_file(result.interior_pdf, str(user_id), interior_name, "template_interior")
         cover_info = upload_file(result.cover_pdf, str(user_id), cover_name, "template_cover")
-    except Exception as exc:
-        return error_response(f"Upload failed: {exc}", "UPLOAD_ERROR", status_code=500)
+    except Exception:
+        return error_response("Upload failed", "UPLOAD_ERROR", status_code=500)
 
     preview_b64 = None
     try:

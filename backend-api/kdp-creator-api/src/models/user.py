@@ -1,7 +1,9 @@
 import os
+import urllib.error
+import urllib.request
 from functools import wraps
 
-from flask import request
+from flask import g, has_request_context, request
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -23,13 +25,15 @@ _MFA_EXEMPT_PATHS = frozenset(
         "/api/user/profile-sync",
         "/api/logout",
         "/api/validate-session",
+        "/api/session/restore",
     }
 )
 
 # Initialize Supabase client (resilient - won't crash if env vars missing)
 supabase = None
+_create_supabase_client = None
 try:
-    from supabase import create_client
+    from supabase import create_client as _create_supabase_client
 
     url = os.environ.get("SUPABASE_URL")
     key = (
@@ -38,7 +42,7 @@ try:
         or os.environ.get("SUPABASE_ANON_KEY")
     )
     if url and key:
-        supabase = create_client(url, key)
+        supabase = _create_supabase_client(url, key)
     else:
         print("Warning: SUPABASE_URL or key not set. Supabase client disabled.")
 except Exception as e:
@@ -57,6 +61,94 @@ def get_supabase_user(token):
         return None
 
 
+def bearer_token():
+    if not has_request_context():
+        return None
+    auth_header = request.headers.get("Authorization") or ""
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+        return token or None
+    return None
+
+
+def user_scoped_client(token=None):
+    """Anon-key PostgREST/storage client authenticated as the caller so RLS applies."""
+    access_token = token or bearer_token()
+    if not access_token:
+        return None
+    cacheable = has_request_context() and token is None
+    if cacheable:
+        cached = getattr(g, "_user_scoped_supabase", None)
+        if cached is not None:
+            return cached
+    url = os.environ.get("SUPABASE_URL")
+    anon = os.environ.get("SUPABASE_ANON_KEY")
+    if not url or not anon or _create_supabase_client is None:
+        return None
+    try:
+        client = _create_supabase_client(url, anon)
+        client.postgrest.auth(access_token)
+        try:
+            client.storage._client.session.headers["Authorization"] = f"Bearer {access_token}"
+        except Exception:
+            try:
+                client.storage._client.headers["Authorization"] = f"Bearer {access_token}"
+            except Exception:
+                pass
+        if cacheable:
+            g._user_scoped_supabase = client
+        return client
+    except Exception as client_error:
+        print(f"Warning: Failed to create user-scoped Supabase client: {client_error}")
+        return None
+
+
+def data_client():
+    """User JWT when present so RLS is a control; service role only off-request."""
+    scoped = user_scoped_client()
+    if scoped is not None:
+        return scoped
+    return supabase
+
+
+def revoke_supabase_session(access_token, scope="global"):
+    """Revoke refresh tokens. Prefer GoTrue admin, else the user logout endpoint."""
+    if not access_token:
+        raise RuntimeError("Missing access token")
+    if supabase is not None:
+        admin = getattr(supabase.auth, "admin", None)
+        sign_out = getattr(admin, "sign_out", None) if admin is not None else None
+        if callable(sign_out):
+            try:
+                return sign_out(access_token, scope)
+            except TypeError:
+                return sign_out(access_token, scope=scope)
+    url = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
+    api_key = (
+        os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("SUPABASE_SERVICE_KEY")
+        or os.environ.get("SUPABASE_ANON_KEY")
+        or ""
+    )
+    if not url or not api_key:
+        raise RuntimeError("Supabase is not configured")
+
+    req = urllib.request.Request(
+        f"{url}/auth/v1/logout?scope={scope}",
+        data=b"",
+        method="POST",
+    )
+    req.add_header("Authorization", f"Bearer {access_token}")
+    req.add_header("apikey", api_key)
+    req.add_header("Content-Type", "application/json")
+    try:
+        urllib.request.urlopen(req, timeout=10)
+    except urllib.error.HTTPError as http_error:
+        if http_error.code in (401, 404):
+            return None
+        raise
+
+
 def _mfa_max_age():
     try:
         return int(os.environ.get("JWT_ACCESS_TOKEN_EXPIRES", "86400"))
@@ -67,7 +159,7 @@ def _mfa_max_age():
 def _mfa_serializer():
     secret = os.environ.get("JWT_SECRET_KEY") or os.environ.get("SECRET_KEY")
     if not secret:
-        secret = "kdp-jwt-dev-secret"
+        raise RuntimeError("JWT_SECRET_KEY or SECRET_KEY is required to sign MFA tokens")
     return URLSafeTimedSerializer(str(secret), salt=MFA_SALT)
 
 
@@ -81,7 +173,7 @@ def verify_mfa_token(user_id, token):
     try:
         data = _mfa_serializer().loads(token, max_age=_mfa_max_age())
         return str(data.get("uid")) == str(user_id)
-    except (BadSignature, SignatureExpired, TypeError, ValueError):
+    except (BadSignature, SignatureExpired, TypeError, ValueError, RuntimeError):
         return False
 
 
@@ -179,10 +271,11 @@ def get_jwt_identity():
 class UserProfile:
     @staticmethod
     def get_by_id(user_id):
-        if not supabase:
+        client = data_client()
+        if not client:
             return None
         try:
-            res = supabase.table("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
+            res = client.table("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
             return res.data if res.data else None
         except Exception as profile_error:
             print(f"Failed to fetch user profile {user_id}: {profile_error}")

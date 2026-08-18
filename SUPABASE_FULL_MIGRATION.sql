@@ -170,6 +170,12 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'user_profiles' AND policyname = 'users_update_own_profile') THEN
         CREATE POLICY users_update_own_profile ON public.user_profiles FOR UPDATE USING (auth.uid() = id);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'user_profiles' AND policyname = 'users_insert_own_profile') THEN
+        CREATE POLICY users_insert_own_profile ON public.user_profiles FOR INSERT WITH CHECK (auth.uid() = id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'user_profiles' AND policyname = 'users_delete_own_profile') THEN
+        CREATE POLICY users_delete_own_profile ON public.user_profiles FOR DELETE USING (auth.uid() = id);
+    END IF;
 END $$;
 
 -- batch_jobs: users can only see/create/update their own jobs
@@ -224,6 +230,16 @@ BEGIN
         CREATE POLICY users_insert_own_events ON public.analytics_events FOR INSERT WITH CHECK (auth.uid() = user_id);
     END IF;
 END $$;
+
+-- rate_limit_events: shared limiter for Vercel isolates. No anon/authenticated policies.
+CREATE TABLE IF NOT EXISTS public.rate_limit_events (
+    id BIGSERIAL PRIMARY KEY,
+    key TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS rate_limit_events_key_created_at
+    ON public.rate_limit_events (key, created_at);
+ALTER TABLE public.rate_limit_events ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- 7. STORAGE BUCKET FOR CREATED FILES

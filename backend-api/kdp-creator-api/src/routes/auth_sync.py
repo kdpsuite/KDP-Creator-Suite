@@ -9,36 +9,41 @@ import jwt as pyjwt
 from flask import Blueprint, request
 from flask_jwt_extended import create_access_token
 
-from src.models.user import User, UserProfile, db, get_jwt_identity, get_supabase_user, jwt_required
+from src.models.user import (
+    User,
+    UserProfile,
+    db,
+    get_jwt_identity,
+    get_supabase_user,
+    jwt_required,
+    supabase,
+    user_scoped_client,
+)
+from src.utils.auth_cookies import read_refresh_cookie, with_refresh_cookie
 from src.utils.responses import error_response, success_response
 
 auth_sync_bp = Blueprint("auth_sync", __name__)
 
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", None)
-
 
 def verify_supabase_token(token: str) -> dict:
-    """Verify a Supabase JWT token and extract user information."""
+    """Verify a Supabase JWT. Signatures are always required."""
+    secret = os.environ.get("SUPABASE_JWT_SECRET")
+    if not secret:
+        print("Token verification failed: SUPABASE_JWT_SECRET is required")
+        return None
     try:
-        if SUPABASE_JWT_SECRET:
-            return pyjwt.decode(
-                token,
-                SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
-                audience="authenticated",
-            )
-        env = (os.environ.get("ENVIRONMENT") or "development").lower()
-        if env in ("production", "prod", "staging"):
-            print("Token verification failed: SUPABASE_JWT_SECRET is required in production")
-            return None
-        print("[WARNING] SUPABASE_JWT_SECRET unset — decoding JWT without signature verify (dev only)")
-        return pyjwt.decode(token, options={"verify_signature": False})
+        return pyjwt.decode(
+            token,
+            secret,
+            algorithms=["HS256"],
+            audience="authenticated",
+        )
     except Exception as token_error:
         print(f"Token verification failed: {token_error}")
         return None
 
 
-def _upsert_user_profile(user) -> dict:
+def _upsert_user_profile(user, access_token=None) -> dict:
     """Ensure a Supabase user has a user_profiles row."""
     user_id = str(user.id)
     profile = UserProfile.get_by_id(user_id)
@@ -61,12 +66,13 @@ def _upsert_user_profile(user) -> dict:
         "updated_at": datetime.utcnow().isoformat(),
     }
 
-    from src.models.user import supabase
-
-    if not supabase:
+    client = user_scoped_client(access_token) if access_token else None
+    if client is None:
+        client = supabase
+    if not client:
         return new_profile
 
-    res = supabase.table("user_profiles").insert(new_profile).execute()
+    res = client.table("user_profiles").insert(new_profile).execute()
     return res.data[0] if res.data else new_profile
 
 
@@ -75,6 +81,7 @@ def sync_session():
     """Sync a Supabase session across domains after frontend login."""
     data = request.get_json() or {}
     supabase_token = data.get("supabase_token")
+    refresh_token = data.get("refresh_token")
 
     if not supabase_token:
         return error_response("Missing supabase_token", "VALIDATION_ERROR", status_code=400)
@@ -84,8 +91,8 @@ def sync_session():
         return error_response("Invalid token", "AUTH_INVALID", status_code=401)
 
     try:
-        profile = _upsert_user_profile(user)
-        return success_response(
+        profile = _upsert_user_profile(user, supabase_token)
+        payload = success_response(
             {
                 "user_id": str(user.id),
                 "email": user.email,
@@ -94,12 +101,59 @@ def sync_session():
             },
             "Session synced successfully",
         )
-    except Exception as sync_error:
+        if refresh_token:
+            return with_refresh_cookie(payload, refresh_token)
+        return payload
+    except Exception:
         return error_response(
-            f"Session sync failed: {sync_error}",
+            "Session sync failed",
             "INTERNAL_ERROR",
             status_code=500,
         )
+
+
+@auth_sync_bp.route("/session/restore", methods=["POST"])
+def restore_session():
+    """Restore a session from the HttpOnly refresh cookie."""
+    refresh_token = read_refresh_cookie()
+    if not refresh_token:
+        return error_response("No session", "AUTH_MISSING", status_code=401)
+
+    if not supabase:
+        return error_response("Auth unavailable", "AUTH_UNAVAILABLE", status_code=503)
+
+    try:
+        result = supabase.auth.refresh_session(refresh_token)
+    except Exception:
+        return error_response("Invalid session", "AUTH_INVALID", status_code=401)
+
+    session = getattr(result, "session", None)
+    if not session or not getattr(session, "access_token", None):
+        return error_response("Invalid session", "AUTH_INVALID", status_code=401)
+
+    user = getattr(session, "user", None) or get_supabase_user(session.access_token)
+    if not user:
+        return error_response("Invalid session", "AUTH_INVALID", status_code=401)
+
+    try:
+        profile = _upsert_user_profile(user, session.access_token)
+    except Exception:
+        return error_response("Session restore failed", "INTERNAL_ERROR", status_code=500)
+
+    return with_refresh_cookie(
+        success_response(
+            {
+                "user_id": str(user.id),
+                "email": getattr(user, "email", None),
+                "access_token": session.access_token,
+                "refresh_token": session.refresh_token,
+                "valid": True,
+                "profile": UserProfile.to_dict(profile),
+            },
+            "Session restored",
+        ),
+        session.refresh_token,
+    )
 
 
 @auth_sync_bp.route("/validate-session", methods=["GET"])

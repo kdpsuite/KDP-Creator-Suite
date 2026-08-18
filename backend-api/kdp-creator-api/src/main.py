@@ -39,23 +39,20 @@ if _sentry_dsn:
 # ============================================================================
 REQUIRED_ENV_VARS = [
     "SUPABASE_URL",
+    "SECRET_KEY",
     "JWT_SECRET_KEY",
 ]
 
 missing_vars = [var for var in REQUIRED_ENV_VARS if not os.environ.get(var)]
 if missing_vars:
-    msg = f"Missing required environment variables: {', '.join(missing_vars)}"
-    if _IS_PRODUCTION:
-        raise RuntimeError(msg)
-    print(f"[WARNING] {msg}")
-    print("[WARNING] Please check your Vercel environment settings.")
+    raise RuntimeError(f"Missing required environment variables: {', '.join(missing_vars)}")
 
 # Log startup information
 print(f"[STARTUP] Environment: {os.environ.get('ENVIRONMENT', 'development')}")
 print(f"[STARTUP] Debug mode: {os.environ.get('DEBUG', 'False')}")
 print(f"[STARTUP] Supabase URL: {os.environ.get('SUPABASE_URL', 'NOT SET')}")
 
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from sqlalchemy import text
@@ -103,14 +100,10 @@ app = Flask(__name__)
 
 _secret_key = os.environ.get("SECRET_KEY")
 _jwt_secret = os.environ.get("JWT_SECRET_KEY")
-if _IS_PRODUCTION:
-    if not _secret_key:
-        raise RuntimeError("SECRET_KEY is required when ENVIRONMENT=production")
-    if not _jwt_secret:
-        raise RuntimeError("JWT_SECRET_KEY is required when ENVIRONMENT=production")
-else:
-    _secret_key = _secret_key or "kdp-creator-suite-dev-secret"
-    _jwt_secret = _jwt_secret or "kdp-jwt-dev-secret"
+if not _secret_key:
+    raise RuntimeError("SECRET_KEY is required")
+if not _jwt_secret:
+    raise RuntimeError("JWT_SECRET_KEY is required")
 
 app.config["SECRET_KEY"] = _secret_key
 app.config["JWT_SECRET_KEY"] = _jwt_secret
@@ -120,10 +113,14 @@ CORS(
     app,
     resources={r"/api/*": {"origins": _CORS_ORIGINS}},
     supports_credentials=True,
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-MFA-Token"],
     methods=["GET", "PUT", "POST", "PATCH", "DELETE", "OPTIONS"],
 )
 print(f"[STARTUP] CORS origins: {_CORS_ORIGINS}")
+
+
+_API_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+_HSTS = "max-age=31536000; includeSubDomains"
 
 
 @app.after_request
@@ -132,6 +129,10 @@ def security_headers(response):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Content-Security-Policy"] = _API_CSP
+    proto = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+    if _IS_PRODUCTION or request.is_secure or proto == "https":
+        response.headers["Strict-Transport-Security"] = _HSTS
     return response
 
 

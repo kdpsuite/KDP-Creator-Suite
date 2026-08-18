@@ -1,6 +1,11 @@
 import os
 import sys
 
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret")
+os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
+os.environ.setdefault("ENVIRONMENT", "development")
+
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))

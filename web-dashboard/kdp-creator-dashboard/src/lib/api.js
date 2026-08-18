@@ -26,12 +26,26 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   );
 }
 
+const memoryAuthStorage = {
+  _store: new Map(),
+  getItem(key) {
+    return this._store.has(key) ? this._store.get(key) : null;
+  },
+  setItem(key, value) {
+    this._store.set(key, String(value));
+  },
+  removeItem(key) {
+    this._store.delete(key);
+  },
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storage: memoryAuthStorage,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    storageKey: 'kdp-auth',
   },
   global: {
     headers: {
@@ -43,6 +57,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 60000,
+  withCredentials: true,
 });
 
 export function getMfaToken() {
@@ -235,7 +250,13 @@ export const authApi = {
     },
   }),
   getMe: () => api.get('/me'),
-  logout: () => supabase.auth.signOut(),
+  logout: async () => {
+    try {
+      await api.post('/logout');
+    } finally {
+      await supabase.auth.signOut({ scope: 'local' });
+    }
+  },
   requestPasswordReset: (email) => supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
   }),
@@ -248,7 +269,12 @@ export const totpApi = {
 };
 
 export const sessionApi = {
-  syncSession: (supabaseToken) => api.post('/sync-session', { supabase_token: supabaseToken }),
+  syncSession: (supabaseToken, refreshToken) =>
+    api.post('/sync-session', {
+      supabase_token: supabaseToken,
+      refresh_token: refreshToken,
+    }),
+  restoreSession: () => api.post('/session/restore'),
   validateSession: () => api.get('/validate-session'),
 };
 

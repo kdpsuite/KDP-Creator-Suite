@@ -7,7 +7,7 @@ const { getDashboardUrl, isMarketingReachable, getBaseUrl } = require('../helper
  */
 
 test.describe('Cross-Domain Session Persistence', () => {
-  test('should persist session tokens in localStorage after dashboard login', async ({
+  test('should persist session in an HttpOnly cookie, not localStorage', async ({
     page,
   }) => {
     await loginToDashboard(page);
@@ -16,13 +16,13 @@ test.describe('Cross-Domain Session Persistence', () => {
     const refresh = await page.evaluate(() =>
       localStorage.getItem('kdp_session_refresh')
     );
-    const userId = await page.evaluate(() =>
-      localStorage.getItem('kdp_session_user_id')
-    );
+    const cookies = await page.context().cookies();
+    const refreshCookie = cookies.find((cookie) => cookie.name === 'kdp_refresh');
 
-    expect(token).toBeTruthy();
-    expect(refresh).toBeTruthy();
-    expect(userId).toBeTruthy();
+    expect(token).toBeNull();
+    expect(refresh).toBeNull();
+    expect(refreshCookie).toBeTruthy();
+    expect(refreshCookie.httpOnly).toBe(true);
   });
 
   test('should remain authenticated after dashboard refresh', async ({ page }) => {
@@ -51,10 +51,11 @@ test.describe('Cross-Domain Session Persistence', () => {
 
     await page.goto(dashboardUrl, { waitUntil: 'networkidle' });
 
-    const token = await page.evaluate(() => localStorage.getItem('kdp_session_token'));
+    const cookies = await page.context().cookies();
+    const refreshCookie = cookies.find((cookie) => cookie.name === 'kdp_refresh');
     const loginForm = page.locator('input[type="email"]');
 
-    expect(token).toBeTruthy();
+    expect(refreshCookie).toBeTruthy();
     await expect(loginForm).not.toBeVisible({ timeout: 5000 });
   });
 });
