@@ -19,7 +19,11 @@ flutter pub get
 2. Run the application:
 
 To run the app with environment variables defined in an env.json file, follow the steps mentioned below:
-1. Through CLI
+1. Copy the example file and fill in local values (env.json is gitignored):
+    ```bash
+    cp env.json.example env.json
+    ```
+2. Through CLI
     ```bash
     flutter run --dart-define-from-file=env.json
     ```

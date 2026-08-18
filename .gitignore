@@ -59,3 +59,8 @@ cypress/screenshots/
 allure-results/
 allure-report/
 .env*
+
+# Flutter dart-define files (anon JWT + local secrets)
+mobile-app/env.json
+mobile-appold/env.json
+mobile-app/merged_project/env.json
