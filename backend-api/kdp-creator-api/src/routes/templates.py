@@ -31,7 +31,7 @@ def get_template_detail(template_id):
 def generate_template_product(template_id):
     from src.routes.subscription import enforce_conversion_quota, enforce_template_tier, record_conversion_usage
     from src.services.template_generator import generate_product
-    from src.storage import upload_file
+    from src.storage import StorageError, upload_file
 
     user_id = get_jwt_identity()
     quota_error = enforce_conversion_quota(user_id)
@@ -61,6 +61,8 @@ def generate_template_product(template_id):
         cover_name = f"cover_{template_id}_{uuid.uuid4().hex[:8]}.pdf"
         interior_info = upload_file(result.interior_pdf, str(user_id), interior_name, "template_interior")
         cover_info = upload_file(result.cover_pdf, str(user_id), cover_name, "template_cover")
+    except StorageError:
+        return error_response("File storage failed", "STORAGE_ERROR", status_code=500)
     except Exception:
         return error_response("Upload failed", "UPLOAD_ERROR", status_code=500)
 

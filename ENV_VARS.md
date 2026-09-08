@@ -26,10 +26,10 @@ This document describes all environment variables used by the KDP Creator Suite 
 - **Purpose:** Supabase anonymous/public key for client-side operations
 - **Notes:** This is the ANON key, not the service role key
 
-**`SUPABASE_SERVICE_KEY`** (Optional)
+**`SUPABASE_SERVICE_ROLE_KEY`** (Required — falls back to `SUPABASE_SERVICE_KEY`)
 - **Type:** String (API key)
-- **Purpose:** Supabase service role key for server-side operations
-- **Notes:** Only needed for admin operations; keep secret
+- **Purpose:** Supabase service role key for server-side operations, including every write to the `kdp-created-files` Storage bucket
+- **Notes:** Keep secret. Without it, `upload_file` fails closed and the coloring, KDP format, batch and template tools return `STORAGE_ERROR`. The anon key cannot substitute: bucket RLS keys writes on `auth.uid()`, which is null for anon.
 
 ### JWT Configuration
 

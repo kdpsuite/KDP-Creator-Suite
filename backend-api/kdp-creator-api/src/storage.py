@@ -2,24 +2,24 @@ import os
 import uuid
 from datetime import datetime
 
-from src.models.user import user_scoped_client
-
-# Initialize Supabase client (prefer service role for storage uploads; same chain as models/user.py)
+# Server-generated files are a trusted backend write, so storage always uses the
+# service role. The anon key cannot satisfy the bucket's RLS policies, which key
+# INSERT/SELECT on auth.uid(), and a user JWT is not attached to storage requests
+# by postgrest.auth(). No anon fallback: it can only ever 403.
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = (
-    os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
-    or os.environ.get("SUPABASE_SERVICE_KEY")
-    or os.environ.get("SUPABASE_ANON_KEY")
-)
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY")
 
 supabase = None
 try:
     from supabase import create_client
 
-    if SUPABASE_URL and SUPABASE_KEY:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
     else:
-        print("Warning: SUPABASE_URL and/or Supabase key environment variables not set. File uploads will be disabled.")
+        print(
+            "Warning: SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY environment "
+            "variables not set. File uploads will be disabled."
+        )
 except Exception as e:
     print(f"Warning: Failed to initialize Supabase client: {str(e)}")
     supabase = None
@@ -28,10 +28,11 @@ BUCKET_NAME = "kdp-created-files"
 SIGNED_URL_EXPIRY = 3600  # 1 hour in seconds
 
 
+class StorageError(Exception):
+    """Supabase Storage failure: missing configuration, denied write, or transport."""
+
+
 def _storage_client():
-    scoped = user_scoped_client()
-    if scoped is not None:
-        return scoped
     return supabase
 
 
@@ -49,10 +50,10 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
         dict with 'path', 'url', and 'signed_url' keys
     """
     client = _storage_client()
-    if not client:
-        raise Exception(
-            "Supabase is not configured. Please set SUPABASE_URL and "
-            "SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_ANON_KEY) environment variables."
+    if client is None:
+        raise StorageError(
+            "Supabase Storage is not configured. Please set SUPABASE_URL and "
+            "SUPABASE_SERVICE_ROLE_KEY environment variables."
         )
 
     try:
@@ -81,7 +82,7 @@ def upload_file(file_bytes: bytes, user_id: str, filename: str, file_type: str) 
             "file_size_bytes": len(file_bytes),
         }
     except Exception as e:
-        raise Exception(f"Failed to upload file to Supabase: {str(e)}")
+        raise StorageError(f"Failed to upload file to Supabase: {str(e)}") from e
 
 
 def delete_file(file_path: str) -> bool:
@@ -95,7 +96,7 @@ def delete_file(file_path: str) -> bool:
         True if successful, False otherwise
     """
     client = _storage_client()
-    if not client:
+    if client is None:
         return False
 
     try:

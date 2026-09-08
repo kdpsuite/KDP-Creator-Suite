@@ -27,7 +27,7 @@ from src.services.kdp_specs import (
     interior_page_size,
     interior_page_size_pts,
 )
-from src.storage import upload_file
+from src.storage import StorageError, upload_file
 from src.utils.logger import PerformanceTimer
 from src.utils.rate_limit import rate_limit_pdf_processing
 from src.utils.responses import error_response, success_response
@@ -229,6 +229,14 @@ def convert_to_coloring():
             )
         except ColoringParamError as exc:
             return error_response(str(exc), exc.code, status_code=400)
+        except StorageError as storage_error:
+            current_app.logger.error(f"Coloring upload failed: {str(storage_error)}")
+            record_pdf_analytics(
+                user_id,
+                "pdf_coloring_conversion",
+                {"status": "failed", "error": str(storage_error), "trim_size": trim_size},
+            )
+            return error_response("File storage failed", "STORAGE_ERROR", status_code=500)
         except Exception as e:
             current_app.logger.error(f"Coloring conversion failed: {str(e)}")
             record_pdf_analytics(
@@ -314,6 +322,14 @@ def format_kdp():
                     "trim_size": trim_size,
                 }
             )
+        except StorageError as storage_error:
+            current_app.logger.error(f"KDP formatting upload failed: {str(storage_error)}")
+            record_pdf_analytics(
+                user_id,
+                "kdp_formatting",
+                {"status": "failed", "error": str(storage_error)},
+            )
+            return error_response("File storage failed", "STORAGE_ERROR", status_code=500)
         except Exception as e:
             current_app.logger.error(f"KDP formatting failed: {str(e)}")
             record_pdf_analytics(
@@ -425,6 +441,19 @@ def batch_convert_coloring():
             )
         except ColoringParamError as exc:
             return error_response(str(exc), exc.code, status_code=400)
+        except StorageError as storage_error:
+            current_app.logger.error(f"Batch coloring upload failed: {str(storage_error)}")
+            record_pdf_analytics(
+                user_id,
+                "batch_coloring_conversion",
+                {
+                    "status": "failed",
+                    "error": str(storage_error),
+                    "file_count": len(file_keys),
+                    "trim_size": trim_size,
+                },
+            )
+            return error_response("File storage failed", "STORAGE_ERROR", status_code=500)
         except Exception as e:
             current_app.logger.error(f"Batch coloring conversion failed: {str(e)}")
             record_pdf_analytics(
