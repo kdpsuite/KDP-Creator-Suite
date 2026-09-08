@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import stripe
 from flask import Blueprint, request
@@ -188,6 +188,59 @@ def _set_tier_for_user(user_id, tier, stripe_customer_id=None):
     return _update_profile(user_id, fields)
 
 
+def _parse_timestamp(value):
+    """Parse a Supabase timestamptz into naive UTC. Returns None if unusable."""
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        raw = str(value).strip()
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+def _current_period_start():
+    now = datetime.utcnow()
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def apply_usage_window(profile):
+    """Zero the monthly counters when last_usage_reset predates this UTC month.
+
+    Reset is lazy: it happens on the next request that reads or writes usage,
+    so no scheduler is required. A missing/unparseable marker counts as stale
+    so legacy profiles get a marker on first touch.
+    """
+    if not profile:
+        return profile
+    last_reset = _parse_timestamp(profile.get("last_usage_reset"))
+    if last_reset is not None and last_reset >= _current_period_start():
+        return profile
+
+    fields = {
+        "conversions_this_month": 0,
+        "batch_operations_this_month": 0,
+        "last_usage_reset": datetime.utcnow().isoformat(),
+    }
+    if not _update_profile(profile.get("id"), fields):
+        # Keep serving the stored counters rather than handing out free quota
+        # on a write failure; the next request retries the reset.
+        return profile
+    return {**profile, **fields}
+
+
+def _profile_for_usage(user_id):
+    return apply_usage_window(UserProfile.get_by_id(user_id))
+
+
 def user_meets_tier(user_tier, required_tier):
     user_rank = TIER_RANK.get(user_tier or "free", 0)
     required_rank = TIER_RANK.get(required_tier or "free", 0)
@@ -217,7 +270,7 @@ def get_subscription_tiers():
 @jwt_required()
 def get_subscription_status():
     user_id = get_jwt_identity()
-    profile = UserProfile.get_by_id(user_id)
+    profile = _profile_for_usage(user_id)
     if not profile:
         tier_limits = SUBSCRIPTION_TIERS["free"]
         return success_response(
@@ -269,7 +322,7 @@ def get_subscription_status():
 
 
 def _tier_usage_for_user(user_id):
-    profile = UserProfile.get_by_id(user_id)
+    profile = _profile_for_usage(user_id)
     if not profile:
         return SUBSCRIPTION_TIERS["free"], 0, 0
     tier = profile.get("subscription_tier", "free")
@@ -312,7 +365,7 @@ def enforce_batch_quota(user_id):
 def record_conversion_usage(user_id, amount=1):
     if not supabase or amount < 1:
         return
-    profile = UserProfile.get_by_id(user_id)
+    profile = _profile_for_usage(user_id)
     if not profile:
         return
     current = profile.get("conversions_this_month", 0) or 0
@@ -330,7 +383,7 @@ def record_conversion_usage(user_id, amount=1):
 def record_batch_usage(user_id, amount=1):
     if not supabase or amount < 1:
         return
-    profile = UserProfile.get_by_id(user_id)
+    profile = _profile_for_usage(user_id)
     if not profile:
         return
     current = profile.get("batch_operations_this_month", 0) or 0

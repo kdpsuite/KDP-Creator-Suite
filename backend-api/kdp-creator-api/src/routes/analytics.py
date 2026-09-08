@@ -22,6 +22,7 @@ ALLOWED_EVENT_TYPES = {
     "user_registered",
     "subscription_upgraded",
     "support_ticket",
+    "client_error",
 }
 
 CONVERSION_EVENT_TYPES = {
