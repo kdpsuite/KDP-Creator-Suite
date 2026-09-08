@@ -16,6 +16,7 @@ pnpm-debug.log*
 .env
 .env.local
 .env.*.local
+supabasepat
 
 # OS-specific
 .DS_Store
