@@ -17,52 +17,50 @@ TIER_RANK = {
     "unlimited": 3,
 }
 
+# Only perks that code actually enforces belong in a tier.
+#
+# kdp_ready_export covers the trim/bleed/spine math in template_generator.py and
+# the /validate-kdp report. It ships on every tier, so it is advertised as
+# included rather than as an upgrade. premium_templates is gated for real by
+# enforce_template_tier against each template's tier_required.
 SUBSCRIPTION_TIERS = {
     "free": {
         "name": "Free",
         "monthly_conversions": 5,
         "batch_processing_limit": 1,
-        "watermark_free": False,
-        "priority_support": False,
-        "advanced_features": False,
-        "cloud_storage": False,
-        "kdp_integration": False,
+        "kdp_ready_export": True,
+        "premium_templates": False,
         "price": 0,
     },
     "pro": {
         "name": "Pro",
         "monthly_conversions": -1,
         "batch_processing_limit": 10,
-        "watermark_free": True,
-        "priority_support": True,
-        "advanced_features": True,
-        "cloud_storage": True,
-        "kdp_integration": True,
+        "kdp_ready_export": True,
+        "premium_templates": True,
         "price": 19.99,
     },
     "studio": {
         "name": "Studio",
         "monthly_conversions": -1,
         "batch_processing_limit": -1,
-        "watermark_free": True,
-        "priority_support": True,
-        "advanced_features": True,
-        "cloud_storage": True,
-        "kdp_integration": True,
+        "kdp_ready_export": True,
+        "premium_templates": True,
         "price": 49.99,
     },
     "unlimited": {
         "name": "Admin",
         "monthly_conversions": -1,
         "batch_processing_limit": -1,
-        "watermark_free": True,
-        "priority_support": True,
-        "advanced_features": True,
-        "cloud_storage": True,
-        "kdp_integration": True,
+        "kdp_ready_export": True,
+        "premium_templates": True,
         "price": 0,
     },
 }
+
+# Sold or advertised, but no code enforces them yet. Served separately so the
+# public payload cannot imply a paid plan already unlocks them.
+ROADMAP_PERKS = ("watermark_free", "priority_support", "cloud_storage")
 
 PUBLIC_TIERS = ("free", "pro", "studio")
 PAID_TIERS = ("pro", "studio")
@@ -432,7 +430,13 @@ def enforce_template_tier(user_id, required_tier):
 
 @subscription_bp.route("/tiers", methods=["GET"])
 def get_subscription_tiers():
-    public = {key: SUBSCRIPTION_TIERS[key] for key in PUBLIC_TIERS}
+    public = {
+        key: {
+            **SUBSCRIPTION_TIERS[key],
+            "roadmap": list(ROADMAP_PERKS) if key in PAID_TIERS else [],
+        }
+        for key in PUBLIC_TIERS
+    }
     return success_response({"tiers": public})
 
 

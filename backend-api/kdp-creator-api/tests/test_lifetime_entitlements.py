@@ -38,6 +38,24 @@ def test_never_grants_above_studio():
     assert set(subscription.LIFETIME_PLANS.values()) <= {"pro", "studio"}
 
 
+def test_tiers_only_advertise_perks_the_code_enforces():
+    enforced = {"kdp_ready_export", "premium_templates"}
+    unenforced = {"watermark_free", "priority_support", "cloud_storage", "advanced_features", "kdp_integration"}
+    for tier in subscription.SUBSCRIPTION_TIERS.values():
+        assert unenforced.isdisjoint(tier.keys())
+        assert enforced <= tier.keys()
+
+
+def test_premium_templates_matches_the_template_catalog():
+    from src.data.templates import STARTER_TEMPLATES
+
+    gated = {t.get("tier_required") for t in STARTER_TEMPLATES} - {"free"}
+    # A premium_templates perk is only honest while some template is gated.
+    assert gated, "no template requires a paid tier, so premium_templates would be fake"
+    assert subscription.SUBSCRIPTION_TIERS["free"]["premium_templates"] is False
+    assert subscription.SUBSCRIPTION_TIERS["pro"]["premium_templates"] is True
+
+
 def test_existing_account_is_granted_directly(monkeypatch):
     grants = []
     parked = []
