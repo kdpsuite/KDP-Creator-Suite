@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import datetime, timezone
 
@@ -65,6 +66,17 @@ SUBSCRIPTION_TIERS = {
 
 PUBLIC_TIERS = ("free", "pro", "studio")
 PAID_TIERS = ("pro", "studio")
+
+# Founding-campaign plans sold as one-time Payment Links. The value is the
+# entitlement actually granted, which is capped at studio: the team, API, and
+# white-label perks advertised above studio do not exist in the product yet and
+# are fulfilled by hand, not by this map.
+LIFETIME_PLANS = {
+    "starter_founding": "pro",
+    "professional_founding": "studio",
+    "enterprise_founding": "studio",
+    "founders_circle": "studio",
+}
 
 # One Stripe Product per plan. Lookup keys work in both test and live if the
 # catalog is cloned with the same keys (Stripe catalog modeling best practice).
@@ -188,6 +200,164 @@ def _set_tier_for_user(user_id, tier, stripe_customer_id=None):
     return _update_profile(user_id, fields)
 
 
+def _lifetime_price_map():
+    """price_id -> plan_id, from STRIPE_LIFETIME_PRICE_MAP (JSON object)."""
+    raw = os.environ.get("STRIPE_LIFETIME_PRICE_MAP")
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError as exc:
+        print(f"[subscription] STRIPE_LIFETIME_PRICE_MAP is not valid JSON: {exc}")
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    return {str(key): str(value) for key, value in parsed.items()}
+
+
+def _session_price_ids(session):
+    line_items = (session.get("line_items") or {}).get("data")
+    if not line_items:
+        stripe_client = _get_stripe()
+        session_id = session.get("id")
+        if not stripe_client or not session_id:
+            return []
+        try:
+            result = stripe_client.checkout.Session.list_line_items(session_id, limit=10)
+            line_items = result.get("data") if isinstance(result, dict) else getattr(result, "data", None)
+        except Exception as exc:
+            print(f"[subscription] failed to load line items for {session_id}: {exc}")
+            return []
+
+    price_ids = []
+    for item in line_items or []:
+        price = _as_dict(_as_dict(item).get("price"))
+        if price.get("id"):
+            price_ids.append(price["id"])
+    return price_ids
+
+
+def _lifetime_plan_for_session(session):
+    """Resolve (plan_id, tier) for a one-time purchase, or (None, None)."""
+    metadata = session.get("metadata") or {}
+    declared = (metadata.get("plan") or metadata.get("plan_id") or metadata.get("tier") or "").strip()
+    if declared in LIFETIME_PLANS:
+        return declared, LIFETIME_PLANS[declared]
+
+    price_map = _lifetime_price_map()
+    if price_map:
+        for price_id in _session_price_ids(session):
+            plan_id = price_map.get(price_id)
+            if plan_id in LIFETIME_PLANS:
+                return plan_id, LIFETIME_PLANS[plan_id]
+    return None, None
+
+
+def _profile_by_email(email):
+    if not supabase or not email:
+        return None
+    try:
+        res = supabase.table("user_profiles").select("id,email,subscription_tier").ilike("email", email).limit(1).execute()
+    except Exception as exc:
+        print(f"[subscription] profile lookup by email failed: {exc}")
+        return None
+    rows = res.data or []
+    return rows[0] if rows else None
+
+
+def _grant_lifetime(user_id, plan_id, tier, stripe_customer_id=None):
+    if tier not in SUBSCRIPTION_TIERS:
+        return False
+    fields = {
+        "subscription_tier": tier,
+        "lifetime_plan": plan_id,
+        "lifetime_granted_at": datetime.utcnow().isoformat(),
+    }
+    if stripe_customer_id:
+        fields["stripe_customer_id"] = stripe_customer_id
+    if _update_profile(user_id, fields):
+        return True
+    # The buyer paid. If the lifetime bookkeeping columns are missing, still
+    # hand over the tier rather than leaving a paid account on free.
+    print(f"[subscription] lifetime grant degraded to tier-only for {user_id}")
+    return _set_tier_for_user(user_id, tier, stripe_customer_id=stripe_customer_id)
+
+
+def _store_pending_entitlement(session, email, plan_id, tier, stripe_customer_id=None):
+    if not supabase:
+        print(f'[subscription] no supabase client; cannot park entitlement for {email}')
+        return False
+    row = {
+        "email": email,
+        "tier": tier,
+        "plan_id": plan_id,
+        "stripe_session_id": session.get("id"),
+        "stripe_customer_id": stripe_customer_id,
+        "amount_total": session.get("amount_total"),
+        "currency": session.get("currency"),
+    }
+    try:
+        supabase.table("pending_entitlements").upsert(row, on_conflict="stripe_session_id").execute()
+        print(f'[subscription] parked {plan_id} entitlement for {email} ({session.get("id")})')
+        return True
+    except Exception as exc:
+        print(f'[subscription] failed to park entitlement for {email}: {exc}')
+        return False
+
+
+def claim_pending_entitlement(profile):
+    """Grant a lifetime plan bought before this account existed."""
+    if not supabase or not profile:
+        return profile
+    if profile.get("lifetime_plan") or (profile.get("subscription_tier") or "free") != "free":
+        return profile
+    email = (profile.get("email") or "").strip().lower()
+    if not email:
+        return profile
+
+    try:
+        res = (
+            supabase.table("pending_entitlements")
+            .select("*")
+            .ilike("email", email)
+            .is_("claimed_at", "null")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        print(f"[subscription] pending entitlement lookup failed: {exc}")
+        return profile
+
+    rows = res.data or []
+    if not rows:
+        return profile
+
+    pending = rows[0]
+    tier = pending.get("tier")
+    if tier not in SUBSCRIPTION_TIERS:
+        print(f'[subscription] pending entitlement {pending.get("id")} has unknown tier {tier}')
+        return profile
+
+    user_id = profile.get("id")
+    if not _grant_lifetime(user_id, pending.get("plan_id"), tier, pending.get("stripe_customer_id")):
+        return profile
+
+    try:
+        supabase.table("pending_entitlements").update(
+            {"claimed_at": datetime.utcnow().isoformat(), "claimed_by": str(user_id)}
+        ).eq("id", pending["id"]).execute()
+    except Exception as exc:
+        # The grant already landed; the free-tier guard above stops a re-grant.
+        print(f'[subscription] failed to mark entitlement {pending.get("id")} claimed: {exc}')
+
+    return {
+        **profile,
+        "subscription_tier": tier,
+        "lifetime_plan": pending.get("plan_id"),
+    }
+
+
 def _parse_timestamp(value):
     """Parse a Supabase timestamptz into naive UTC. Returns None if unusable."""
     if not value:
@@ -238,7 +408,7 @@ def apply_usage_window(profile):
 
 
 def _profile_for_usage(user_id):
-    return apply_usage_window(UserProfile.get_by_id(user_id))
+    return apply_usage_window(claim_pending_entitlement(UserProfile.get_by_id(user_id)))
 
 
 def user_meets_tier(user_tier, required_tier):
@@ -531,11 +701,45 @@ def create_billing_portal():
         return error_response("Failed to open billing portal.", "PORTAL_ERROR", status_code=500)
 
 
+def _handle_lifetime_checkout(session, user_id, customer_id):
+    """One-time founding purchase, usually from a Payment Link with no account."""
+    if (session.get("payment_status") or "").lower() not in ("paid", "no_payment_required"):
+        return
+
+    plan_id, tier = _lifetime_plan_for_session(session)
+    if not tier:
+        print(
+            f'[subscription] one-time checkout {session.get("id")} matched no lifetime plan; '
+            "set metadata.plan on the Payment Link or fill STRIPE_LIFETIME_PRICE_MAP"
+        )
+        return
+
+    email = ((session.get("customer_details") or {}).get("email") or session.get("customer_email") or "").strip().lower()
+
+    if not user_id and email:
+        existing = _profile_by_email(email)
+        user_id = existing.get("id") if existing else None
+
+    if user_id:
+        _grant_lifetime(user_id, plan_id, tier, customer_id)
+        return
+
+    if not email:
+        print(f'[subscription] one-time checkout {session.get("id")} has no user and no email; grant manually')
+        return
+
+    _store_pending_entitlement(session, email, plan_id, tier, customer_id)
+
+
 def _handle_checkout_completed(session):
     session = _as_dict(session)
     user_id = session.get("client_reference_id") or (session.get("metadata") or {}).get("user_id")
     tier = (session.get("metadata") or {}).get("tier")
     customer_id = session.get("customer")
+
+    if not session.get("subscription"):
+        _handle_lifetime_checkout(session, user_id, customer_id)
+        return
 
     if not tier and session.get("subscription"):
         stripe_client = _get_stripe()
