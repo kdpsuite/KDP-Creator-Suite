@@ -206,7 +206,7 @@ def admin_emails():
 
 
 def user_is_admin(user, profile=None):
-    """Deny by default. Allow only ADMIN_EMAILS or an explicit admin role."""
+    """Deny by default. Never trust client-writable user_metadata."""
     user_email = ""
     if user is not None:
         user_email = (getattr(user, "email", None) or "").strip().lower()
@@ -215,14 +215,20 @@ def user_is_admin(user, profile=None):
     if user_email and user_email in admin_emails():
         return True
 
-    role = None
-    if profile:
-        role = profile.get("role")
+    # Prefer server-controlled app_metadata.role (service-role only).
     if user is not None:
         app_metadata = getattr(user, "app_metadata", None) or {}
-        user_metadata = getattr(user, "user_metadata", None) or {}
-        role = role or app_metadata.get("role") or user_metadata.get("role")
-    return isinstance(role, str) and role.strip().lower() == "admin"
+        app_role = app_metadata.get("role")
+        if isinstance(app_role, str) and app_role.strip().lower() == "admin":
+            return True
+
+    # Profile.role is only safe if RLS/API prevent users from updating it.
+    if profile:
+        profile_role = profile.get("role")
+        if isinstance(profile_role, str) and profile_role.strip().lower() == "admin":
+            return True
+
+    return False
 
 
 def jwt_required():

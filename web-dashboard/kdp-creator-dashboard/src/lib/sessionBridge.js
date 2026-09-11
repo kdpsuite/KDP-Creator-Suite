@@ -4,6 +4,9 @@ const LEGACY_TOKEN_KEY = 'kdp_session_token';
 const LEGACY_REFRESH_KEY = 'kdp_session_refresh';
 const LEGACY_USER_ID_KEY = 'kdp_session_user_id';
 
+/** In-memory access token when restore returns access_token only (HttpOnly refresh). */
+let memoryAccessToken = null;
+
 function cookieDomain() {
   if (typeof window === 'undefined') return null;
   const host = window.location.hostname;
@@ -26,6 +29,7 @@ function clearLegacyCookie(name) {
 }
 
 function clearLegacyJsTokens() {
+  memoryAccessToken = null;
   try {
     localStorage.removeItem(LEGACY_TOKEN_KEY);
     localStorage.removeItem(LEGACY_REFRESH_KEY);
@@ -51,17 +55,31 @@ async function restoreFromHttpOnlyCookie() {
   try {
     const response = await sessionApi.restoreSession();
     const payload = response?.data?.data;
-    if (!payload?.access_token || !payload?.refresh_token) return null;
-    const { error } = await supabase.auth.setSession({
-      access_token: payload.access_token,
-      refresh_token: payload.refresh_token,
-    });
-    if (error) {
-      console.warn('[SESSION_BRIDGE] Failed to restore session:', error.message);
-      return null;
+    if (!payload?.access_token) return null;
+
+    // Prefer full setSession when server still returns refresh (compat).
+    if (payload.refresh_token) {
+      const { error } = await supabase.auth.setSession({
+        access_token: payload.access_token,
+        refresh_token: payload.refresh_token,
+      });
+      if (error) {
+        console.warn('[SESSION_BRIDGE] Failed to restore session:', error.message);
+        return null;
+      }
+      const { data: { session } } = await supabase.auth.getSession();
+      return session;
     }
-    const { data: { session } } = await supabase.auth.getSession();
-    return session;
+
+    // Access-token only: keep in memory; refresh via cookie restore on expiry.
+    memoryAccessToken = payload.access_token;
+    return {
+      access_token: payload.access_token,
+      refresh_token: null,
+      user: payload.email
+        ? { id: payload.user_id, email: payload.email }
+        : { id: payload.user_id },
+    };
   } catch {
     return null;
   }
@@ -76,13 +94,14 @@ export const sessionBridge = {
       session = await restoreFromHttpOnlyCookie();
     }
 
-    if (session) {
+    if (session?.refresh_token) {
       await persistRefreshCookie(session);
     }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, nextSession) => {
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && nextSession) {
+          memoryAccessToken = nextSession.access_token ?? null;
           await persistRefreshCookie(nextSession);
           if (event === 'SIGNED_IN') {
             window.dispatchEvent(new CustomEvent('kdp_session_changed', {
@@ -102,11 +121,16 @@ export const sessionBridge = {
   },
 
   getToken: async () => {
+    if (memoryAccessToken) return memoryAccessToken;
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token ?? null;
+    if (session?.access_token) return session.access_token;
+
+    const restored = await restoreFromHttpOnlyCookie();
+    return restored?.access_token ?? memoryAccessToken ?? null;
   },
 
   isAuthenticated: async () => {
+    if (memoryAccessToken) return true;
     const { data: { session } } = await supabase.auth.getSession();
     return Boolean(session);
   },

@@ -7,7 +7,6 @@ from datetime import datetime
 
 import jwt as pyjwt
 from flask import Blueprint, request
-from flask_jwt_extended import create_access_token
 
 from src.models.user import (
     User,
@@ -140,13 +139,14 @@ def restore_session():
     except Exception:
         return error_response("Session restore failed", "INTERNAL_ERROR", status_code=500)
 
+    # Refresh token stays HttpOnly-only; do not echo it in JSON.
     return with_refresh_cookie(
         success_response(
             {
                 "user_id": str(user.id),
                 "email": getattr(user, "email", None),
                 "access_token": session.access_token,
-                "refresh_token": session.refresh_token,
+                "expires_in": getattr(session, "expires_in", None),
                 "valid": True,
                 "profile": UserProfile.to_dict(profile),
             },
@@ -185,12 +185,9 @@ def sync_supabase_user():
         return error_response("Request body is required", "VALIDATION_ERROR", status_code=400)
 
     supabase_token = data.get("supabase_token")
-    email = data.get("email")
-    username = data.get("username")
-
-    if not supabase_token or not email:
+    if not supabase_token:
         return error_response(
-            "supabase_token and email are required",
+            "supabase_token is required",
             "VALIDATION_ERROR",
             status_code=400,
         )
@@ -200,16 +197,20 @@ def sync_supabase_user():
         return error_response("Invalid Supabase token", "AUTH_INVALID", status_code=401)
 
     supabase_uuid = token_payload.get("sub")
-    if not supabase_uuid:
+    # Email/username must come from verified claims, never the request body.
+    email = (token_payload.get("email") or "").strip().lower()
+    if not supabase_uuid or not email:
         return error_response("Invalid token payload", "AUTH_INVALID", status_code=401)
+
+    meta = token_payload.get("user_metadata") or {}
+    username = meta.get("username") if isinstance(meta, dict) else None
 
     existing_user = User.query.filter_by(supabase_uuid=supabase_uuid).first()
     if existing_user:
-        access_token = create_access_token(identity=str(existing_user.id))
         return success_response(
             {
                 "user": existing_user.to_dict(),
-                "access_token": access_token,
+                "synced": True,
             },
             "User already synced",
         )
@@ -218,16 +219,15 @@ def sync_supabase_user():
     if existing_email:
         existing_email.supabase_uuid = supabase_uuid
         db.session.commit()
-        access_token = create_access_token(identity=str(existing_email.id))
         return success_response(
             {
                 "user": existing_email.to_dict(),
-                "access_token": access_token,
+                "synced": True,
             },
             "User linked to existing account",
         )
 
-    if not username:
+    if not username or not isinstance(username, str):
         username = email.split("@")[0]
 
     base_username = username
@@ -246,11 +246,10 @@ def sync_supabase_user():
     db.session.add(new_user)
     db.session.commit()
 
-    access_token = create_access_token(identity=str(new_user.id))
     return success_response(
         {
             "user": new_user.to_dict(),
-            "access_token": access_token,
+            "synced": True,
         },
         "User synced successfully",
         status_code=201,
