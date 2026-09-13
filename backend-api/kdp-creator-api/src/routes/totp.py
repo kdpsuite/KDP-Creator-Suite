@@ -1,11 +1,16 @@
 import pyotp
 from flask import Blueprint, request
 
-from src.models.user import UserProfile, data_client, get_jwt_identity, issue_mfa_token, jwt_required
+from src.models.user import UserProfile, get_jwt_identity, issue_mfa_token, jwt_required, supabase
 from src.utils.rate_limit import rate_limit_totp_validate
 from src.utils.responses import error_response, success_response
 
 totp_bp = Blueprint("totp", __name__)
+
+
+def _privileged_profiles():
+    """TOTP secret columns are not writable/readable via authenticated JWT grants."""
+    return supabase
 
 
 @totp_bp.route("/2fa/setup", methods=["POST"])
@@ -18,8 +23,12 @@ def setup_2fa():
     if profile.get("totp_enabled"):
         return error_response("2FA is already enabled", "ALREADY_EXISTS", status_code=400)
 
+    client = _privileged_profiles()
+    if not client:
+        return error_response("Service unavailable", "SERVICE_UNAVAILABLE", status_code=503)
+
     secret = pyotp.random_base32()
-    data_client().table("user_profiles").update({"totp_secret": secret}).eq("id", user_id).execute()
+    client.table("user_profiles").update({"totp_secret": secret}).eq("id", user_id).execute()
 
     totp = pyotp.TOTP(secret)
     provisioning_uri = totp.provisioning_uri(
@@ -40,7 +49,7 @@ def setup_2fa():
 @jwt_required()
 def verify_2fa():
     user_id = get_jwt_identity()
-    profile = UserProfile.get_by_id(user_id)
+    profile = UserProfile.get_by_id(user_id, include_secrets=True)
     if not profile:
         return error_response("User not found", "NOT_FOUND", status_code=404)
 
@@ -55,7 +64,10 @@ def verify_2fa():
 
     totp = pyotp.TOTP(secret)
     if totp.verify(code, valid_window=1):
-        data_client().table("user_profiles").update({"totp_enabled": True}).eq("id", user_id).execute()
+        client = _privileged_profiles()
+        if not client:
+            return error_response("Service unavailable", "SERVICE_UNAVAILABLE", status_code=503)
+        client.table("user_profiles").update({"totp_enabled": True}).eq("id", user_id).execute()
         return success_response(
             {"mfa_token": issue_mfa_token(user_id)},
             "2FA has been enabled successfully",
@@ -68,7 +80,7 @@ def verify_2fa():
 @jwt_required()
 def disable_2fa():
     user_id = get_jwt_identity()
-    profile = UserProfile.get_by_id(user_id)
+    profile = UserProfile.get_by_id(user_id, include_secrets=True)
     if not profile:
         return error_response("User not found", "NOT_FOUND", status_code=404)
 
@@ -82,7 +94,10 @@ def disable_2fa():
 
     totp = pyotp.TOTP(profile.get("totp_secret"))
     if totp.verify(code, valid_window=1):
-        data_client().table("user_profiles").update(
+        client = _privileged_profiles()
+        if not client:
+            return error_response("Service unavailable", "SERVICE_UNAVAILABLE", status_code=503)
+        client.table("user_profiles").update(
             {
                 "totp_enabled": False,
                 "totp_secret": None,
@@ -99,7 +114,7 @@ def disable_2fa():
 def validate_2fa_login():
     """Validate TOTP for the authenticated user after password login."""
     user_id = get_jwt_identity()
-    profile = UserProfile.get_by_id(user_id)
+    profile = UserProfile.get_by_id(user_id, include_secrets=True)
     if not profile or not profile.get("totp_enabled"):
         return error_response("Invalid request", "VALIDATION_ERROR", status_code=400)
 
@@ -108,7 +123,11 @@ def validate_2fa_login():
     if not code:
         return error_response("Verification code is required", "VALIDATION_ERROR", status_code=400)
 
-    totp = pyotp.TOTP(profile.get("totp_secret"))
+    secret = profile.get("totp_secret")
+    if not secret:
+        return error_response("Invalid request", "VALIDATION_ERROR", status_code=400)
+
+    totp = pyotp.TOTP(secret)
     if totp.verify(code, valid_window=1):
         return success_response(
             {

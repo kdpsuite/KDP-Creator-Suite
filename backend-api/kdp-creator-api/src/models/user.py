@@ -275,13 +275,32 @@ def get_jwt_identity():
 
 
 class UserProfile:
+    # totp_secret / reset_token* are revoked from authenticated SELECT — use service role.
+    _PUBLIC_COLUMNS = (
+        "id,username,email,role,subscription_tier,totp_enabled,"
+        "conversions_this_month,batch_operations_this_month,last_usage_reset,created_at,"
+        "full_name,avatar_url,bio,subscription_status,subscription_plan,is_active"
+    )
+
     @staticmethod
-    def get_by_id(user_id):
-        client = data_client()
+    def get_by_id(user_id, *, include_secrets=False):
+        """Load profile. Secrets require service role (column grants deny JWT clients)."""
+        if include_secrets:
+            client = supabase
+            columns = "*"
+        else:
+            client = data_client() or supabase
+            columns = UserProfile._PUBLIC_COLUMNS
         if not client:
             return None
         try:
-            res = client.table("user_profiles").select("*").eq("id", user_id).maybe_single().execute()
+            res = (
+                client.table("user_profiles")
+                .select(columns)
+                .eq("id", user_id)
+                .maybe_single()
+                .execute()
+            )
             return res.data if res.data else None
         except Exception as profile_error:
             print(f"Failed to fetch user profile {user_id}: {profile_error}")
