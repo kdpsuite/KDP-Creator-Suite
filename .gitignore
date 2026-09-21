@@ -34,6 +34,8 @@ Thumbs.db
 mobile-app/commandlinetools-linux-11076708_latest.zip
 __pycache__/
 *.pyc
+.venv/
+venv/
 .vercel
 
 # Test reports & artifacts (keep tests/ source tracked)
