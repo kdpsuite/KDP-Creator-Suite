@@ -1,0 +1,137 @@
+[
+  {
+    "file": "lineart_black_on_white.png",
+    "tool": "coloring",
+    "purpose": "Happy-path outlines; both engines should keep lines"
+  },
+  {
+    "file": "lineart_thin_hairlines.png",
+    "tool": "coloring",
+    "purpose": "Enhanced morphology may drop <5px components"
+  },
+  {
+    "file": "lineart_white_on_black.png",
+    "tool": "coloring",
+    "purpose": "Inverted art \u2192 mostly-black page under dark-as-line"
+  },
+  {
+    "file": "filled_cartoon.png",
+    "tool": "coloring",
+    "purpose": "Filled regions become black blobs"
+  },
+  {
+    "file": "photo_gradient.png",
+    "tool": "coloring",
+    "purpose": "Soft tones; legacy threshold 127 lottery"
+  },
+  {
+    "file": "low_contrast_gray.png",
+    "tool": "coloring",
+    "purpose": "Values near 127"
+  },
+  {
+    "file": "high_contrast_hard.png",
+    "tool": "coloring",
+    "purpose": "Already B&W; should stay clean"
+  },
+  {
+    "file": "rgba_on_transparent.png",
+    "tool": "coloring",
+    "purpose": "Legacy black halo vs enhanced white flatten"
+  },
+  {
+    "file": "palette_p_mode.png",
+    "tool": "coloring",
+    "purpose": "Indexed PNG mode P"
+  },
+  {
+    "file": "grayscale_L.png",
+    "tool": "coloring",
+    "purpose": "Grayscale mode L"
+  },
+  {
+    "file": "jpeg_artifacts.jpg",
+    "tool": "coloring",
+    "purpose": "JPEG compression noise as false edges"
+  },
+  {
+    "file": "saturated_primaries.jpg",
+    "tool": "coloring",
+    "purpose": "Color \u2192 gray conversion"
+  },
+  {
+    "file": "aspect_landscape.png",
+    "tool": "coloring",
+    "purpose": "16:9 letterbox bars"
+  },
+  {
+    "file": "aspect_portrait_tall.png",
+    "tool": "coloring",
+    "purpose": "9:16 side bars"
+  },
+  {
+    "file": "aspect_square.png",
+    "tool": "coloring",
+    "purpose": "Square vs portrait trim"
+  },
+  {
+    "file": "aspect_exact_6x9.png",
+    "tool": "coloring",
+    "purpose": "2:3 should fill 6x9"
+  },
+  {
+    "file": "edge_markers.png",
+    "tool": "coloring",
+    "purpose": "Corner/center ticks for bleed vs trim"
+  },
+  {
+    "file": "dark_scene.png",
+    "tool": "coloring",
+    "purpose": "Mostly dark with light lines"
+  },
+  {
+    "file": "speckle_noise.png",
+    "tool": "coloring",
+    "purpose": "Salt-pepper vs edge=strong"
+  },
+  {
+    "file": "mandala_dense.png",
+    "tool": "coloring",
+    "purpose": "detail_level low vs high"
+  },
+  {
+    "file": "text_geometry.png",
+    "tool": "coloring",
+    "purpose": "Letters + concentric circles measurable"
+  },
+  {
+    "file": "tiny_32.png",
+    "tool": "coloring",
+    "purpose": "Extreme upscale"
+  },
+  {
+    "file": "pdf_1page_letter.pdf",
+    "tool": "format-kdp",
+    "purpose": "8.5x11 1 page \u2192 pad to 24 even"
+  },
+  {
+    "file": "pdf_1page_6x9.pdf",
+    "tool": "format-kdp",
+    "purpose": "Already 6x9"
+  },
+  {
+    "file": "pdf_3page_odd.pdf",
+    "tool": "format-kdp",
+    "purpose": "Odd count + min pages"
+  },
+  {
+    "file": "pdf_landscape.pdf",
+    "tool": "format-kdp",
+    "purpose": "Landscape source on portrait trim"
+  },
+  {
+    "file": "pdf_mixed_page_sizes.pdf",
+    "tool": "format-kdp",
+    "purpose": "Per-page fit"
+  }
+]
